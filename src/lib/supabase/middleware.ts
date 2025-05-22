@@ -90,8 +90,32 @@ export async function updateSession(request: NextRequest) {
     user?.id || "No user"
   );
 
-  // Add route protection logic as per the guide if desired (example shown in guide)
-  // For now, just focusing on session refresh.
+  const { pathname } = request.nextUrl;
+
+  // Define protected paths
+  const protectedPaths = ["/learn"]; // Add other paths like '/account', '/settings' as needed
+
+  // If no user and trying to access a protected path
+  if (!user && protectedPaths.some((path) => pathname.startsWith(path))) {
+    console.log(
+      `[AUTH_DEBUG] [middleware/updateSession] No user, trying to access protected path: ${pathname}. Redirecting to /auth/signin.`
+    );
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/signin";
+    // Optionally, add a redirect query parameter to return to the originally requested page after login
+    // url.searchParams.set('redirect_to', pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // If user is logged in and tries to access auth pages (e.g., /auth/signin, /auth/signup)
+  // an enhancement could be to redirect them to a dashboard or /learn page.
+  // Example (optional):
+  // if (user && (pathname.startsWith('/auth/signin') || pathname.startsWith('/auth/signup'))) {
+  //   console.log(`[AUTH_DEBUG] [middleware/updateSession] User logged in, trying to access ${pathname}. Redirecting to /learn.`);
+  //   const url = request.nextUrl.clone();
+  //   url.pathname = '/learn';
+  //   return NextResponse.redirect(url);
+  // }
 
   return response; // Return the potentially modified response
 }

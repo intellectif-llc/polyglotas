@@ -172,7 +172,7 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-4">
-      <h1 className="text-5xl font-bold mb-12 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+      <h1 className="text-center text-5xl font-bold mb-12 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
         Welcome to Polyglotas
       </h1>
 
