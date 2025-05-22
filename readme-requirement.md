@@ -1,0 +1,697 @@
+# Application Requirements: Polyglotas - Multilingual Language Learning SaaS
+
+## 1. Overview 🎯
+
+The primary goal is to build a **Polyglotas** web application, a Software as a Service (SaaS) platform offering tiered subscription plans for accessing comprehensive language learning features. Key functionalities include user authentication, multilingual content delivery (lessons, phrases), interactive pronunciation practice with AI-driven assessment, AI-powered chat exercises, and subscription management.
+
+The application will utilize **Supabase** for backend services (database, authentication) and **Stripe** for payment processing and subscription management. The frontend will be built with **Next.js**.
+
+The core free offering will grant users access to the **first lesson of a language course** to experience the platform. Paid subscriptions will unlock full access to all lessons and premium features.
+
+## 2. Core Features ✨
+
+### 2.1. User Authentication & Management (Supabase Auth)
+
+- **Social Sign-Up/Sign-In:**
+  - Users must be able to sign up and sign in using social identity providers (e.g., Google, GitHub, Facebook). This will be the primary authentication method.
+  - Authentication will be centralized using Supabase Auth. Google sign in has been set up on google console and the authorized URIs that has been set are: http://localhost:3000/auth/callback and also the one provided by supabase.
+- **Account Management Page (`/account`):**
+  - Authenticated users must have a dedicated account page.
+  - **Profile Information:** Users should be able to view and potentially update their full name. Email updates are managed via Supabase Auth.
+  - **Language Preferences:** Users can set their native language and current target learning language(s).
+  - **Subscription Management (via Stripe Customer Portal):**
+    - View current subscription plan (e.g., Standard, Premium), status, and billing cycle.
+    - Ability to upgrade, downgrade, or cancel their subscription.
+    - View billing history.
+- **Session Management:** Secure and persistent user sessions using Supabase Auth helpers.
+
+### 2.2. Subscription Plans & Access Control
+
+- **Dynamic Pricing Page (`/pricing`):**
+  - Display available subscription plans (e.g., Free, Standard, Premium) with their respective features and pricing (monthly/yearly).
+  - Products and prices are managed in Stripe and synced to the Supabase database.
+  - Allow users to toggle between monthly and yearly billing intervals if available.
+- **Tiered Access:**
+  - **Free Tier:** Grants access to the first lesson of any language course.
+  - **Paid Tiers (e.g., Standard, Premium):** Grant access to all lessons and potentially other premium features. Feature differentiation will be based on the `subscription_tier` in the user's profile.
+- **Stripe Integration for Subscriptions:**
+  - **Stripe Checkout:** Redirect users to Stripe Checkout to subscribe to a paid plan. Handle success/failure scenarios.
+  - **Stripe Customer Portal:** Integrate for subscription self-management.
+  - **Stripe Webhooks:** Implement a secure webhook endpoint to sync data (products, prices, subscriptions, customers, invoices) between Stripe and Supabase. Key events include:
+    - `product.created`, `product.updated`
+    - `price.created`, `price.updated`
+    - `customer.created`, `customer.updated`
+    - `checkout.session.completed`
+    - `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
+    - `invoice.paid`, `invoice.payment_failed`
+    - Webhook signatures must be verified.
+
+### 2.3. Language Learning Core Functionality (Polyglotas)
+
+- **Multilingual Content Delivery:**
+  - All learning content (units, lessons, phrases, chat prompts) will be available in multiple languages.
+  - Users will interact with content primarily in their `current_target_language_code`.
+  - Translations of phrases into the user's `native_language_code` (or other languages) will be available.
+- **Learning Dashboard (`/learn` or `/dashboard`):**
+  - Display user stats (e.g., points, current streak).
+  - "Continue learning" feature to resume from the last point.
+  - Browse language courses, units, and lessons.
+  - Visual progress tracking (units, lessons, phrases).
+- **Lesson & Phrase Practice (`/learn/lesson/[lessonId]`):**
+  - Display lesson phrases in the target language, with optional translations.
+  - Play pre-recorded audio for phrases (target language).
+  - **Pronunciation Practice:**
+    - Users record their pronunciation of phrases.
+    - Integrate with **Azure Speech Services** for speech-to-text and detailed pronunciation assessment (accuracy, fluency, completeness, prosody, word/phoneme level feedback).
+    - Display visual feedback on pronunciation.
+  - Other exercise types (e.g., unscramble, dictation) can be incorporated.
+- **Targeted Word Practice (`/learn/practice-words`):**
+  - Users can review and practice words/phrases where they previously had pronunciation difficulties.
+- **Interactive Chat (`/learn/lesson/[lessonId]/chat`):**
+  - Lesson-specific chat scenarios with an AI.
+  - Users interact (text or voice) in their target language.
+  - AI responses generated by an **LLM (e.g., Gemini)**.
+  - AI voice responses generated using **ElevenLabs Text-to-Speech**.
+  - Conversation history is saved.
+- **On-Demand Translation (Utility):**
+  - Provide a utility to translate ad-hoc text snippets using **Azure Translate** for learning support.
+
+## 3. Data Model (Supabase PostgreSQL) 🐘
+
+The database will store user data, subscription information, and all multilingual learning content. Row Level Security (RLS) policies must be implemented for data security.
+
+Key tables include:
+
+- **`languages`**: Stores supported language codes and names.
+- **`persons`**: Basic individual information.
+- **`student_profiles`**: Central user table. Includes `person_id`, `native_language_code`, `current_target_language_code`, `subscription_tier` (ENUM: 'free', 'standard', 'premium', etc.), `stripe_customer_id`, `default_payment_method_details` (JSONB for display), `billing_address` (JSONB), points, streak.
+  - A trigger (`handle_new_user`) will create a profile from `auth.users`.
+- **`student_target_languages`**: Links students to all languages they are learning.
+- **Stripe-related Tables (synced via webhooks):**
+  - **`products`**: Defines service tiers (e.g., Standard, Premium) and links to `stripe_product_id`.
+  - **`prices`**: Defines specific prices for products (monthly/yearly, currency) and links to `stripe_price_id`.
+  - **`student_subscriptions`**: Tracks individual student subscriptions to specific `prices`, including `stripe_subscription_id`, status, current period, etc.
+  - **`invoices`**: (Recommended) Stores key invoice details from Stripe for billing history.
+- **Content Structure Tables (Language-Agnostic Cores):**
+  - **`units`**: (level, unit_order)
+  - **`lessons`**: (unit_id, lesson_order, grammar_focus, total_phrases)
+  - **`learning_outcomes`**: (lesson_id)
+  - **`vocabulary_phrases`**: (lesson_id, phrase_order, concept_description)
+  - **`conversation_starters`**: (lesson_id)
+- **Content Translations Tables (Language-Specific Content):**
+  - **`unit_translations`**: (unit_id, language_code, unit_title, description)
+  - **`lesson_translations`**: (lesson_id, language_code, lesson_title)
+  - **`learning_outcome_translations`**: (outcome_id, language_code, outcome_text)
+  - **`phrase_versions`**: (phrase_id, language_code, phrase_text, audio_url)
+  - **`conversation_starter_translations`**: (starter_id, language_code, starter_text)
+- **User Progress & Interaction Tables (with language context):**
+  - **`speech_attempts`**: (student_id, lesson_id, phrase_id, `language_code`, attempt_number, reference_text, recognized_text, scores, phonetic_data).
+  - **`user_word_pronunciation`**: (student_id, word_text, `language_code`, scores, stats).
+  - **`user_lesson_progress`**: (student_id, lesson_id, status, phrases_completed).
+  - **`user_phrase_progress`**: (student*id, lesson_id, phrase_id, status, best_scores). Consider adding `language_code` if progress on the \_same phrase concept* needs to be distinct per language.
+  - **`user_points_log`**: (student_id, points, reason, related_ids, `related_word_language_code`).
+- **Chat Functionality Tables (with language context):**
+  - **`lesson_chat_conversations`**: (student_id, lesson_id, `language_code`).
+  - **`conversation_messages`**: (conversation_id, sender_type, message_order, message_text, `message_language_code`, feedback_text, `feedback_language_code`, azure_pronunciation_data for user voice input).
+  - **`conversation_prompt_status`**: (conversation_id, prompt_id).
+
+## 4. API Endpoints (Next.js API Routes) ↔️
+
+Backend logic will be implemented as Next.js API Routes, secured using Supabase Auth and RLS.
+
+- **Authentication:** Handled by Supabase Auth client libraries and redirect flows.
+- **Stripe Webhooks:** A single endpoint (`/api/stripe/webhooks`) to securely receive and process all Stripe events.
+- **Content Delivery:**
+  - `GET /api/languages`: List available languages.
+  - `GET /api/content/units?level=A1&lang={target_lang}`: Fetch units for a level in the target language.
+  - `GET /api/content/units/[unitId]/lessons?lang={target_lang}`: Fetch lessons for a unit.
+  - `GET /api/content/lessons/[lessonId]?lang={target_lang}&native_lang={native_lang}`: Fetch lesson details, phrases (in target lang), and translations (in native lang).
+- **Learning & Practice:**
+  - `GET /api/speech/token`: Generate Azure Speech Services client token.
+  - `POST /api/speech/attempt`: Save speech attempt (audio upload to Supabase Storage, assessment via Azure). Requires `phrase_id`, `language_code`.
+  - `GET /api/users/me/practice-words?lang={target_lang}`: Fetch user's practice words in target language.
+  - `POST /api/users/me/practice-words/review`: Update practice word status.
+- **User Profile & Progress:**
+  - `GET /api/users/me/profile`: Fetch current user's profile including language preferences, subscription status, points, streak.
+  - `PUT /api/users/me/profile`: Update user profile (name, language preferences).
+  - `GET /api/users/me/progress/lessons`: Fetch overall lesson progress.
+  - `GET /api/users/me/continue-learning`: Get data for "continue learning" feature.
+- **Chat Activity:**
+  - `GET /api/lessons/[lessonId]/chat-prompts?lang={target_lang}`: Fetch chat prompts for a lesson in the target language.
+  - `POST /api/lessons/[lessonId]/chat/conversations?lang={target_lang}`: Start or get existing chat conversation for a lesson in a specific language.
+  - `GET /api/chat/conversations/[conversationId]/messages`: Get messages for a conversation.
+  - `POST /api/chat/conversations/[conversationId]/messages`: Post user message (text/audio) or get AI response. Handles LLM interaction and ElevenLabs TTS.
+- **Utilities:**
+  - `POST /api/translate`: Translate ad-hoc text using Azure Translate (request includes text and target language).
+  - Internal endpoint/mechanism for batch-generating phrase audio using ElevenLabs and uploading to Supabase Storage.
+
+## 5. Third-Party Integrations 🛠️
+
+- **Supabase:** Database (PostgreSQL), Authentication, Storage (for audio files), Edge Functions (potentially for webhook processing or secure backend logic).
+- **Stripe:** Payments (Checkout), Subscription Management (Customer Portal, Subscriptions API), Webhooks.
+- **Azure Speech Services:** Speech-to-text, pronunciation assessment.
+- **Azure Translate:** Text translation.
+- **ElevenLabs:** Text-to-speech for pre-recorded phrases and AI chat responses.
+- **LLM (e.g., Google Gemini API):** For AI-powered chat conversations.
+
+## 6. Technology Stack 💻
+
+- **Framework:** Next.js (latest stable version, App Router)
+- **Language:** TypeScript
+- **Backend & Database:** Supabase
+- **Styling:** Tailwind CSS
+- **State Management (Frontend):** React Query (TanStack Query) for server state; Zustand or React Context for minimal global client state.
+- **Payment Processing:** Stripe
+- **Speech & Translation AI:** Azure AI Services
+- **Voice Generation AI:** ElevenLabs
+- **Conversational AI:** LLM (e.g., Gemini)
+
+## 7. Non-Functional Requirements ⚙️
+
+- **Security:** Secure environment variables, webhook signature verification, strict RLS, input validation, protection against common web vulnerabilities.
+- **User Experience:** Clean, modern, responsive UI. Clear feedback (loading, success, error states). Intuitive navigation.
+- **Performance:** Fast page loads, responsive interactions, optimized database queries.
+- **Scalability:** Design to handle a growing user base and content library.
+- **Maintainability:** Clean, well-documented, modular code.
+
+## 8. Development Practices & Deployment 🚀
+
+- **Version Control:** Git (e.g., GitHub/GitLab) with a clear branching strategy.
+- **Code Quality:** ESLint, Prettier, TypeScript strict mode.
+- **Testing:** Unit and integration tests (e.g., Vitest/Jest, React Testing Library). Consider E2E tests (e.g., Playwright) for critical flows.
+- **Local Development Environment:**
+  - Utilize Docker for running a local Supabase instance (via Supabase CLI `supabase start`). This provides an isolated and consistent development database. (Alternatively, Supabase Cloud can be used during development if Docker is not preferred, but local instance via Docker is recommended for isolation.)
+  - Stripe CLI for testing webhooks locally.
+- **Deployment:** Vercel is recommended for Next.js applications.
+- **Environment Variables:** All API keys, Supabase URLs/keys, Stripe keys, webhook secrets must be managed via environment variables.
+
+## 9. UI Flow Highlights 🌊
+
+- **Public:** Pricing page. Sign-in prompts if trying to subscribe without being logged in.
+- **Auth:** Social sign-in/sign-up flow.
+- **Authenticated:**
+  - Dashboard: Overview, course/unit/lesson navigation, progress.
+  - Lesson View: Phrase display, audio, recording, feedback.
+  - Chat View: Interactive conversation with AI.
+  - Account Page: Profile, language preferences, subscription management (redirect to Stripe Customer Portal).
+- **Navigation:** Consistent navbar with relevant links based on auth state.
+
+-- ENUM for Levels (Provided by you)
+CREATE TYPE level_enum AS ENUM ('A1', 'A2', 'B1', 'B2', 'C1');
+
+-- ENUM for Message Sender (Provided by you)
+CREATE TYPE sender_type_enum AS ENUM ('user', 'ai');
+
+CREATE TYPE subscription_tier_enum AS ENUM ('free', 'starer','pro');
+
+-- NEW ENUM for Price Types (used in `prices` table)
+CREATE TYPE price_type_enum AS ENUM ('recurring', 'one_time');
+
+-- NEW ENUM for Price Billing Intervals (used in `prices` table)
+CREATE TYPE price_billing_interval_enum AS ENUM ('day', 'week', 'month', 'year');
+
+-- NEW ENUM for Subscription Statuses (used in `student_subscriptions` table)
+CREATE TYPE subscription_status_enum AS ENUM (
+'trialing',
+'active',
+'past_due',
+'unpaid',
+'canceled',
+'incomplete',
+'incomplete_expired',
+'paused'
+);
+
+-- NEW ENUM for Invoice Statuses (used in `invoices` table)
+CREATE TYPE invoice_status_enum AS ENUM (
+'draft',
+'open',
+'paid',
+'void',
+'uncollectible'
+);
+
+CREATE TYPE status_enum AS ENUM (
+'pending_verification', -- Account created, but awaiting initial verification (e.g., email confirmation)
+'active', -- Account is active and in good standing; user can access the platform based on their subscription tier
+'suspended', -- Account access has been temporarily or permanently revoked by an administrator
+'deactivated' -- Account has been deactivated, either by the user or due to other reasons (e.g., end of a deletion grace period)
+);
+
+-- Table to store supported languages
+CREATE TABLE languages (
+language_code CHAR(5) PRIMARY KEY, -- BCP 47 language codes (e.g., 'en', 'es', 'en-US', 'fr-CA')
+language_name VARCHAR(100) NOT NULL UNIQUE,
+created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE languages IS 'Stores all supported languages for content and UI.';
+COMMENT ON COLUMN languages.language_code IS 'BCP 47 language code, e.g., ''en'', ''es'', ''en-US''.';
+COMMENT ON COLUMN languages.language_name IS 'Human-readable name of the language.';
+
+-- Persons Table
+CREATE TABLE persons (
+person_id BIGSERIAL PRIMARY KEY,
+first_name VARCHAR(255) NOT NULL,
+last_name VARCHAR(255) NULL,
+phone VARCHAR(50) NOT NULL,
+email VARCHAR(255) NULL UNIQUE,
+sub VARCHAR(255) NULL UNIQUE, -- Auth provider subject claim
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE persons IS 'Stores basic information about individuals.';
+
+-- Student Profiles Table (Updated)
+CREATE TABLE student_profiles (
+student_id BIGINT PRIMARY KEY REFERENCES persons(person_id) ON DELETE CASCADE,
+discount NUMERIC(5,2) NULL,
+status status_enum NOT NULL, -- Ensure status_enum is defined by you
+current_streak_days INTEGER NOT NULL DEFAULT 0,
+last_streak_date DATE NULL,
+subscription_tier subscription_tier_enum NOT NULL DEFAULT 'free',
+points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
+native_language_code CHAR(5) REFERENCES languages(language_code) NULL,
+current_target_language_code CHAR(5) REFERENCES languages(language_code) NULL,
+
+    -- Stripe-related columns integrated directly
+    stripe_customer_id VARCHAR(255) UNIQUE NULL,
+    default_payment_method_details JSONB NULL, -- For display: e.g., {"brand": "visa", "last4": "4242", "exp_month": 12, "exp_year": 2025}
+    billing_address JSONB NULL, -- e.g., {"line1": "...", "city": "...", "postal_code": "...", "country": "..."}
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+
+);
+
+COMMENT ON TABLE student_profiles IS 'Stores student-specific academic, subscription, and payment-related information.';
+COMMENT ON COLUMN student_profiles.native_language_code IS 'The native language of the student.';
+COMMENT ON COLUMN student_profiles.current_target_language_code IS 'The language the student is currently actively learning/using.';
+COMMENT ON COLUMN student_profiles.subscription_tier IS 'The current subscription tier of the student, e.g., free, standard, pro.';
+COMMENT ON COLUMN student_profiles.stripe_customer_id IS 'Stripe Customer ID for this student. Created when user initiates first payment.';
+COMMENT ON COLUMN student_profiles.default_payment_method_details IS 'Non-sensitive, displayable details of the default payment method from Stripe.';
+COMMENT ON COLUMN student_profiles.billing_address IS 'Billing address details, often collected by Stripe and stored for reference.';
+COMMENT ON COLUMN student_profiles.status IS 'Overall account status of the student on the platform (e.g., active, suspended, email_unverified). Define status_enum separately.';
+
+-- Student Target Languages Table
+CREATE TABLE student_target_languages (
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code) ON DELETE CASCADE,
+added_at TIMESTAMPTZ DEFAULT NOW(),
+PRIMARY KEY (student_id, language_code)
+);
+
+COMMENT ON TABLE student_target_languages IS 'Stores all languages a student intends to learn or has learned.';
+
+-- Units Table
+CREATE TABLE units (
+unit_id SERIAL PRIMARY KEY,
+level level_enum NOT NULL,
+unit_order INT NOT NULL,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (level, unit_order)
+);
+
+COMMENT ON TABLE units IS 'Groups lessons by level and defines their order. Title and description are in unit_translations.';
+
+-- Lessons Table
+CREATE TABLE lessons (
+lesson_id SERIAL PRIMARY KEY,
+unit_id INT NOT NULL REFERENCES units(unit_id) ON DELETE CASCADE,
+lesson_order INT NOT NULL,
+grammar_focus TEXT[] NOT NULL,
+total_phrases INT NOT NULL DEFAULT 0,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (unit_id, lesson_order)
+);
+
+COMMENT ON TABLE lessons IS 'Main lessons table. Title is in lesson_translations.';
+COMMENT ON COLUMN lessons.grammar_focus IS 'Array of grammar topic keys. Actual display text might be handled by i18n on client or a dedicated translation table if complex.';
+
+-- Learning Outcomes Table
+CREATE TABLE learning_outcomes (
+outcome_id SERIAL PRIMARY KEY,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE learning_outcomes IS 'Defines learning outcomes for lessons. Actual outcome text is in learning_outcome_translations.';
+
+-- Vocabulary Phrases Table (Represents phrase concept)
+CREATE TABLE vocabulary_phrases (
+id SERIAL PRIMARY KEY,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+phrase_order INT NOT NULL,
+concept_description TEXT NULL,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (lesson_id, phrase_order)
+);
+
+COMMENT ON TABLE vocabulary_phrases IS 'Stores language-agnostic phrase concepts, ordered within a lesson. Actual text/audio are in phrase_versions.';
+COMMENT ON COLUMN vocabulary_phrases.concept_description IS 'Optional language-neutral description of the phrase''s meaning or concept.';
+
+-- Conversation Starters Table
+CREATE TABLE conversation_starters (
+id SERIAL PRIMARY KEY,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE conversation_starters IS 'Stores conversation starter concepts for lessons. Actual text is in conversation_starter_translations.';
+
+-- Unit Translations Table
+CREATE TABLE unit_translations (
+unit_translation_id SERIAL PRIMARY KEY,
+unit_id INT NOT NULL REFERENCES units(unit_id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code) ON DELETE CASCADE,
+unit_title VARCHAR(255) NOT NULL,
+description TEXT,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (unit_id, language_code)
+);
+
+COMMENT ON TABLE unit_translations IS 'Stores language-specific titles and descriptions for units.';
+
+-- Lesson Translations Table
+CREATE TABLE lesson_translations (
+lesson_translation_id SERIAL PRIMARY KEY,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code) ON DELETE CASCADE,
+lesson_title VARCHAR(255) NOT NULL,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (lesson_id, language_code)
+);
+
+COMMENT ON TABLE lesson_translations IS 'Stores language-specific titles for lessons.';
+
+-- Learning Outcome Translations Table
+CREATE TABLE learning_outcome_translations (
+outcome_translation_id SERIAL PRIMARY KEY,
+outcome_id INT NOT NULL REFERENCES learning_outcomes(outcome_id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code) ON DELETE CASCADE,
+outcome_text TEXT NOT NULL CHECK (outcome_text <> ''),
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (outcome_id, language_code)
+);
+
+COMMENT ON TABLE learning_outcome_translations IS 'Stores language-specific text for learning outcomes.';
+
+-- Phrase Versions Table (Translations for Vocabulary Phrases)
+CREATE TABLE phrase_versions (
+phrase_version_id SERIAL PRIMARY KEY,
+phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code) ON DELETE CASCADE,
+phrase_text TEXT NOT NULL,
+audio_url VARCHAR(255),
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (phrase_id, language_code)
+);
+
+COMMENT ON TABLE phrase_versions IS 'Stores language-specific text and audio for vocabulary phrases.';
+
+-- Conversation Starter Translations Table
+CREATE TABLE conversation_starter_translations (
+starter_translation_id SERIAL PRIMARY KEY,
+starter_id INT NOT NULL REFERENCES conversation_starters(id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code) ON DELETE CASCADE,
+starter_text TEXT NOT NULL,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (starter_id, language_code)
+);
+
+COMMENT ON TABLE conversation_starter_translations IS 'Stores language-specific text for conversation starters.';
+
+-- Speech Attempts Table
+CREATE TABLE speech_attempts (
+attempt_id SERIAL PRIMARY KEY,
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code),
+attempt_number INT NOT NULL,
+reference_text TEXT NOT NULL,
+recognized_text TEXT NULL,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+accuracy_score NUMERIC(5,2) CHECK (accuracy_score BETWEEN 0 AND 100),
+fluency_score NUMERIC(5,2) CHECK (fluency_score BETWEEN 0 AND 100),
+completeness_score NUMERIC(5,2) CHECK (completeness_score BETWEEN 0 AND 100),
+pronunciation_score NUMERIC(5,2) CHECK (pronunciation_score BETWEEN 0 AND 100),
+prosody_score NUMERIC(5,2) CHECK (prosody_score BETWEEN 0 AND 100),
+phonetic_data JSONB,
+CONSTRAINT speech_attempts_student_lesson_phrase_lang_attempt_key UNIQUE (student_id, lesson_id, phrase_id, language_code, attempt_number)
+);
+
+COMMENT ON TABLE speech_attempts IS 'Stores records of student speech attempts for specific phrases and languages.';
+COMMENT ON COLUMN speech_attempts.phrase_id IS 'References the language-agnostic phrase concept in vocabulary_phrases.';
+COMMENT ON COLUMN speech_attempts.language_code IS 'The language of the phrase version (from phrase_versions) that was attempted.';
+COMMENT ON COLUMN speech_attempts.reference_text IS 'The canonical text of the phrase in the attempted language, sourced from phrase_versions.';
+
+-- User Word Pronunciation Table
+CREATE TABLE user_word_pronunciation (
+id SERIAL PRIMARY KEY,
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+word_text VARCHAR(100) NOT NULL,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code),
+total_attempts INT DEFAULT 0,
+error_count INT DEFAULT 0,
+sum_accuracy_score NUMERIC DEFAULT 0,
+average_accuracy_score NUMERIC(5, 2) DEFAULT 0,
+last_accuracy_score NUMERIC(5,2),
+last_error_type VARCHAR(50),
+last_attempt_at TIMESTAMPTZ,
+needs_practice BOOLEAN DEFAULT FALSE,
+last_reviewed_at TIMESTAMPTZ,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (student_id, word_text, language_code)
+);
+
+COMMENT ON TABLE user_word_pronunciation IS 'Tracks student''s pronunciation performance for individual words in specific languages.';
+COMMENT ON COLUMN user_word_pronunciation.language_code IS 'The language of the word_text being tracked.';
+
+-- User Lesson Progress Table
+CREATE TABLE user_lesson_progress (
+progress_id SERIAL PRIMARY KEY,
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+started_at TIMESTAMPTZ DEFAULT NOW(),
+completed_at TIMESTAMPTZ,
+chat_activity_engaged_at TIMESTAMPTZ NULL,
+is_completed BOOLEAN DEFAULT FALSE,
+phrases_completed INT DEFAULT 0,
+last_progress_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (student_id, lesson_id)
+);
+
+COMMENT ON TABLE user_lesson_progress IS 'Tracks student progress at the lesson level.';
+COMMENT ON COLUMN user_lesson_progress.chat_activity_engaged_at IS 'Timestamp when the student first sent a message in the end-of-lesson chat activity for this lesson for any language.';
+COMMENT ON COLUMN user_lesson_progress.is_completed IS 'Flag indicating full lesson completion. Criteria may involve completing phrases in a target language and chat engagement.';
+
+-- User Phrase Progress Table
+CREATE TABLE user_phrase_progress (
+phrase_progress_id SERIAL PRIMARY KEY,
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
+-- language_code CHAR(5) REFERENCES languages(language_code), -- Add if tracking phrase progress per language explicitly for the SAME phrase concept
+pronunciation_attempts INT DEFAULT 0,
+pronunciation_last_attempt_at TIMESTAMPTZ,
+best_accuracy_score NUMERIC(5,2) CHECK (best_accuracy_score BETWEEN 0 AND 100),
+best_fluency_score NUMERIC(5,2) CHECK (best_fluency_score BETWEEN 0 AND 100),
+best_completeness_score NUMERIC(5,2) CHECK (best_completeness_score BETWEEN 0 AND 100),
+best_pronunciation_score NUMERIC(5,2) CHECK (best_pronunciation_score BETWEEN 0 AND 100),
+best_prosody_score NUMERIC(5,2) CHECK (best_prosody_score BETWEEN 0 AND 100),
+is_completed BOOLEAN DEFAULT FALSE,
+last_progress_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (student_id, lesson_id, phrase_id) -- If language_code is added, include it in UNIQUE constraint
+);
+
+COMMENT ON TABLE user_phrase_progress IS 'Tracks student progress on individual phrases within lessons. Assumes context of student''s current target language for the session unless language_code is added.';
+COMMENT ON COLUMN user_phrase_progress.phrase_id IS 'References the language-agnostic phrase concept.';
+COMMENT ON COLUMN user_phrase_progress.is_completed IS 'Indicates overall completion status for this phrase in the context of the current learning session/language.';
+
+-- User Points Log Table
+CREATE TABLE user_points_log (
+log_id SERIAL PRIMARY KEY,
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+points_awarded INT NOT NULL,
+reason_code VARCHAR(50) NOT NULL,
+related_lesson_id INT NULL REFERENCES lessons(lesson_id),
+related_phrase_id INT NULL REFERENCES vocabulary_phrases(id),
+related_word_text VARCHAR(100) NULL,
+related_word_language_code CHAR(5) NULL REFERENCES languages(language_code),
+notes TEXT,
+created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE user_points_log IS 'Logs points awarded or spent by students, with language context for word-related points.';
+COMMENT ON COLUMN user_points_log.related_phrase_id IS 'References the language-agnostic phrase concept, if applicable.';
+COMMENT ON COLUMN user_points_log.related_word_language_code IS 'Language of related_word_text, if applicable.';
+
+-- Lesson Chat Conversations Table
+CREATE TABLE lesson_chat_conversations (
+conversation_id BIGSERIAL PRIMARY KEY,
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code),
+created_at TIMESTAMPTZ DEFAULT NOW(),
+all_prompts_addressed_at TIMESTAMPTZ NULL,
+last_message_at TIMESTAMPTZ NULL
+);
+
+CREATE INDEX idx_lesson_chat_conversations_student_lesson_lang ON lesson_chat_conversations (student_id, lesson_id, language_code);
+COMMENT ON TABLE lesson_chat_conversations IS 'Tracks each distinct conversation attempt for a lesson, specific to a language.';
+COMMENT ON COLUMN lesson_chat_conversations.language_code IS 'The language in which this conversation took place.';
+
+-- Conversation Messages Table
+CREATE TABLE conversation_messages (
+message_id BIGSERIAL PRIMARY KEY,
+conversation_id BIGINT NOT NULL REFERENCES lesson_chat_conversations(conversation_id) ON DELETE CASCADE,
+sender_type sender_type_enum NOT NULL,
+message_order INT NOT NULL,
+message_text TEXT NOT NULL,
+message_language_code CHAR(5) NOT NULL REFERENCES languages(language_code),
+created_at TIMESTAMPTZ DEFAULT NOW(),
+related_prompt_id INT NULL REFERENCES conversation_starters(id) ON DELETE SET NULL,
+feedback_text TEXT NULL,
+feedback_language_code CHAR(5) NULL REFERENCES languages(language_code),
+azure_pronunciation_data JSONB NULL,
+UNIQUE (conversation_id, message_order)
+);
+
+CREATE INDEX idx_conversation_messages_conversation ON conversation_messages (conversation_id);
+CREATE INDEX idx_conversation_messages_prompt ON conversation_messages (related_prompt_id);
+COMMENT ON TABLE conversation_messages IS 'Stores messages within a conversation, with language context for message and feedback.';
+COMMENT ON COLUMN conversation_messages.message_language_code IS 'Language of the message_text (user utterance or AI response).';
+COMMENT ON COLUMN conversation_messages.feedback_language_code IS 'Language of the feedback_text, if different from message_language_code.';
+COMMENT ON COLUMN conversation_messages.related_prompt_id IS 'Links to the language-agnostic conversation starter concept.';
+
+-- Conversation Prompt Status Table
+CREATE TABLE conversation_prompt_status (
+prompt_status_id BIGSERIAL PRIMARY KEY,
+conversation_id BIGINT NOT NULL REFERENCES lesson_chat_conversations(conversation_id) ON DELETE CASCADE,
+prompt_id INT NOT NULL REFERENCES conversation_starters(id) ON DELETE CASCADE,
+first_addressed_message_id BIGINT NULL REFERENCES conversation_messages(message_id) ON DELETE SET NULL,
+addressed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+UNIQUE (conversation_id, prompt_id)
+);
+
+CREATE INDEX idx_conversation_prompt_status_convo_prompt ON conversation_prompt_status (conversation_id, prompt_id);
+COMMENT ON TABLE conversation_prompt_status IS 'Tracks addressed status of conversation starter concepts within a specific language-bound conversation attempt.';
+COMMENT ON COLUMN conversation_prompt_status.prompt_id IS 'References the language-agnostic conversation starter concept.';
+
+CREATE TABLE products (
+id SERIAL PRIMARY KEY, -- Your internal ID for the product
+stripe_product_id VARCHAR(255) UNIQUE NOT NULL, -- Stripe's Product ID (prod_xxxxxx)
+active BOOLEAN DEFAULT TRUE,
+name VARCHAR(255) NOT NULL, -- e.g., "Standard Tier", "Premium Tier"
+description TEXT NULL,
+tier_key subscription_tier_enum NULL, -- Optional: Maps this product to your internal tier ENUM
+metadata JSONB NULL, -- Any additional custom data from Stripe or for your use
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_products_stripe_product_id ON products(stripe_product_id);
+CREATE INDEX idx_products_tier_key ON products(tier_key);
+
+COMMENT ON TABLE products IS 'Represents the core subscription products/tiers offered (e.g., Standard, Premium).';
+COMMENT ON COLUMN products.tier_key IS 'Optionally links this product to an internal subscription_tier_enum.';
+
+CREATE TYPE price_type_enum AS ENUM ('recurring', 'one_time');
+CREATE TYPE price_billing_interval_enum AS ENUM ('day', 'week', 'month', 'year');
+
+CREATE TABLE prices (
+id SERIAL PRIMARY KEY, -- Your internal ID for the price
+stripe_price_id VARCHAR(255) UNIQUE NOT NULL, -- Stripe's Price ID (price_xxxxxx)
+product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+active BOOLEAN DEFAULT TRUE,
+unit_amount INT NULL, -- Amount in the smallest currency unit (e.g., cents for USD). NULL for metered/tiered pricing not defined here.
+currency CHAR(3) NOT NULL,
+type price_type_enum NOT NULL, -- 'recurring' or 'one_time'
+billing_interval price_billing_interval_enum NULL, -- e.g., 'month', 'year'; NULL if type is 'one_time'
+interval_count INT NULL, -- e.g., 1 for every month/year, 3 for every 3 months
+description TEXT NULL, -- Optional description for this specific price
+trial_period_days INT NULL, -- Only if you use Stripe-managed trial periods for this price
+metadata JSONB NULL,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_prices_stripe_price_id ON prices(stripe_price_id);
+CREATE INDEX idx_prices_product_id ON prices(product_id);
+
+COMMENT ON TABLE prices IS 'Defines specific prices for products, including currency, amount, and billing interval.';
+COMMENT ON COLUMN prices.unit_amount IS 'Price in the smallest currency unit (e.g., cents for USD).';
+COMMENT ON COLUMN prices.trial_period_days IS 'Number of trial days offered by Stripe for this specific price, if applicable.';
+
+-- subscription_status_enum was defined in the previous response, ensure it exists:
+-- CREATE TYPE subscription_status_enum AS ENUM (
+-- 'trialing', 'active', 'past_due', 'unpaid', 'canceled', 'incomplete', 'incomplete_expired', 'paused'
+-- );
+
+CREATE TABLE student_subscriptions (
+id SERIAL PRIMARY KEY, -- Your internal subscription ID
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+price_id INT NOT NULL REFERENCES prices(id), -- Link to the specific price they are subscribed to
+stripe_subscription_id VARCHAR(255) UNIQUE NOT NULL,
+status subscription_status_enum NOT NULL,
+quantity INT DEFAULT 1,
+current_period_start TIMESTAMPTZ NOT NULL,
+current_period_end TIMESTAMPTZ NOT NULL,
+cancel_at_period_end BOOLEAN DEFAULT FALSE,
+canceled_at TIMESTAMPTZ NULL,
+ended_at TIMESTAMPTZ NULL,
+-- Stripe trial fields: only relevant if a specific subscription has a Stripe-managed trial
+trial_start_at TIMESTAMPTZ NULL,
+trial_end_at TIMESTAMPTZ NULL,
+metadata JSONB NULL, -- For any extra data from Stripe's subscription object
+stripe_created_at TIMESTAMPTZ NULL, -- Timestamp from Stripe for when the subscription was created
+created_at TIMESTAMPTZ DEFAULT NOW(), -- Your record's creation timestamp
+updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_student_subscriptions_student_id ON student_subscriptions(student_id);
+CREATE INDEX idx_student_subscriptions_stripe_subscription_id ON student_subscriptions(stripe_subscription_id);
+CREATE INDEX idx_student_subscriptions_status ON student_subscriptions(status);
+
+COMMENT ON TABLE student_subscriptions IS 'Tracks individual student subscriptions to specific prices/plans.';
+COMMENT ON COLUMN student_subscriptions.price_id IS 'The specific price (monthly/yearly/etc.) the student is subscribed to.';
+
+CREATE TABLE invoices (
+id SERIAL PRIMARY KEY, -- Your internal invoice ID
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+stripe_invoice_id VARCHAR(255) UNIQUE NOT NULL,
+stripe_subscription_id VARCHAR(255) NULL REFERENCES student_subscriptions(stripe_subscription_id), -- Link to subscription if applicable
+stripe_customer_id VARCHAR(255) NULL REFERENCES student_profiles(stripe_customer_id),
+status invoice_status_enum NOT NULL,
+amount_due INT NOT NULL, -- In smallest currency unit (cents)
+amount_paid INT NOT NULL,
+amount_remaining INT NOT NULL,
+currency CHAR(3) NOT NULL,
+due_date TIMESTAMPTZ NULL,
+paid_at TIMESTAMPTZ NULL,
+invoice_pdf_url TEXT NULL, -- Link to download the PDF from Stripe
+hosted_invoice_url TEXT NULL, -- Link for user to view invoice on Stripe
+billing_reason TEXT NULL, -- e.g., 'subscription_create', 'subscription_cycle', 'manual'
+metadata JSONB NULL,
+stripe_created_at TIMESTAMPTZ NULL, -- Timestamp from Stripe for when the invoice was created
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_invoices_student_id ON invoices(student_id);
+CREATE INDEX idx_invoices_stripe_invoice_id ON invoices(stripe_invoice_id);
+CREATE INDEX idx_invoices_stripe_subscription_id ON invoices(stripe_subscription_id);
+
+COMMENT ON TABLE invoices IS 'Stores key information about Stripe invoices for billing history and support.';
