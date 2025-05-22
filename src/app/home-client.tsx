@@ -11,39 +11,84 @@ interface HomeClientProps {
 
 export default function HomeClient({ initialUser }: HomeClientProps) {
   const [user, setUser] = useState<User | null>(initialUser);
-  const [loading, setLoading] = useState(true); // To track initial client-side auth check
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const supabaseClient = createClient(); // Regular client-side Supabase client
+  const supabaseClient = createClient();
 
   useEffect(() => {
     console.log(
-      "[AUTH_DEBUG] [home-client.tsx] useEffect: Setting up auth state change listener. Initial server user:",
-      initialUser?.id
+      `[AUTH_DEBUG] [home-client.tsx] useEffect mounted/updated. Initial server user: ${initialUser?.id}, Current client user state before this effect: ${user?.id}`
     );
+
     setUser(initialUser);
-    setLoading(false); // Initial state is now set
+    setLoading(false);
+    console.log(
+      `[AUTH_DEBUG] [home-client.tsx] useEffect: initialUser processed. User state now: ${initialUser?.id}, loading set to false.`
+    );
+
+    const checkInitialClientSession = async () => {
+      try {
+        const {
+          data: { session: clientSession },
+          error: clientSessionError,
+        } = await supabaseClient.auth.getSession();
+        console.log(
+          "[AUTH_DEBUG] [home-client.tsx] useEffect - Initial ASYNC supabaseClient.auth.getSession():",
+          clientSession?.user?.id || "No client session user",
+          "Error:",
+          clientSessionError?.message
+        );
+        if (!initialUser && clientSession?.user) {
+          console.warn(
+            "[AUTH_DEBUG] [home-client.tsx] Discrepancy: Server initialUser is null, but client SDK getSession found a user. Relying on onAuthStateChange to correct."
+          );
+        }
+      } catch (e: any) {
+        console.error(
+          "[AUTH_DEBUG] [home-client.tsx] Error in useEffect getSession async:",
+          e.message
+        );
+      }
+    };
+    checkInitialClientSession();
 
     const { data: authListener } = supabaseClient.auth.onAuthStateChange(
-      (event: AuthChangeEvent, session: Session | null) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         console.log(
-          `[AUTH_DEBUG] [home-client.tsx] onAuthStateChange: event - ${event}, session user - ${session?.user?.id}`
+          `[AUTH_DEBUG] [home-client.tsx] onAuthStateChange Fired! Event: ${event}, Session User from event: ${session?.user?.id}, Current client user state BEFORE this event processing: ${user?.id}`
         );
-        setUser(session?.user ?? null);
-        setLoading(false);
 
-        if (event === "SIGNED_IN") {
-          // Can perform actions on sign-in, e.g., redirect
-          // router.refresh(); // Refresh server components if needed
-        } else if (event === "SIGNED_OUT") {
-          // Can perform actions on sign-out
-          // router.refresh(); // Refresh to reflect signed-out state server-side
+        const newEventUser = session?.user ?? null;
+        setUser(newEventUser);
+
+        if (event === "SIGNED_OUT") {
+          console.log(
+            "[AUTH_DEBUG] [home-client.tsx] onAuthStateChange: SIGNED_OUT event processed."
+          );
+        } else if (event === "INITIAL_SESSION") {
+          console.log(
+            "[AUTH_DEBUG] [home-client.tsx] onAuthStateChange: INITIAL_SESSION event processed."
+          );
+        } else if (event === "SIGNED_IN") {
+          console.log(
+            "[AUTH_DEBUG] [home-client.tsx] onAuthStateChange: SIGNED_IN event processed."
+          );
+        } else {
+          console.log(
+            `[AUTH_DEBUG] [home-client.tsx] onAuthStateChange: ${event} event processed.`
+          );
         }
+
+        setLoading(false);
+        console.log(
+          `[AUTH_DEBUG] [home-client.tsx] onAuthStateChange Completed. Event: ${event}. User state is now: ${newEventUser?.id}, loading is false.`
+        );
       }
     );
 
     return () => {
       console.log(
-        "[AUTH_DEBUG] [home-client.tsx] useEffect cleanup: Unsubscribing from auth state changes."
+        `[AUTH_DEBUG] [home-client.tsx] useEffect cleanup for initialUser: ${initialUser?.id}. Unsubscribing.`
       );
       if (authListener?.subscription) {
         authListener.subscription.unsubscribe();
@@ -65,35 +110,56 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
 
   const handleSignOut = async () => {
     console.log(
-      "[AUTH_DEBUG] [home-client.tsx] handleSignOut: Attempting sign out via API."
+      "[AUTH_DEBUG] [home-client.tsx] handleSignOut: Attempting sign out."
     );
     setLoading(true);
+
+    const { error: clientSignOutError } = await supabaseClient.auth.signOut();
+
+    if (clientSignOutError) {
+      console.error(
+        "[AUTH_DEBUG] [home-client.tsx] Error during client-side signOut:",
+        clientSignOutError.message
+      );
+      alert(
+        `Client sign-out error: ${clientSignOutError.message}. Attempting server sign-out.`
+      );
+    }
+
+    setUser(null);
+
+    console.log(
+      "[AUTH_DEBUG] [home-client.tsx] Client-side state set to signed out. Now calling server API for cookie clearance."
+    );
+
     try {
       const response = await fetch("/auth/signout", { method: "POST" });
       if (!response.ok) {
         const errorData = await response.json();
         console.error(
-          "[AUTH_DEBUG] [home-client.tsx] Sign out failed:",
+          "[AUTH_DEBUG] [home-client.tsx] Server sign out API call failed:",
           errorData.details || response.statusText
         );
-        alert(`Sign out failed: ${errorData.details || response.statusText}`);
+        alert(
+          `Server sign out failed: ${
+            errorData.details || response.statusText
+          }. Client was signed out.`
+        );
       } else {
         console.log(
-          "[AUTH_DEBUG] [home-client.tsx] Sign out POST successful, auth state change should handle UI."
+          "[AUTH_DEBUG] [home-client.tsx] Server sign out API POST successful. Server will redirect."
         );
       }
     } catch (error: any) {
       console.error(
-        "[AUTH_DEBUG] [home-client.tsx] Error during sign out fetch:",
+        "[AUTH_DEBUG] [home-client.tsx] Error during server sign out fetch:",
         error.message
       );
-      alert(`Sign out error: ${error.message}`);
-    } finally {
-      setLoading(false); // Ensure loading state is reset
+      alert(`Server sign out error: ${error.message}. Client was signed out.`);
     }
   };
 
-  if (loading && !user) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-4">
         <h1 className="text-4xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">

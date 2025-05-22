@@ -11,5 +11,9 @@ export default async function Home() {
   } = await supabaseServer.auth.getUser();
 
   // Pass the initialUser to the client component
-  return <HomeClient initialUser={initialUser as User | null} />;
+  // Adding a key that changes with auth state will force a full remount of HomeClient,
+  // resetting its internal state upon login/logout.
+  const key = initialUser ? initialUser.id : "logged-out";
+
+  return <HomeClient key={key} initialUser={initialUser as User | null} />;
 }
