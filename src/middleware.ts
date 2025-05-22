@@ -1,95 +1,39 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { type NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { unstable_noStore as noStore } from "next/cache";
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  noStore(); // Ensure dynamic execution, especially for session checks
+  // console.log('[AUTH_DEBUG] [middleware.ts] Running middleware for path:', request.nextUrl.pathname);
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: "",
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.delete({ name, ...options });
-        },
-      },
-    }
-  );
-
-  // Refresh session if expired - important for Server Components
-  // await supabase.auth.getUser(); // This line is often the cause of issues if not handled carefully with middleware response
-
+  const supabase = await createClient();
   const {
     data: { session },
+    error: sessionError,
   } = await supabase.auth.getSession();
 
-  // Basic route protection example (customize as needed based on your requirements.md)
-  const { pathname } = request.nextUrl;
+  // console.log('[AUTH_DEBUG] [middleware.ts] Initial getSession result:', session ? `User ID: ${session.user.id}` : 'No session', 'Error:', sessionError?.message);
 
-  // Allow access to auth routes, API routes, and static assets
-  if (
-    pathname.startsWith("/auth") ||
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/_next") || // Next.js internal assets
-    pathname.startsWith("/static") || // Your static assets if any in public/static
-    pathname.includes(".") // Generally allows files with extensions (images, css, js)
-  ) {
-    return response;
-  }
+  // if (sessionError) {
+  //   console.error('[AUTH_DEBUG] [middleware.ts] Error getting session in middleware:', sessionError.message);
+  //   // Potentially handle this error, e.g., by redirecting to an error page or allowing access
+  //   // For now, we'll let it proceed and rely on page-level checks or Supabase client behavior
+  // }
 
-  // If no session and trying to access a protected route (e.g., /learn), redirect to signin
-  if (!session && pathname.startsWith("/learn")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/signin";
-    url.searchParams.set("next", pathname); // Optional: redirect back after login
-    return NextResponse.redirect(url);
-  }
+  // if (!session && request.nextUrl.pathname.startsWith('/learn')) {
+  //   console.log('[AUTH_DEBUG] [middleware.ts] No session, redirecting to signin for /learn path.');
+  //   const url = request.nextUrl.clone();
+  //   url.pathname = '/auth/signin';
+  //   return NextResponse.redirect(url);
+  // }
 
-  // If there IS a session and the user tries to go to /auth/signin or /auth/signup, redirect to /learn
-  if (
-    session &&
-    (pathname.startsWith("/auth/signin") || pathname.startsWith("/auth/signup"))
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/learn";
-    return NextResponse.redirect(url);
-  }
+  // Refresh session if expired - important for Server Components
+  // await supabase.auth.getUser(); // This also refreshes the session
 
-  return response;
+  // The createServerClient in @supabase/ssr is designed to automatically refresh the session
+  // by reading and writing cookies. Calling getSession() or getUser() should be enough.
+
+  return NextResponse.next();
 }
 
 export const config = {
@@ -101,6 +45,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * Feel free to modify this pattern to include more paths.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|auth/.*|.*\\.[A-Za-z0-9]+$).*)",
+    // Match /learn explicitly if not covered above and needs protection
+    // '/learn/:path*',
   ],
 };

@@ -1,38 +1,34 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { type CookieOptions, createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 // For Server Components & Route Handlers
-export function createClient() {
-  // Assuming cookieStore might be Promise<ReadonlyRequestCookies> due to linter behavior
-  const cookieStorePromise = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: async (name: string) => {
-          const store = await cookieStorePromise;
-          return store.get(name)?.value;
+        get(name: string) {
+          return cookieStore.get(name)?.value;
         },
-        set: async (name: string, value: string, options: CookieOptions) => {
-          const store = await cookieStorePromise;
+        set(name: string, value: string, options: CookieOptions) {
           try {
-            // NextResponse in middleware handles actual cookie setting on response.
-            // For server actions/route handlers, this attempts to set directly.
-            store.set({ name, value, ...options });
+            cookieStore.set({ name, value, ...options });
           } catch (error) {
-            // Fail silently if not in a context where cookies can be set (e.g. RSC render)
-            // console.warn(`Set cookie error for ${name}: ${error}`);
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
           }
         },
-        remove: async (name: string, options: CookieOptions) => {
-          const store = await cookieStorePromise;
+        remove(name: string, options: CookieOptions) {
           try {
-            store.set({ name, value: "", ...options }); // Removing by setting empty value
+            cookieStore.set({ name, value: "", ...options });
           } catch (error) {
-            // Fail silently
-            // console.warn(`Remove cookie error for ${name}: ${error}`);
+            // The `delete` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
           }
         },
       },

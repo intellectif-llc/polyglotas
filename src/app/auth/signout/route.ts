@@ -1,27 +1,37 @@
-import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
+import { unstable_noStore as noStore } from "next/cache";
 
-export async function POST(request: NextRequest) {
-  const requestUrl = new URL(request.url);
-  const supabase = createClient();
+export async function POST() {
+  noStore(); // Ensure dynamic execution
+  const supabase = await createClient();
+
+  console.log("[AUTH_DEBUG] [auth/signout/route.ts] Attempting to sign out.");
 
   const { error } = await supabase.auth.signOut();
 
   if (error) {
-    console.error("Error signing out:", error.message);
-    return NextResponse.json({ error: "Failed to sign out" }, { status: 500 });
+    console.error(
+      "[AUTH_DEBUG] [auth/signout/route.ts] Error during sign out:",
+      error.message
+    );
+    return NextResponse.json(
+      { error: "Failed to sign out", details: error.message },
+      { status: 500 }
+    );
   }
 
-  // Redirect to home or sign-in page after sign out
-  // Important: Use an absolute URL for redirection in API routes if not using NextResponse.redirect
-  // However, for client-side initiated sign-out, the client will handle the redirect after calling this endpoint.
-  // So, just returning a success status is often enough.
-  return NextResponse.json({ success: true }, { status: 200 });
-
-  // If you want to force a redirect from the server-side upon POST:
-  // return NextResponse.redirect(`${requestUrl.origin}/auth/signin`, {
-  //   status: 302, // Or 303 for POST redirect
-  // });
+  console.log(
+    "[AUTH_DEBUG] [auth/signout/route.ts] Sign out successful. Redirecting to home."
+  );
+  // Redirect to home or login page after sign out
+  const redirectUrl = new URL(
+    "/",
+    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  );
+  return NextResponse.redirect(redirectUrl.toString(), {
+    status: 302, // Use 302 for temporary redirect
+  });
 }
 
 // Optionally, a GET handler if you want to allow sign-out via GET requests (less common for actions)
