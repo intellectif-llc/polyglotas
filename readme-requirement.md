@@ -345,13 +345,15 @@ interface ActivityResultPayload {
   - Account Page: Profile, language preferences, subscription management (redirect to Stripe Customer Portal).
 - **Navigation:** Consistent navbar with relevant links based on auth state.
 
+## 10. Databas schema
+
 -- ENUM for Levels (Provided by you)
 CREATE TYPE level_enum AS ENUM ('A1', 'A2', 'B1', 'B2', 'C1');
 
 -- ENUM for Message Sender (Provided by you)
 CREATE TYPE sender_type_enum AS ENUM ('user', 'ai');
 
-CREATE TYPE subscription_tier_enum AS ENUM ('free', 'starer','pro');
+CREATE TYPE subscription_tier_enum AS ENUM ('free', 'starter','pro');
 
 -- NEW ENUM for Price Types (used in `prices` table)
 CREATE TYPE price_type_enum AS ENUM ('recurring', 'one_time');
@@ -372,15 +374,18 @@ CREATE TYPE subscription_status_enum AS ENUM (
 );
 
 -- NEW ENUM for Invoice Statuses (used in `invoices` table)
-CREATE TYPE invoice_status_enum AS ENUM (
-'draft',
-'open',
-'paid',
-'void',
-'uncollectible'
+CREATE TYPE subscription_status_enum AS ENUM (
+'trialing',
+'active',
+'past_due',
+'unpaid',
+'canceled',
+'incomplete',
+'incomplete_expired',
+'paused'
 );
 
-CREATE TYPE status_enum AS ENUM (
+CREATE TYPE account_status_enum AS ENUM (
 'pending_verification', -- Account created, but awaiting initial verification (e.g., email confirmation)
 'active', -- Account is active and in good standing; user can access the platform based on their subscription tier
 'suspended', -- Account access has been temporarily or permanently revoked by an administrator
@@ -416,7 +421,7 @@ COMMENT ON TABLE persons IS 'Stores basic information about individuals.';
 CREATE TABLE student_profiles (
 student_id BIGINT PRIMARY KEY REFERENCES persons(person_id) ON DELETE CASCADE,
 discount NUMERIC(5,2) NULL,
-status status_enum NOT NULL, -- Ensure status_enum is defined by you
+status account_status_enum NOT NULL,
 current_streak_days INTEGER NOT NULL DEFAULT 0,
 last_streak_date DATE NULL,
 subscription_tier subscription_tier_enum NOT NULL DEFAULT 'free',
@@ -441,7 +446,7 @@ COMMENT ON COLUMN student_profiles.subscription_tier IS 'The current subscriptio
 COMMENT ON COLUMN student_profiles.stripe_customer_id IS 'Stripe Customer ID for this student. Created when user initiates first payment.';
 COMMENT ON COLUMN student_profiles.default_payment_method_details IS 'Non-sensitive, displayable details of the default payment method from Stripe.';
 COMMENT ON COLUMN student_profiles.billing_address IS 'Billing address details, often collected by Stripe and stored for reference.';
-COMMENT ON COLUMN student_profiles.status IS 'Overall account status of the student on the platform (e.g., active, suspended, email_unverified). Define status_enum separately.';
+COMMENT ON COLUMN student_profiles.status IS 'Overall account status of the student on the platform (e.g., active, suspended, email_unverified). Define account_status_enum separately.';
 
 -- Student Target Languages Table
 CREATE TABLE student_target_languages (
@@ -895,7 +900,7 @@ invoice_pdf_url TEXT NULL, -- Link to download the PDF from Stripe
 hosted_invoice_url TEXT NULL, -- Link for user to view invoice on Stripe
 billing_reason TEXT NULL, -- e.g., 'subscription_create', 'subscription_cycle', 'manual'
 metadata JSONB NULL,
-stripe_created_at TIMESTAMPTZ NULL, -- Timestamp from Stripe for when the invoice was created
+issued_at TIMESTAMPTZ NULL, -- Timestamp from Stripe for when the invoice was created
 created_at TIMESTAMPTZ DEFAULT NOW(),
 updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -905,3 +910,565 @@ CREATE INDEX idx_invoices_stripe_invoice_id ON invoices(stripe_invoice_id);
 CREATE INDEX idx_invoices_stripe_subscription_id ON invoices(stripe_subscription_id);
 
 COMMENT ON TABLE invoices IS 'Stores key information about Stripe invoices for billing history and support.';
+
+## 11. Database functions
+
+This section contains all the PL/pgSQL functions. Some of these are called directly by the application, while others are designed to be used by triggers.
+
+---
+
+-- FUNCTION: update_updated_at_column
+-- Automatically sets the `updated_at` timestamp for a row.
+
+---
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+NEW.updated_at = NOW();
+RETURN NEW;
+END;
+
+$$
+LANGUAGE plpgsql VOLATILE;
+
+COMMENT ON FUNCTION update_updated_at_column() IS 'Trigger function to automatically update the updated_at timestamp column to the current time upon row modification.';
+
+--------------------------------------------------------------------------------
+-- FUNCTION: increment_points
+-- Increments points for a student.
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION increment_points(
+    p_student_id BIGINT,
+    p_points_to_add INT
+)
+RETURNS INT AS
+$$
+
+DECLARE
+v_new_point_total INT;
+BEGIN
+UPDATE student_profiles
+SET points = points + p_points_to_add
+WHERE student_id = p_student_id
+RETURNING points INTO v_new_point_total;
+
+    RETURN v_new_point_total;
+
+END;
+
+$$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
+
+COMMENT ON FUNCTION increment_points(BIGINT, INT) IS 'Increments the points for a given student and returns the new total. p_student_id: ID of the student. p_points_to_add: Number of points to add (can be negative to subtract). Consider RLS implications if SECURITY DEFINER is used.';
+
+--------------------------------------------------------------------------------
+-- FUNCTION: update_chat_engagement
+-- Updates or inserts user_lesson_progress on first chat engagement for a lesson.
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_chat_engagement(
+    p_student_id BIGINT,
+    p_lesson_id INT
+)
+RETURNS VOID AS
+$$
+
+BEGIN
+-- Attempt to update first
+UPDATE user_lesson_progress
+SET chat_activity_engaged_at = NOW(),
+last_progress_at = NOW() -- Also update last_progress_at
+WHERE student_id = p_student_id
+AND lesson_id = p_lesson_id
+AND chat_activity_engaged_at IS NULL;
+
+    -- If no row was updated (either no record, or chat_activity_engaged_at was already set)
+    -- and specifically if no record exists, then insert.
+    IF NOT FOUND THEN
+        INSERT INTO user_lesson_progress (
+            student_id,
+            lesson_id,
+            started_at,
+            chat_activity_engaged_at,
+            phrases_completed,
+            is_completed,
+            last_progress_at
+        )
+        SELECT
+            p_student_id,
+            p_lesson_id,
+            NOW(),
+            NOW(),
+            0,
+            FALSE,
+            NOW()
+        WHERE NOT EXISTS ( -- Ensure no record exists before inserting
+            SELECT 1 FROM user_lesson_progress
+            WHERE student_id = p_student_id AND lesson_id = p_lesson_id
+        );
+    END IF;
+
+END;
+
+$$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
+
+COMMENT ON FUNCTION update_chat_engagement(BIGINT, INT) IS 'Sets the chat_activity_engaged_at timestamp for a student''s lesson progress. If no progress record exists, it creates one. p_student_id: ID of the student. p_lesson_id: ID of the lesson. Consider RLS implications if SECURITY DEFINER is used.';
+
+--------------------------------------------------------------------------------
+-- FUNCTION: update_lesson_phrase_count (Trigger Function)
+-- Updates total_phrases in the lessons table.
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_lesson_phrase_count()
+RETURNS TRIGGER AS
+$$
+
+DECLARE
+v*lesson_id_old INT;
+v_lesson_id_new INT;
+BEGIN
+IF (TG_OP = 'DELETE') THEN
+v_lesson_id_old := OLD.lesson_id;
+IF v_lesson_id_old IS NOT NULL THEN
+UPDATE lessons
+SET total_phrases = (SELECT COUNT(*) FROM vocabulary*phrases WHERE lesson_id = v_lesson_id_old)
+WHERE lesson_id = v_lesson_id_old;
+END IF;
+RETURN OLD;
+ELSIF (TG_OP = 'INSERT') THEN
+v_lesson_id_new := NEW.lesson_id;
+UPDATE lessons
+SET total_phrases = (SELECT COUNT(*) FROM vocabulary_phrases WHERE lesson_id = v_lesson_id_new)
+WHERE lesson_id = v_lesson_id_new;
+RETURN NEW;
+ELSIF (TG_OP = 'UPDATE') THEN
+-- This part handles if a phrase is moved from one lesson to another
+IF OLD.lesson_id IS DISTINCT FROM NEW.lesson_id THEN
+v_lesson_id_old := OLD.lesson_id;
+v_lesson_id_new := NEW.lesson_id;
+
+            IF v_lesson_id_old IS NOT NULL THEN
+                UPDATE lessons
+                SET total_phrases = (SELECT COUNT(*) FROM vocabulary_phrases WHERE lesson_id = v_lesson_id_old)
+                WHERE lesson_id = v_lesson_id_old;
+            END IF;
+            IF v_lesson_id_new IS NOT NULL THEN
+                UPDATE lessons
+                SET total_phrases = (SELECT COUNT(*) FROM vocabulary_phrases WHERE lesson_id = v_lesson_id_new)
+                WHERE lesson_id = v_lesson_id_new;
+            END IF;
+        END IF;
+        RETURN NEW;
+    END IF;
+    RETURN NULL; -- Should only be reached if TG_OP is not INSERT, DELETE, or UPDATE
+
+END;
+
+$$
+LANGUAGE plpgsql VOLATILE;
+
+COMMENT ON FUNCTION update_lesson_phrase_count() IS 'Trigger function to update the total_phrases count in the lessons table when vocabulary_phrases are added, deleted, or their lesson_id is changed.';
+
+--------------------------------------------------------------------------------
+-- FUNCTION: upsert_word_pronunciation
+-- Upserts word pronunciation statistics for a student.
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION upsert_word_pronunciation(
+    p_student_id BIGINT,
+    p_language_code CHAR(5),
+    p_word_data JSONB -- Expects: {"word_text": "...", "accuracy_score": ..., "error_type": "...", "attempt_timestamp": "..."}
+)
+RETURNS VOID AS
+$$
+
+DECLARE
+v_word_text TEXT := lower(p_word_data->>'word_text');
+v_accuracy_score NUMERIC := (p_word_data->>'accuracy_score')::NUMERIC;
+v_error_type TEXT := p_word_data->>'error_type';
+v_attempt_timestamp TIMESTAMPTZ := COALESCE((p_word_data->>'attempt_timestamp')::TIMESTAMPTZ, NOW());
+v_error_increment INT;
+v_current_total_attempts INT;
+v_current_error_count INT;
+v_current_sum_accuracy_score NUMERIC;
+v_final_needs_practice BOOLEAN;
+v_new_average_accuracy_score NUMERIC;
+BEGIN
+IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
+RAISE EXCEPTION 'word_text and accuracy_score must be provided in p_word_data';
+END IF;
+v_accuracy_score := GREATEST(0, LEAST(100, v_accuracy_score));
+
+    IF v_error_type IS NULL OR v_error_type = 'None' OR v_error_type = '' THEN
+        v_error_increment := 0;
+        v_error_type := NULL;
+    ELSE
+        v_error_increment := 1;
+    END IF;
+
+    INSERT INTO user_word_pronunciation (
+        student_id, word_text, language_code,
+        total_attempts, error_count, sum_accuracy_score, average_accuracy_score,
+        last_accuracy_score, last_error_type, last_attempt_at,
+        needs_practice, created_at, updated_at
+    )
+    VALUES (
+        p_student_id, v_word_text, p_language_code,
+        1, v_error_increment, v_accuracy_score, v_accuracy_score,
+        v_accuracy_score, v_error_type, v_attempt_timestamp,
+        (v_error_increment = 1 OR v_accuracy_score < 70), NOW(), NOW()
+    )
+    ON CONFLICT (student_id, word_text, language_code) DO UPDATE
+    SET
+        total_attempts = user_word_pronunciation.total_attempts + 1,
+        error_count = user_word_pronunciation.error_count + v_error_increment,
+        sum_accuracy_score = user_word_pronunciation.sum_accuracy_score + v_accuracy_score,
+        last_accuracy_score = v_accuracy_score,
+        last_error_type = v_error_type,
+        last_attempt_at = v_attempt_timestamp,
+        updated_at = NOW()
+    RETURNING total_attempts, error_count, sum_accuracy_score
+    INTO v_current_total_attempts, v_current_error_count, v_current_sum_accuracy_score;
+
+    IF v_current_total_attempts > 0 THEN
+        v_new_average_accuracy_score := ROUND(v_current_sum_accuracy_score / v_current_total_attempts, 2);
+    ELSE
+        v_new_average_accuracy_score := 0;
+    END IF;
+
+    IF v_accuracy_score >= 85 AND v_error_increment = 0 THEN
+        v_final_needs_practice := FALSE;
+    ELSIF v_accuracy_score < 70 OR v_error_increment = 1 THEN
+        v_final_needs_practice := TRUE;
+    ELSE
+        v_final_needs_practice := (v_new_average_accuracy_score < 75);
+    END IF;
+
+    UPDATE user_word_pronunciation uwp
+    SET average_accuracy_score = v_new_average_accuracy_score, needs_practice = v_final_needs_practice
+    WHERE uwp.student_id = p_student_id AND uwp.word_text = v_word_text AND uwp.language_code = p_language_code;
+
+END;
+
+$$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
+
+COMMENT ON FUNCTION upsert_word_pronunciation(BIGINT, CHAR(5), JSONB) IS 'Upserts word pronunciation statistics for a student. p_word_data expects {"word_text", "accuracy_score", "error_type", "attempt_timestamp"}. Consider RLS implications if SECURITY DEFINER is used.';
+
+--------------------------------------------------------------------------------
+-- FUNCTION: upsert_word_spelling
+-- Upserts word spelling statistics for a student.
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION upsert_word_spelling(
+    p_student_id BIGINT,
+    p_language_code CHAR(5),
+    p_word_data JSONB -- Expects: {"word_text": "...", "similarity_score": ..., "is_error": boolean, "attempt_timestamp": "..."}
+)
+RETURNS VOID AS
+$$
+
+DECLARE
+v_word_text TEXT := lower(p_word_data->>'word_text');
+v_similarity_score NUMERIC := (p_word_data->>'similarity_score')::NUMERIC;
+v_is_error BOOLEAN := (p_word_data->>'is_error')::BOOLEAN;
+v_attempt_timestamp TIMESTAMPTZ := COALESCE((p_word_data->>'attempt_timestamp')::TIMESTAMPTZ, NOW());
+v_error_increment INT;
+v_current_total_occurrences INT;
+v_current_error_count INT;
+v_current_sum_similarity_score NUMERIC;
+v_final_needs_practice BOOLEAN;
+v_new_average_similarity_score NUMERIC;
+BEGIN
+IF v_word_text IS NULL OR v_similarity_score IS NULL THEN
+RAISE EXCEPTION 'word_text and similarity_score must be provided in p_word_data';
+END IF;
+v_similarity_score := GREATEST(0, LEAST(100, v_similarity_score));
+
+    IF v_is_error THEN v_error_increment := 1; ELSE v_error_increment := 0; END IF;
+
+    INSERT INTO user_word_spelling (
+        student_id, word_text, language_code,
+        total_dictation_occurrences, dictation_error_count, sum_word_similarity_score, average_word_similarity_score,
+        last_word_similarity_score, last_dictation_attempt_at,
+        needs_spelling_practice, created_at, updated_at
+    )
+    VALUES (
+        p_student_id, v_word_text, p_language_code,
+        1, v_error_increment, v_similarity_score, v_similarity_score,
+        v_similarity_score, v_attempt_timestamp,
+        (v_error_increment = 1 OR v_similarity_score < 75), NOW(), NOW()
+    )
+    ON CONFLICT (student_id, word_text, language_code) DO UPDATE
+    SET
+        total_dictation_occurrences = user_word_spelling.total_dictation_occurrences + 1,
+        dictation_error_count = user_word_spelling.dictation_error_count + v_error_increment,
+        sum_word_similarity_score = user_word_spelling.sum_word_similarity_score + v_similarity_score,
+        last_word_similarity_score = v_similarity_score,
+        last_dictation_attempt_at = v_attempt_timestamp,
+        updated_at = NOW()
+    RETURNING total_dictation_occurrences, dictation_error_count, sum_word_similarity_score
+    INTO v_current_total_occurrences, v_current_error_count, v_current_sum_similarity_score;
+
+    IF v_current_total_occurrences > 0 THEN
+        v_new_average_similarity_score := ROUND(v_current_sum_similarity_score / v_current_total_occurrences, 2);
+    ELSE
+        v_new_average_similarity_score := 0;
+    END IF;
+
+    IF v_similarity_score >= 90 AND v_error_increment = 0 THEN
+        v_final_needs_practice := FALSE;
+    ELSIF v_similarity_score < 75 OR v_error_increment = 1 THEN
+        v_final_needs_practice := TRUE;
+    ELSE
+        v_final_needs_practice := (v_new_average_similarity_score < 80);
+    END IF;
+
+    UPDATE user_word_spelling uws
+    SET average_word_similarity_score = v_new_average_similarity_score, needs_spelling_practice = v_final_needs_practice
+    WHERE uws.student_id = p_student_id AND uws.word_text = v_word_text AND uws.language_code = p_language_code;
+
+END;
+
+$$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
+
+COMMENT ON FUNCTION upsert_word_spelling(BIGINT, CHAR(5), JSONB) IS 'Upserts word spelling statistics for a student. p_word_data expects {"word_text", "similarity_score", "is_error", "attempt_timestamp"}. Consider RLS implications if SECURITY DEFINER is used.';
+
+--------------------------------------------------------------------------------
+-- FUNCTION: update_lesson_completion_stats (Trigger Function)
+-- Updates user_lesson_progress based on user_phrase_progress changes.
+--------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_lesson_completion_stats()
+RETURNS TRIGGER AS
+$$
+
+DECLARE
+v_lesson_total_phrases INT;
+v_phrases_now_completed_for_lang INT;
+v_lesson_progress_exists BOOLEAN;
+BEGIN
+-- This trigger fires on INSERT or UPDATE of user_phrase_progress
+IF (TG_OP = 'INSERT' AND NEW.is_completed) OR
+(TG_OP = 'UPDATE' AND NEW.is_completed AND (OLD.is_completed IS NULL OR NOT OLD.is_completed)) OR
+(TG_OP = 'UPDATE' AND NOT NEW.is_completed AND OLD.is_completed IS NOT NULL AND OLD.is_completed) -- A phrase was un-completed
+THEN
+-- Recalculate completed phrases for the lesson in this specific language
+SELECT COUNT(\*)
+INTO v_phrases_now_completed_for_lang
+FROM user_phrase_progress upp
+WHERE upp.student_id = NEW.student_id
+AND upp.lesson_id = NEW.lesson_id
+AND upp.language_code = NEW.language_code -- Specific to the language of the phrase progress
+AND upp.is_completed = TRUE;
+
+        -- Get total phrases for the lesson (this count is language-agnostic from the `lessons` table)
+        SELECT total_phrases
+        INTO v_lesson_total_phrases
+        FROM lessons l
+        WHERE l.lesson_id = NEW.lesson_id;
+
+        -- Check if a user_lesson_progress record exists
+        SELECT EXISTS (
+            SELECT 1 FROM user_lesson_progress
+            WHERE student_id = NEW.student_id AND lesson_id = NEW.lesson_id
+        ) INTO v_lesson_progress_exists;
+
+        -- The definition of overall lesson completion in `user_lesson_progress` needs to be carefully considered.
+        -- If `user_lesson_progress.phrases_completed` refers to the count of phrases completed in *any* language
+        -- or specifically the student's *current* target language for that lesson, this logic might need adjustment.
+        -- For this example, we assume `user_lesson_progress.phrases_completed` reflects progress in a primary language
+        -- or the language in which the most recent phrase completion occurred.
+        -- Let's assume for now `phrases_completed` should reflect the count for the language of the current target language of the student for that lesson.
+        -- This trigger fires based on a specific language phrase completion from `user_phrase_progress (NEW.language_code)`.
+        -- We will update based on this language.
+
+        IF v_lesson_progress_exists THEN
+            UPDATE user_lesson_progress
+            SET
+                phrases_completed = v_phrases_now_completed_for_lang, -- This now specifically reflects count for NEW.language_code
+                is_completed = (CASE
+                                    WHEN v_lesson_total_phrases > 0 AND v_phrases_now_completed_for_lang >= v_lesson_total_phrases THEN TRUE
+                                    ELSE FALSE
+                                END),
+                completed_at = (CASE
+                                    WHEN v_lesson_total_phrases > 0 AND v_phrases_now_completed_for_lang >= v_lesson_total_phrases AND completed_at IS NULL THEN NOW()
+                                    WHEN v_lesson_total_phrases > 0 AND v_phrases_now_completed_for_lang < v_lesson_total_phrases THEN NULL -- Reset completed_at if no longer complete
+                                    ELSE completed_at
+                                END),
+                last_progress_at = NOW()
+            WHERE student_id = NEW.student_id
+              AND lesson_id = NEW.lesson_id;
+        ELSE
+             INSERT INTO user_lesson_progress (
+                student_id, lesson_id, started_at, phrases_completed, is_completed, completed_at, last_progress_at, chat_activity_engaged_at
+            ) VALUES (
+                NEW.student_id, NEW.lesson_id, NOW(), v_phrases_now_completed_for_lang,
+                (CASE WHEN v_lesson_total_phrases > 0 AND v_phrases_now_completed_for_lang >= v_lesson_total_phrases THEN TRUE ELSE FALSE END),
+                (CASE WHEN v_lesson_total_phrases > 0 AND v_phrases_now_completed_for_lang >= v_lesson_total_phrases THEN NOW() ELSE NULL END),
+                NOW(), NULL
+            );
+        END IF;
+    END IF;
+
+    IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+
+END;
+
+$$
+LANGUAGE plpgsql VOLATILE;
+
+COMMENT ON FUNCTION update_lesson_completion_stats() IS 'Trigger function to update user_lesson_progress (phrases_completed, is_completed, completed_at) when a user_phrase_progress record is inserted or its is_completed status changes. Assumes phrases_completed count is specific to the language of the phrase just updated.';
+
+
+## 12. Database Triggers
+This section contains all the CREATE TRIGGER statements.
+
+--------------------------------------------------------------------------------
+-- Triggers for `update_updated_at_column` function
+--------------------------------------------------------------------------------
+
+-- On 'persons' table
+DROP TRIGGER IF EXISTS trg_persons_update_updated_at ON persons;
+CREATE TRIGGER trg_persons_update_updated_at
+BEFORE UPDATE ON persons
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'student_profiles' table
+DROP TRIGGER IF EXISTS trg_student_profiles_update_updated_at ON student_profiles;
+CREATE TRIGGER trg_student_profiles_update_updated_at
+BEFORE UPDATE ON student_profiles
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'units' table
+DROP TRIGGER IF EXISTS trg_units_update_updated_at ON units;
+CREATE TRIGGER trg_units_update_updated_at
+BEFORE UPDATE ON units
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'lessons' table
+DROP TRIGGER IF EXISTS trg_lessons_update_updated_at ON lessons;
+CREATE TRIGGER trg_lessons_update_updated_at
+BEFORE UPDATE ON lessons
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'vocabulary_phrases' table
+DROP TRIGGER IF EXISTS trg_vocabulary_phrases_update_updated_at ON vocabulary_phrases;
+CREATE TRIGGER trg_vocabulary_phrases_update_updated_at
+BEFORE UPDATE ON vocabulary_phrases
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'conversation_starters' table
+DROP TRIGGER IF EXISTS trg_conversation_starters_update_updated_at ON conversation_starters;
+CREATE TRIGGER trg_conversation_starters_update_updated_at
+BEFORE UPDATE ON conversation_starters
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'unit_translations' table
+DROP TRIGGER IF EXISTS trg_unit_translations_update_updated_at ON unit_translations;
+CREATE TRIGGER trg_unit_translations_update_updated_at
+BEFORE UPDATE ON unit_translations
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'lesson_translations' table
+DROP TRIGGER IF EXISTS trg_lesson_translations_update_updated_at ON lesson_translations;
+CREATE TRIGGER trg_lesson_translations_update_updated_at
+BEFORE UPDATE ON lesson_translations
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'learning_outcome_translations' table
+DROP TRIGGER IF EXISTS trg_learning_outcome_translations_update_updated_at ON learning_outcome_translations;
+CREATE TRIGGER trg_learning_outcome_translations_update_updated_at
+BEFORE UPDATE ON learning_outcome_translations
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'phrase_versions' table
+DROP TRIGGER IF EXISTS trg_phrase_versions_update_updated_at ON phrase_versions;
+CREATE TRIGGER trg_phrase_versions_update_updated_at
+BEFORE UPDATE ON phrase_versions
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'conversation_starter_translations' table
+DROP TRIGGER IF EXISTS trg_conversation_starter_translations_update_updated_at ON conversation_starter_translations;
+CREATE TRIGGER trg_conversation_starter_translations_update_updated_at
+BEFORE UPDATE ON conversation_starter_translations
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'user_word_pronunciation' table
+DROP TRIGGER IF EXISTS trg_user_word_pronunciation_update_updated_at ON user_word_pronunciation;
+CREATE TRIGGER trg_user_word_pronunciation_update_updated_at
+BEFORE UPDATE ON user_word_pronunciation
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'user_word_spelling' table
+DROP TRIGGER IF EXISTS trg_user_word_spelling_update_updated_at ON user_word_spelling;
+CREATE TRIGGER trg_user_word_spelling_update_updated_at
+BEFORE UPDATE ON user_word_spelling
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'products' table
+DROP TRIGGER IF EXISTS trg_products_update_updated_at ON products;
+CREATE TRIGGER trg_products_update_updated_at
+BEFORE UPDATE ON products
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'prices' table
+DROP TRIGGER IF EXISTS trg_prices_update_updated_at ON prices;
+CREATE TRIGGER trg_prices_update_updated_at
+BEFORE UPDATE ON prices
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'student_subscriptions' table
+DROP TRIGGER IF EXISTS trg_student_subscriptions_update_updated_at ON student_subscriptions;
+CREATE TRIGGER trg_student_subscriptions_update_updated_at
+BEFORE UPDATE ON student_subscriptions
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- On 'invoices' table
+DROP TRIGGER IF EXISTS trg_invoices_update_updated_at ON invoices;
+CREATE TRIGGER trg_invoices_update_updated_at
+BEFORE UPDATE ON invoices
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Note: `languages`, `learning_outcomes` currently only have `created_at` in your schema.
+-- If you add `updated_at` to them and they can be modified, add triggers for them too.
+-- Tables like `user_lesson_progress` and `user_phrase_progress` have `last_progress_at` which might be updated by application logic or other specific triggers,
+-- so a generic `updated_at` trigger might be redundant or conflict if you also have a general `updated_at` column on them.
+-- Your current `user_lesson_progress` and `user_phrase_progress` already have `last_progress_at TIMESTAMPTZ DEFAULT NOW()`.
+-- If you add a general `updated_at` to these, then also add the trigger.
+
+--------------------------------------------------------------------------------
+-- Triggers for `update_lesson_phrase_count` function
+--------------------------------------------------------------------------------
+
+-- On 'vocabulary_phrases' after DELETE
+DROP TRIGGER IF EXISTS trg_vocab_phrases_after_delete_update_lesson_count ON vocabulary_phrases;
+CREATE TRIGGER trg_vocab_phrases_after_delete_update_lesson_count
+AFTER DELETE ON vocabulary_phrases
+FOR EACH ROW EXECUTE FUNCTION update_lesson_phrase_count();
+
+-- On 'vocabulary_phrases' after INSERT
+DROP TRIGGER IF EXISTS trg_vocab_phrases_after_insert_update_lesson_count ON vocabulary_phrases;
+CREATE TRIGGER trg_vocab_phrases_after_insert_update_lesson_count
+AFTER INSERT ON vocabulary_phrases
+FOR EACH ROW EXECUTE FUNCTION update_lesson_phrase_count();
+
+-- On 'vocabulary_phrases' after UPDATE OF lesson_id (if phrases can change lessons)
+DROP TRIGGER IF EXISTS trg_vocab_phrases_after_update_update_lesson_count ON vocabulary_phrases;
+CREATE TRIGGER trg_vocab_phrases_after_update_update_lesson_count
+AFTER UPDATE OF lesson_id ON vocabulary_phrases
+FOR EACH ROW
+WHEN (OLD.lesson_id IS DISTINCT FROM NEW.lesson_id)
+EXECUTE FUNCTION update_lesson_phrase_count();
+
+--------------------------------------------------------------------------------
+-- Trigger for `update_lesson_completion_stats` function
+--------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_user_phrase_progress_after_insert_update_completion ON user_phrase_progress;
+CREATE TRIGGER trg_user_phrase_progress_after_insert_update_completion
+AFTER INSERT ON user_phrase_progress -- Fire on insert if a phrase is immediately completed
+FOR EACH ROW EXECUTE FUNCTION update_lesson_completion_stats();
+
+DROP TRIGGER IF EXISTS trg_user_phrase_progress_after_update_completion ON user_phrase_progress;
+CREATE TRIGGER trg_user_phrase_progress_after_update_completion
+AFTER UPDATE OF is_completed ON user_phrase_progress -- Fire only when is_completed changes
+FOR EACH ROW EXECUTE FUNCTION update_lesson_completion_stats();
+$$
