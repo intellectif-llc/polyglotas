@@ -64,7 +64,17 @@ The core free offering will grant users access to the **first lesson of a langua
     - Users record their pronunciation of phrases.
     - Integrate with **Azure Speech Services** for speech-to-text and detailed pronunciation assessment (accuracy, fluency, completeness, prosody, word/phoneme level feedback).
     - Display visual feedback on pronunciation.
-  - Other exercise types (e.g., unscramble, dictation) can be incorporated.
+  - **Unscramble the Phrase:**
+    - Users will be presented with the words of a phrase in a scrambled order.
+    - They must drag and drop or select the words to arrange them into the correct sequence.
+    - This activity reinforces sentence structure and word order.
+  - **Dictation:**
+    - Users listen to the pre-recorded audio of a phrase.
+    - They must type the phrase as they hear it.
+    - The system compares their typed input against the original phrase text for accuracy.
+    - This activity helps with listening comprehension and spelling in the target language.
+  - These three activities (Pronunciation, Unscramble the Phrase, Dictation) form the core practice for each phrase within a lesson before proceeding to the lesson's chat section.
+  - Other exercise types can be incorporated as supplementary activities if needed in the future.
 - **Targeted Word Practice (`/learn/practice-words`):**
   - Users can review and practice words/phrases where they previously had pronunciation difficulties.
 - **Interactive Chat (`/learn/lesson/[lessonId]/chat`):**
@@ -129,8 +139,10 @@ Backend logic will be implemented as Next.js API Routes, secured using Supabase 
 - **Learning & Practice:**
   - `GET /api/speech/token`: Generate Azure Speech Services client token.
   - `POST /api/speech/attempt`: Save speech attempt (audio upload to Supabase Storage, assessment via Azure). Requires `phrase_id`, `language_code`.
+  - `POST /api/learn/phrases/{phraseVersionId}/activity-result`: Submit the result of a phrase-based learning activity (Unscramble or Dictation).
+    - Request body would include `activityType` ("unscramble" | "dictation"), `isSuccessful` (boolean), `attemptData` (object with activity-specific details like typed text or chosen word order), and optional `score`.
+    - This endpoint would update the `user_phrase_progress` table and potentially log detailed attempts to tables like `unscramble_attempts` or contribute to `user_word_spelling` data.
   - `GET /api/users/me/practice-words?lang={target_lang}`: Fetch user's practice words in target language.
-  - `POST /api/users/me/practice-words/review`: Update practice word status.
 - **User Profile & Progress:**
   - `GET /api/users/me/profile`: Fetch current user's profile including language preferences, subscription status, points, streak.
   - `PUT /api/users/me/profile`: Update user profile (name, language preferences).
@@ -144,6 +156,143 @@ Backend logic will be implemented as Next.js API Routes, secured using Supabase 
 - **Utilities:**
   - `POST /api/translate`: Translate ad-hoc text using Azure Translate (request includes text and target language).
   - Internal endpoint/mechanism for batch-generating phrase audio using ElevenLabs and uploading to Supabase Storage.
+
+## 4.1. Conceptual TypeScript Interfaces
+
+This section outlines conceptual TypeScript interfaces that can be used on the frontend to model data structures related to learning content and user progress. These are illustrative and may evolve during development.
+
+**1. `PhraseVersion`**
+
+Represents a specific language version of a phrase concept.
+
+```typescript
+interface PhraseVersion {
+  id: number; // Corresponds to phrase_versions.id (the specific language version)
+  phraseConceptId: number; // Corresponds to vocabulary_phrases.id (the language-agnostic concept)
+  languageCode: string; // The language code of this version (e.g., 'en-US', 'es-ES')
+  text: string; // The phrase text in this language
+  audioUrl?: string; // URL to the audio for this phrase version
+  // concept_description?: string; // Optional: from vocabulary_phrases.concept_description if needed
+}
+```
+
+**2. `LessonContent`**
+
+Represents the content of a lesson a user will interact with.
+
+```typescript
+interface LessonContent {
+  id: number; // lessons.lesson_id
+  title: string; // lesson_translations.lesson_title (in user's target language)
+  phrases: PhraseVersion[]; // Array of all phrase versions for this lesson, in order
+  // Other lesson metadata like grammar_focus, etc., can be added here
+}
+```
+
+**3. `UserSinglePhraseProgress`**
+
+Reflects the structure of a row in the `user_phrase_progress` table, detailing the student's progress on a single phrase concept _in a specific language_ across all its activities.
+
+```typescript
+interface UserSinglePhraseProgress {
+  phraseProgressId?: number; // Optional: from user_phrase_progress.phrase_progress_id
+  studentId: number; // student_profiles.student_id
+  lessonId: number; // lessons.lesson_id
+  phraseConceptId: number; // vocabulary_phrases.id
+  languageCode: string; // The language of this specific phrase progress
+
+  // Unscramble Step
+  unscrambleCompleted: boolean;
+  unscrambleAttempts: number;
+  unscrambleLastAttemptAt?: string | Date | null; // ISO date string or Date object
+
+  // Pronunciation Step (maps to speech_attempts summary or best scores in user_phrase_progress)
+  pronunciationCompleted: boolean;
+  pronunciationAttempts: number;
+  pronunciationLastAttemptAt?: string | Date | null;
+  bestAccuracyScore?: number | null;
+  bestFluencyScore?: number | null;
+  bestCompletenessScore?: number | null;
+  bestPronunciationScore?: number | null; // Overall pronunciation score
+  bestProsodyScore?: number | null;
+
+  // Dictation Step
+  dictationCompleted: boolean;
+  dictationAttempts: number;
+  dictationLastAttemptAt?: string | Date | null;
+  bestDictationScore?: number | null; // e.g., a similarity score or simple correct/incorrect
+
+  // Overall status for this phrase in this language
+  isCompleted: boolean; // True if all required activities for this phrase are completed
+  lastProgressAt?: string | Date | null; // Timestamp of the last update
+}
+```
+
+**4. `LessonPlayerState`**
+
+This is the state managed by the main `LessonPlayer.tsx` client component (conceptual).
+
+```typescript
+type ActivityType = "pronunciation" | "unscramble" | "dictation";
+
+interface LessonPlayerState {
+  lessonContent: LessonContent | null;
+  currentPhraseIndex: number; // Index in lessonContent.phrases
+  currentActivityForPhrase: ActivityType | null; // Which activity is active for the currentPhraseIndex
+
+  // Stores the progress for each phrase in the current lesson.
+  // Keyed by phraseConceptId, as progress is per concept and language.
+  // The language is implicitly the user's current_target_language for this lesson instance.
+  userProgressForLesson: Record<number, UserSinglePhraseProgress>;
+
+  isChatActive: boolean; // True if the lesson has moved to the chat phase
+
+  isLoading: boolean; // For fetching lesson data or submitting progress
+  error: string | null; // For displaying errors
+
+  // Temporary state for the current active activity (could be more detailed)
+  // For example, for dictation, what the user has typed so far.
+  // This would be cleared or reset when moving between activities/phrases.
+  currentActivityAttemptData?: {
+    type: ActivityType;
+    userInput?: string; // For dictation
+    userArrangement?: string[]; // For unscramble (e.g., array of word IDs/texts in chosen order)
+    // Other relevant temporary data
+  };
+}
+```
+
+**5. `ActivityResultPayload` (Conceptual - for API payloads)**
+
+Conceptual payload for submitting activity results.
+
+```typescript
+interface ActivityResultPayload {
+  activityType: ActivityType;
+  phraseConceptId: number; // or phraseVersionId, depending on API design
+  languageCode: string;
+
+  isSuccessful: boolean; // Overall success for this attempt
+  score?: number | null; // Score for this specific attempt, if applicable
+
+  // Activity-specific detailed data for logging
+  attemptDetails: {
+    // For unscramble
+    actionsTaken?: any[]; // e.g., sequence of moves [{ wordId: 'abc', fromIndex: 2, toIndex: 0 }, ...]
+    finalArrangement?: string[]; // User's final word order
+    timeTakenMs?: number;
+
+    // For dictation
+    typedText?: string;
+    similarityToOriginal?: number; // if calculated client-side for immediate feedback or server-side
+
+    // For pronunciation (if this endpoint were also used, though you have /api/speech/attempt)
+    // recognizedText?: string;
+    // audioBlob?: Blob; // if sending audio
+    // detailedScores?: any; // from Azure
+  };
+}
+```
 
 ## 5. Third-Party Integrations 🛠️
 
@@ -503,22 +652,83 @@ phrase_progress_id SERIAL PRIMARY KEY,
 student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
 lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
 phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
--- language_code CHAR(5) REFERENCES languages(language_code), -- Add if tracking phrase progress per language explicitly for the SAME phrase concept
-pronunciation_attempts INT DEFAULT 0,
-pronunciation_last_attempt_at TIMESTAMPTZ,
-best_accuracy_score NUMERIC(5,2) CHECK (best_accuracy_score BETWEEN 0 AND 100),
-best_fluency_score NUMERIC(5,2) CHECK (best_fluency_score BETWEEN 0 AND 100),
-best_completeness_score NUMERIC(5,2) CHECK (best_completeness_score BETWEEN 0 AND 100),
-best_pronunciation_score NUMERIC(5,2) CHECK (best_pronunciation_score BETWEEN 0 AND 100),
-best_prosody_score NUMERIC(5,2) CHECK (best_prosody_score BETWEEN 0 AND 100),
-is_completed BOOLEAN DEFAULT FALSE,
-last_progress_at TIMESTAMPTZ DEFAULT NOW(),
-UNIQUE (student_id, lesson_id, phrase_id) -- If language_code is added, include it in UNIQUE constraint
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code), -- Explicitly added as per discussion below
+
+    -- Unscramble Step (Non-Scored)
+    unscramble_completed BOOLEAN DEFAULT FALSE,
+    unscramble_attempts INT DEFAULT 0,
+    unscramble_last_attempt_at TIMESTAMPTZ,
+
+    -- Pronunciation Step (Incorporates fields from your original table)
+    pronunciation_completed BOOLEAN DEFAULT FALSE, -- Renamed from your original 'is_completed'
+    pronunciation_attempts INT DEFAULT 0,
+    pronunciation_last_attempt_at TIMESTAMPTZ,
+    best_accuracy_score NUMERIC(5,2) CHECK (best_accuracy_score IS NULL OR best_accuracy_score BETWEEN 0 AND 100),
+    best_fluency_score NUMERIC(5,2) CHECK (best_fluency_score IS NULL OR best_fluency_score BETWEEN 0 AND 100),
+    best_completeness_score NUMERIC(5,2) CHECK (best_completeness_score IS NULL OR best_completeness_score BETWEEN 0 AND 100),
+    best_pronunciation_score NUMERIC(5,2) CHECK (best_pronunciation_score IS NULL OR best_pronunciation_score BETWEEN 0 AND 100),
+    best_prosody_score NUMERIC(5,2) CHECK (best_prosody_score IS NULL OR best_prosody_score BETWEEN 0 AND 100),
+
+    -- Dictation Step
+    dictation_completed BOOLEAN DEFAULT FALSE,
+    dictation_attempts INT DEFAULT 0,
+    dictation_last_attempt_at TIMESTAMPTZ,
+    best_dictation_score NUMERIC(5,2) CHECK (best_dictation_score IS NULL OR best_dictation_score BETWEEN 0 AND 100),
+
+    -- Overall status for this phrase in this specific language, considering all its applicable activity types
+    is_completed BOOLEAN DEFAULT FALSE,
+    last_progress_at TIMESTAMPTZ DEFAULT NOW(), -- Tracks the latest interaction with any part of this phrase progress
+
+    UNIQUE (student_id, lesson_id, phrase_id, language_code) -- Updated UNIQUE constraint
+
 );
 
-COMMENT ON TABLE user_phrase_progress IS 'Tracks student progress on individual phrases within lessons. Assumes context of student''s current target language for the session unless language_code is added.';
-COMMENT ON COLUMN user_phrase_progress.phrase_id IS 'References the language-agnostic phrase concept.';
-COMMENT ON COLUMN user_phrase_progress.is_completed IS 'Indicates overall completion status for this phrase in the context of the current learning session/language.';
+COMMENT ON TABLE user_phrase_progress IS 'Tracks student summary progress across different activity types for a single phrase, specific to a language.';
+COMMENT ON COLUMN user_phrase_progress.language_code IS 'The language in which the student is progressing with this specific phrase concept.';
+COMMENT ON COLUMN user_phrase_progress.pronunciation_completed IS 'True if the student has successfully completed the pronunciation activity for this phrase in this language.';
+COMMENT ON COLUMN user_phrase_progress.is_completed IS 'True when all required activity types (e.g., unscramble, pronunciation, dictation) for this phrase are complete in this language. Application logic determines which activities are required for a given phrase.';
+COMMENT ON COLUMN user_phrase_progress.last_progress_at IS 'Timestamp of the last update to any progress field for this phrase/language combination.';
+
+CREATE TABLE unscramble_attempts (
+attempt_id SERIAL PRIMARY KEY,
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code), -- Language context of the phrase being unscrambled
+attempt_number INT NOT NULL,
+is_successful BOOLEAN NOT NULL, -- Was this attempt successful?
+actions_taken JSONB NULL, -- e.g., array of moves, sequence of words chosen
+time_taken_ms INT NULL, -- Time taken for this attempt in milliseconds
+score NUMERIC(5,2) NULL CHECK (score IS NULL OR score BETWEEN 0 AND 100), -- If attempts can be scored
+created_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (student_id, lesson_id, phrase_id, language_code, attempt_number)
+);
+
+COMMENT ON TABLE unscramble_attempts IS 'Logs detailed information for each unscramble activity attempt by a student.';
+COMMENT ON COLUMN unscramble_attempts.language_code IS 'The language of the phrase version being unscrambled.';
+COMMENT ON COLUMN unscramble_attempts.actions_taken IS 'Structured data on the user''s actions during the unscramble attempt, e.g., sequence of word placements.';
+
+CREATE TABLE user_word_spelling (
+id SERIAL PRIMARY KEY,
+student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+word_text VARCHAR(100) NOT NULL,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code), -- Added: Language of the word
+total_dictation_occurrences INT DEFAULT 0,
+dictation_error_count INT DEFAULT 0,
+sum_word_similarity_score NUMERIC DEFAULT 0,
+average_word_similarity_score NUMERIC(5,2) DEFAULT 0,
+last_word_similarity_score NUMERIC(5,2) CHECK (last_word_similarity_score IS NULL OR last_word_similarity_score BETWEEN 0 AND 100),
+last_dictation_attempt_at TIMESTAMPTZ,
+needs_spelling_practice BOOLEAN DEFAULT FALSE,
+last_reviewed_at TIMESTAMPTZ,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(), -- Added for consistency
+UNIQUE (student_id, word_text, language_code) -- Added language_code
+);
+
+COMMENT ON TABLE user_word_spelling IS 'Tracks student spelling performance for individual words in specific languages, primarily from dictation activities.';
+COMMENT ON COLUMN user_word_spelling.language_code IS 'The language of the word_text being tracked for spelling.';
+COMMENT ON COLUMN user_word_spelling.dictation_error_count IS 'Times this word was marked as incorrect in dictation, potentially based on a similarity score threshold.';
 
 -- User Points Log Table
 CREATE TABLE user_points_log (
