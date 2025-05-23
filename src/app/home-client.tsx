@@ -219,6 +219,7 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
 
       <footer className="absolute bottom-8 text-gray-500">
         <p>Polyglotas Authentication Demo</p>
+        <a href="https://lordicon.com/">Icons by Lordicon.com</a>
       </footer>
     </div>
   );
