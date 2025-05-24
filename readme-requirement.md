@@ -403,60 +403,111 @@ COMMENT ON TABLE languages IS 'Stores all supported languages for content and UI
 COMMENT ON COLUMN languages.language_code IS 'BCP 47 language code, e.g., ''en'', ''es'', ''en-US''.';
 COMMENT ON COLUMN languages.language_name IS 'Human-readable name of the language.';
 
--- Persons Table
-CREATE TABLE persons (
-person_id BIGSERIAL PRIMARY KEY,
-first_name VARCHAR(255) NOT NULL,
-last_name VARCHAR(255) NULL,
-phone VARCHAR(50) NOT NULL,
-email VARCHAR(255) NULL UNIQUE,
-sub VARCHAR(255) NULL UNIQUE, -- Auth provider subject claim
+Supabase auth.users Table Definition
+Note: The auth.users table is automatically created and managed by Supabase within the auth schema. Developers should not attempt to modify its structure directly. This documentation is for understanding its fields and how they are used by the Supabase authentication system, enabling better integration with your application's public schema tables.
+
+Here are the columns typically found in the auth.users table, based on the provided image and common Supabase configurations:
+
+instance_id (uuid): This identifier is for Supabase's internal use, often linking the user record to the specific Supabase project instance. It's generally not directly used in application logic.
+id (uuid): This is the Primary Key for the table and the unique identifier for each user. This UUID is crucial for linking your public schema tables (like public.profiles) to an authenticated user.
+aud (character varying): Stands for "Audience." This field typically stores the audience claim for JWTs (JSON Web Tokens) issued for the user, usually 'authenticated'.
+role (character varying): Defines the user's role within the Supabase authentication system (e.g., 'authenticated', 'anon'). This is vital for setting up Row Level Security (RLS) policies.
+email (character varying): The user's primary email address. It's used for login, password recovery, email confirmations, and other communications.
+encrypted_password (character varying): Stores the user's password in a securely hashed format. You will never access or use the plain text password; Supabase handles password verification.
+email_confirmed_at (timestamp with time zone): A timestamp indicating when the user confirmed their email address by clicking a confirmation link. If NULL, the email is not yet confirmed.
+invited_at (timestamp with time zone): If the user was invited to the platform (e.g., by an administrator), this timestamp records when the invitation was created/sent.
+confirmation_token (character varying): A unique token sent to the user's email address to verify their email. This token is short-lived.
+confirmation_sent_at (timestamp with time zone): A timestamp indicating when the most recent email confirmation token was sent to the user.
+recovery_token (character varying): A unique token sent to the user's email (or phone) to allow them to reset their password.
+recovery_sent_at (timestamp with time zone): A timestamp indicating when the most recent password recovery token was sent.
+email_change_token_new (character varying): A token used during the process of changing a user's email address. This token is typically sent to the new email address for verification.
+email_change (character varying): Stores the new email address that a user has requested to change to, while it's pending confirmation.
+email_change_sent_at (timestamp with time zone): A timestamp indicating when the confirmation token for an email address change was sent.
+last_sign_in_at (timestamp with time zone): A timestamp recording the last time the user successfully signed into the application.
+raw_app_meta_data (jsonb): A JSONB field for storing application-specific metadata about the user that is typically managed by the application administrators or backend processes and not directly by the user (e.g., internal flags, group memberships).
+raw_user_meta_data (jsonb): A JSONB field for storing user-specific metadata that can often be set or updated by the user themselves or through your application logic (e.g., display name, preferences, avatar URL if not in a dedicated profile table).
+is_super_admin (boolean): A flag (true/false) that indicates if the user has super administrator privileges within the Supabase instance. This is typically for Supabase's internal management and rarely used directly by application developers.
+created_at (timestamp with time zone): A timestamp indicating when the user's record was first created in the auth.users table.
+updated_at (timestamp with time zone): A timestamp indicating when the user's record in auth.users was last modified.
+phone (text): The user's phone number, which can be used for phone-based login (e.g., with OTP) or account recovery.
+phone_confirmed_at (timestamp with time zone): A timestamp indicating when the user confirmed their phone number, typically by entering an OTP.
+phone_change (text): Stores the new phone number that a user has requested to change to, while it's pending confirmation.
+phone_change_token (character varying): A unique token sent to the user's new phone number to verify the change.
+phone_change_sent_at (timestamp with time zone): A timestamp indicating when the OTP or verification token for a phone number change was sent.
+confirmed_at (timestamp with time zone): A general confirmation timestamp. This often reflects the earliest confirmation time if multiple methods are used (e.g., email or phone), or it might be an alias for email_confirmed_at in simpler setups.
+email_change_token_current (character varying): In some email change flows, this token might be used to verify ownership of the current email address before proceeding with the change, or it could be another name for email_change_token_new depending on Supabase version/flow. It's related to the security of the email change process.
+email_change_confirm_status (smallint): An integer field indicating the status of an email change request (e.g., 0 for pending, 1 for confirmed). The specific integer values and their meanings are defined by Supabase's internal logic.
+banned_until (timestamp with time zone): If the user account is banned, this timestamp indicates when the ban expires. If NULL, the user is not currently banned or the ban is indefinite.
+reauthentication_token (character varying): A token used to confirm a user's identity again (re-authenticate) before performing sensitive operations, even if they have an active session.
+reauthentication_sent_at (timestamp with time zone): A timestamp indicating when a reauthentication request or token was sent.
+is_sso_user (boolean): A flag (true/false) that is set to true if the user account was created or linked via a Single Sign-On (SSO) provider. As noted in the image's description, "The user may have duplicate emails" in the system if they also have a non-SSO account with the same email.
+deleted_at (timestamp with time zone): If Supabase is configured for or uses soft deletes for users, this timestamp would indicate when the user account was marked as deleted.
+is_anonymous (boolean): A flag (true/false) indicating whether the user is an anonymous user. Anonymous users are typically temporary accounts with limited privileges, often used before full sign-up.
+
+-- Profiles Table
+
+CREATE TABLE public.profiles (
+-- This ID is the same as the user's ID in auth.users, serving as both PK and FK
+id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+first_name VARCHAR(255) NULL, -- Made nullable; can be populated from raw_user_meta_data or post-signup
+last_name VARCHAR(255) NULL, -- Made nullable
+-- Timestamps for the profile record itself
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-COMMENT ON TABLE persons IS 'Stores basic information about individuals.';
+COMMENT ON TABLE public.profiles IS 'Stores application-specific common profile information for users, extending auth.users. Email and primary auth phone are managed in auth.users.';
 
 -- Student Profiles Table (Updated)
-CREATE TABLE student_profiles (
-student_id BIGINT PRIMARY KEY REFERENCES persons(person_id) ON DELETE CASCADE,
+CREATE TABLE public.student_profiles (
+profile_id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
 discount NUMERIC(5,2) NULL,
-status account_status_enum NOT NULL,
+status public.account_status_enum NOT NULL,
 current_streak_days INTEGER NOT NULL DEFAULT 0,
 last_streak_date DATE NULL,
-subscription_tier subscription_tier_enum NOT NULL DEFAULT 'free',
+subscription_tier public.subscription_tier_enum NOT NULL DEFAULT 'free',
 points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
-native_language_code CHAR(5) REFERENCES languages(language_code) NULL,
-current_target_language_code CHAR(5) REFERENCES languages(language_code) NULL,
+native_language_code CHAR(5) REFERENCES public.languages(language_code) NULL,
+current_target_language_code CHAR(5) REFERENCES public.languages(language_code) NULL,
 
     -- Stripe-related columns integrated directly
     stripe_customer_id VARCHAR(255) UNIQUE NULL,
-    default_payment_method_details JSONB NULL, -- For display: e.g., {"brand": "visa", "last4": "4242", "exp_month": 12, "exp_year": 2025}
-    billing_address JSONB NULL, -- e.g., {"line1": "...", "city": "...", "postal_code": "...", "country": "..."}
+    default_payment_method_details JSONB NULL,
+    billing_address JSONB NULL,
 
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 
 );
 
-COMMENT ON TABLE student_profiles IS 'Stores student-specific academic, subscription, and payment-related information.';
-COMMENT ON COLUMN student_profiles.native_language_code IS 'The native language of the student.';
-COMMENT ON COLUMN student_profiles.current_target_language_code IS 'The language the student is currently actively learning/using.';
-COMMENT ON COLUMN student_profiles.subscription_tier IS 'The current subscription tier of the student, e.g., free, standard, pro.';
-COMMENT ON COLUMN student_profiles.stripe_customer_id IS 'Stripe Customer ID for this student. Created when user initiates first payment.';
-COMMENT ON COLUMN student_profiles.default_payment_method_details IS 'Non-sensitive, displayable details of the default payment method from Stripe.';
-COMMENT ON COLUMN student_profiles.billing_address IS 'Billing address details, often collected by Stripe and stored for reference.';
-COMMENT ON COLUMN student_profiles.status IS 'Overall account status of the student on the platform (e.g., active, suspended, email_unverified). Define account_status_enum separately.';
+-- Table Comment
+COMMENT ON TABLE public.student_profiles IS 'Stores student-specific academic progress, subscription details, and payment information, extending a user''s general profile from public.profiles.';
+
+-- Column Comments (Revised and Expanded)
+COMMENT ON COLUMN public.student_profiles.profile_id IS 'The unique identifier for this student profile, referencing the primary key (id) of the corresponding user in public.profiles.';
+COMMENT ON COLUMN public.student_profiles.discount IS 'Any applicable discount percentage for the student''s subscription (e.g., 10.00 for 10% discount). NULL if no discount applies.';
+COMMENT ON COLUMN public.student_profiles.status IS 'Overall status of the student profile on the platform (e.g., active, suspended, pending_verification, deactivated). Uses the public.account_status_enum type.';
+COMMENT ON COLUMN public.student_profiles.current_streak_days IS 'Number of consecutive days the student has maintained an activity streak (e.g., lesson completion, practice).';
+COMMENT ON COLUMN public.student_profiles.last_streak_date IS 'The most recent date on which the student successfully contributed to their current activity streak.';
+COMMENT ON COLUMN public.student_profiles.subscription_tier IS 'The current subscription tier of the student (e.g., free, standard, pro). Uses the public.subscription_tier_enum type.';
+COMMENT ON COLUMN public.student_profiles.points IS 'Gamification points or rewards earned by the student within the platform.';
+COMMENT ON COLUMN public.student_profiles.native_language_code IS 'The student''s declared native language, referencing language_code in the public.languages table.';
+COMMENT ON COLUMN public.student_profiles.current_target_language_code IS 'The language the student is currently actively learning or using as a target, referencing language_code in the public.languages table.';
+COMMENT ON COLUMN public.student_profiles.stripe_customer_id IS 'The Stripe Customer ID associated with this student. Typically created when the student initiates their first payment or subscription with Stripe.';
+COMMENT ON COLUMN public.student_profiles.default_payment_method_details IS 'Non-sensitive, displayable details of the student''s default payment method, usually sourced from Stripe (e.g., card brand, last four digits, expiry). For display purposes only.';
+COMMENT ON COLUMN public.student_profiles.billing_address IS 'The billing address associated with the student''s payment methods, often collected by Stripe and can be stored here for reference, display, or local analytics.';
+COMMENT ON COLUMN public.student_profiles.created_at IS 'Timestamp indicating when this student profile record was created.';
+COMMENT ON COLUMN public.student_profiles.updated_at IS 'Timestamp indicating when this student profile record was last updated.';
 
 -- Student Target Languages Table
-CREATE TABLE student_target_languages (
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
-language_code CHAR(5) NOT NULL REFERENCES languages(language_code) ON DELETE CASCADE,
+CREATE TABLE public.student_target_languages (
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES public.languages(language_code) ON DELETE CASCADE,
 added_at TIMESTAMPTZ DEFAULT NOW(),
-PRIMARY KEY (student_id, language_code)
+PRIMARY KEY (profile_id, language_code)
 );
 
-COMMENT ON TABLE student_target_languages IS 'Stores all languages a student intends to learn or has learned.';
+COMMENT ON TABLE public.student_target_languages IS 'Stores all languages a student intends to learn or has learned.';
 
 -- Units Table
 CREATE TABLE units (
@@ -588,7 +639,7 @@ COMMENT ON TABLE conversation_starter_translations IS 'Stores language-specific 
 -- Speech Attempts Table
 CREATE TABLE speech_attempts (
 attempt_id SERIAL PRIMARY KEY,
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
 phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
 language_code CHAR(5) NOT NULL REFERENCES languages(language_code),
@@ -602,18 +653,17 @@ completeness_score NUMERIC(5,2) CHECK (completeness_score BETWEEN 0 AND 100),
 pronunciation_score NUMERIC(5,2) CHECK (pronunciation_score BETWEEN 0 AND 100),
 prosody_score NUMERIC(5,2) CHECK (prosody_score BETWEEN 0 AND 100),
 phonetic_data JSONB,
-CONSTRAINT speech_attempts_student_lesson_phrase_lang_attempt_key UNIQUE (student_id, lesson_id, phrase_id, language_code, attempt_number)
+CONSTRAINT speech_attempts_profile_lesson_phrase_lang_attempt_key UNIQUE (profile_id, lesson_id, phrase_id, language_code, attempt_number)
 );
 
 COMMENT ON TABLE speech_attempts IS 'Stores records of student speech attempts for specific phrases and languages.';
+COMMENT ON COLUMN speech_attempts.profile_id IS 'References the student profile ID.';
 COMMENT ON COLUMN speech_attempts.phrase_id IS 'References the language-agnostic phrase concept in vocabulary_phrases.';
-COMMENT ON COLUMN speech_attempts.language_code IS 'The language of the phrase version (from phrase_versions) that was attempted.';
-COMMENT ON COLUMN speech_attempts.reference_text IS 'The canonical text of the phrase in the attempted language, sourced from phrase_versions.';
 
 -- User Word Pronunciation Table
 CREATE TABLE user_word_pronunciation (
 id SERIAL PRIMARY KEY,
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 word_text VARCHAR(100) NOT NULL,
 language_code CHAR(5) NOT NULL REFERENCES languages(language_code),
 total_attempts INT DEFAULT 0,
@@ -627,16 +677,17 @@ needs_practice BOOLEAN DEFAULT FALSE,
 last_reviewed_at TIMESTAMPTZ,
 created_at TIMESTAMPTZ DEFAULT NOW(),
 updated_at TIMESTAMPTZ DEFAULT NOW(),
-UNIQUE (student_id, word_text, language_code)
+UNIQUE (profile_id, word_text, language_code)
 );
 
 COMMENT ON TABLE user_word_pronunciation IS 'Tracks student''s pronunciation performance for individual words in specific languages.';
+COMMENT ON COLUMN user_word_pronunciation.profile_id IS 'References the student profile ID.';
 COMMENT ON COLUMN user_word_pronunciation.language_code IS 'The language of the word_text being tracked.';
 
 -- User Lesson Progress Table
 CREATE TABLE user_lesson_progress (
 progress_id SERIAL PRIMARY KEY,
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
 started_at TIMESTAMPTZ DEFAULT NOW(),
 completed_at TIMESTAMPTZ,
@@ -644,17 +695,17 @@ chat_activity_engaged_at TIMESTAMPTZ NULL,
 is_completed BOOLEAN DEFAULT FALSE,
 phrases_completed INT DEFAULT 0,
 last_progress_at TIMESTAMPTZ DEFAULT NOW(),
-UNIQUE (student_id, lesson_id)
+UNIQUE (profile_id, lesson_id)
 );
 
 COMMENT ON TABLE user_lesson_progress IS 'Tracks student progress at the lesson level.';
+COMMENT ON COLUMN user_lesson_progress.profile_id IS 'References the student profile ID.';
 COMMENT ON COLUMN user_lesson_progress.chat_activity_engaged_at IS 'Timestamp when the student first sent a message in the end-of-lesson chat activity for this lesson for any language.';
-COMMENT ON COLUMN user_lesson_progress.is_completed IS 'Flag indicating full lesson completion. Criteria may involve completing phrases in a target language and chat engagement.';
 
 -- User Phrase Progress Table
 CREATE TABLE user_phrase_progress (
 phrase_progress_id SERIAL PRIMARY KEY,
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
 phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
 language_code CHAR(5) NOT NULL REFERENCES languages(language_code), -- Explicitly added as per discussion below
@@ -684,38 +735,17 @@ language_code CHAR(5) NOT NULL REFERENCES languages(language_code), -- Explicitl
     is_completed BOOLEAN DEFAULT FALSE,
     last_progress_at TIMESTAMPTZ DEFAULT NOW(), -- Tracks the latest interaction with any part of this phrase progress
 
-    UNIQUE (student_id, lesson_id, phrase_id, language_code) -- Updated UNIQUE constraint
+    UNIQUE (profile_id, lesson_id, phrase_id, language_code) -- Updated UNIQUE constraint
 
 );
 
 COMMENT ON TABLE user_phrase_progress IS 'Tracks student summary progress across different activity types for a single phrase, specific to a language.';
+COMMENT ON COLUMN user_phrase_progress.profile_id IS 'References the student profile ID.';
 COMMENT ON COLUMN user_phrase_progress.language_code IS 'The language in which the student is progressing with this specific phrase concept.';
-COMMENT ON COLUMN user_phrase_progress.pronunciation_completed IS 'True if the student has successfully completed the pronunciation activity for this phrase in this language.';
-COMMENT ON COLUMN user_phrase_progress.is_completed IS 'True when all required activity types (e.g., unscramble, pronunciation, dictation) for this phrase are complete in this language. Application logic determines which activities are required for a given phrase.';
-COMMENT ON COLUMN user_phrase_progress.last_progress_at IS 'Timestamp of the last update to any progress field for this phrase/language combination.';
-
-CREATE TABLE unscramble_attempts (
-attempt_id SERIAL PRIMARY KEY,
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
-lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
-phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
-language_code CHAR(5) NOT NULL REFERENCES languages(language_code), -- Language context of the phrase being unscrambled
-attempt_number INT NOT NULL,
-is_successful BOOLEAN NOT NULL, -- Was this attempt successful?
-actions_taken JSONB NULL, -- e.g., array of moves, sequence of words chosen
-time_taken_ms INT NULL, -- Time taken for this attempt in milliseconds
-score NUMERIC(5,2) NULL CHECK (score IS NULL OR score BETWEEN 0 AND 100), -- If attempts can be scored
-created_at TIMESTAMPTZ DEFAULT NOW(),
-UNIQUE (student_id, lesson_id, phrase_id, language_code, attempt_number)
-);
-
-COMMENT ON TABLE unscramble_attempts IS 'Logs detailed information for each unscramble activity attempt by a student.';
-COMMENT ON COLUMN unscramble_attempts.language_code IS 'The language of the phrase version being unscrambled.';
-COMMENT ON COLUMN unscramble_attempts.actions_taken IS 'Structured data on the user''s actions during the unscramble attempt, e.g., sequence of word placements.';
 
 CREATE TABLE user_word_spelling (
 id SERIAL PRIMARY KEY,
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 word_text VARCHAR(100) NOT NULL,
 language_code CHAR(5) NOT NULL REFERENCES languages(language_code), -- Added: Language of the word
 total_dictation_occurrences INT DEFAULT 0,
@@ -728,17 +758,37 @@ needs_spelling_practice BOOLEAN DEFAULT FALSE,
 last_reviewed_at TIMESTAMPTZ,
 created_at TIMESTAMPTZ DEFAULT NOW(),
 updated_at TIMESTAMPTZ DEFAULT NOW(), -- Added for consistency
-UNIQUE (student_id, word_text, language_code) -- Added language_code
+UNIQUE (profile_id, word_text, language_code) -- Added language_code
 );
 
 COMMENT ON TABLE user_word_spelling IS 'Tracks student spelling performance for individual words in specific languages, primarily from dictation activities.';
+COMMENT ON COLUMN user_word_spelling.profile_id IS 'References the student profile ID.';
 COMMENT ON COLUMN user_word_spelling.language_code IS 'The language of the word_text being tracked for spelling.';
-COMMENT ON COLUMN user_word_spelling.dictation_error_count IS 'Times this word was marked as incorrect in dictation, potentially based on a similarity score threshold.';
+
+CREATE TABLE dictation_attempts (
+attempt_id SERIAL PRIMARY KEY,
+profile_id UUID NOT NULL REFERENCES student_profiles(profile_id) ON DELETE CASCADE,
+lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+phrase_id INT NOT NULL REFERENCES vocabulary_phrases(id) ON DELETE CASCADE,
+language_code CHAR(5) NOT NULL REFERENCES languages(language_code), -- Added: Language of the dictation
+attempt_number INT NOT NULL,
+reference_text TEXT NOT NULL,
+written_text TEXT NOT NULL,
+overall_similarity_score NUMERIC(5,2) CHECK (overall_similarity_score IS NULL OR overall_similarity_score BETWEEN 0 AND 100),
+word_level_feedback JSONB NULL,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+UNIQUE (profile_id, lesson_id, phrase_id, language_code, attempt_number) -- Added language_code
+);
+
+COMMENT ON TABLE dictation_attempts IS 'Logs detailed information for each dictation attempt by a student.';
+COMMENT ON COLUMN dictation_attempts.language_code IS 'The language in which the dictation was performed.';
+COMMENT ON COLUMN dictation_attempts.reference_text IS 'Snapshot of the target phrase text in the specific language at the time of the attempt.';
+COMMENT ON COLUMN dictation_attempts.word_level_feedback IS 'Array of objects detailing word-level comparison, e.g., [{reference_word: "text", written_word: "txet", similarity_score: 75.00, position_in_phrase: 0}, ...].';
 
 -- User Points Log Table
 CREATE TABLE user_points_log (
 log_id SERIAL PRIMARY KEY,
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 points_awarded INT NOT NULL,
 reason_code VARCHAR(50) NOT NULL,
 related_lesson_id INT NULL REFERENCES lessons(lesson_id),
@@ -750,13 +800,13 @@ created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 COMMENT ON TABLE user_points_log IS 'Logs points awarded or spent by students, with language context for word-related points.';
+COMMENT ON COLUMN user_points_log.profile_id IS 'References the student profile ID.';
 COMMENT ON COLUMN user_points_log.related_phrase_id IS 'References the language-agnostic phrase concept, if applicable.';
-COMMENT ON COLUMN user_points_log.related_word_language_code IS 'Language of related_word_text, if applicable.';
 
 -- Lesson Chat Conversations Table
 CREATE TABLE lesson_chat_conversations (
 conversation_id BIGSERIAL PRIMARY KEY,
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 lesson_id INT NOT NULL REFERENCES lessons(lesson_id) ON DELETE CASCADE,
 language_code CHAR(5) NOT NULL REFERENCES languages(language_code),
 created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -764,8 +814,9 @@ all_prompts_addressed_at TIMESTAMPTZ NULL,
 last_message_at TIMESTAMPTZ NULL
 );
 
-CREATE INDEX idx_lesson_chat_conversations_student_lesson_lang ON lesson_chat_conversations (student_id, lesson_id, language_code);
+CREATE INDEX idx_lesson_chat_conversations_profile_lesson_lang ON lesson_chat_conversations (profile_id, lesson_id, language_code);
 COMMENT ON TABLE lesson_chat_conversations IS 'Tracks each distinct conversation attempt for a lesson, specific to a language.';
+COMMENT ON COLUMN lesson_chat_conversations.profile_id IS 'References the student profile ID.';
 COMMENT ON COLUMN lesson_chat_conversations.language_code IS 'The language in which this conversation took place.';
 
 -- Conversation Messages Table
@@ -857,7 +908,7 @@ COMMENT ON COLUMN prices.trial_period_days IS 'Number of trial days offered by S
 
 CREATE TABLE student_subscriptions (
 id SERIAL PRIMARY KEY, -- Your internal subscription ID
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 price_id INT NOT NULL REFERENCES prices(id), -- Link to the specific price they are subscribed to
 stripe_subscription_id VARCHAR(255) UNIQUE NOT NULL,
 status subscription_status_enum NOT NULL,
@@ -876,19 +927,20 @@ created_at TIMESTAMPTZ DEFAULT NOW(), -- Your record's creation timestamp
 updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_student_subscriptions_student_id ON student_subscriptions(student_id);
+CREATE INDEX idx_student_subscriptions_profile_id ON student_subscriptions(profile_id);
 CREATE INDEX idx_student_subscriptions_stripe_subscription_id ON student_subscriptions(stripe_subscription_id);
 CREATE INDEX idx_student_subscriptions_status ON student_subscriptions(status);
 
 COMMENT ON TABLE student_subscriptions IS 'Tracks individual student subscriptions to specific prices/plans.';
+COMMENT ON COLUMN student_subscriptions.profile_id IS 'References the student profile ID.';
 COMMENT ON COLUMN student_subscriptions.price_id IS 'The specific price (monthly/yearly/etc.) the student is subscribed to.';
 
 CREATE TABLE invoices (
 id SERIAL PRIMARY KEY, -- Your internal invoice ID
-student_id BIGINT NOT NULL REFERENCES student_profiles(student_id) ON DELETE CASCADE,
+profile_id UUID NOT NULL REFERENCES public.student_profiles(profile_id) ON DELETE CASCADE,
 stripe_invoice_id VARCHAR(255) UNIQUE NOT NULL,
 stripe_subscription_id VARCHAR(255) NULL REFERENCES student_subscriptions(stripe_subscription_id), -- Link to subscription if applicable
-stripe_customer_id VARCHAR(255) NULL REFERENCES student_profiles(stripe_customer_id),
+stripe_customer_id VARCHAR(255) NULL, -- No direct FK to student_profiles.stripe_customer_id here, as it's more for informational/denormalized data from Stripe
 status invoice_status_enum NOT NULL,
 amount_due INT NOT NULL, -- In smallest currency unit (cents)
 amount_paid INT NOT NULL,
@@ -905,11 +957,13 @@ created_at TIMESTAMPTZ DEFAULT NOW(),
 updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_invoices_student_id ON invoices(student_id);
+CREATE INDEX idx_invoices_profile_id ON invoices(profile_id);
 CREATE INDEX idx_invoices_stripe_invoice_id ON invoices(stripe_invoice_id);
 CREATE INDEX idx_invoices_stripe_subscription_id ON invoices(stripe_subscription_id);
 
 COMMENT ON TABLE invoices IS 'Stores key information about Stripe invoices for billing history and support.';
+COMMENT ON COLUMN invoices.profile_id IS 'References the student profile ID this invoice is associated with.';
+COMMENT ON COLUMN invoices.stripe_customer_id IS 'The Stripe Customer ID. This is stored for reference; primary link to student is via profile_id.';
 
 ## 11. Database functions
 
@@ -939,7 +993,7 @@ COMMENT ON FUNCTION update_updated_at_column() IS 'Trigger function to automatic
 -- Increments points for a student.
 --------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION increment_points(
-    p_student_id BIGINT,
+    p_profile_id UUID,
     p_points_to_add INT
 )
 RETURNS INT AS
@@ -950,7 +1004,7 @@ v_new_point_total INT;
 BEGIN
 UPDATE student_profiles
 SET points = points + p_points_to_add
-WHERE student_id = p_student_id
+WHERE profile_id = p_profile_id
 RETURNING points INTO v_new_point_total;
 
     RETURN v_new_point_total;
@@ -960,14 +1014,14 @@ END;
 $$
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
 
-COMMENT ON FUNCTION increment_points(BIGINT, INT) IS 'Increments the points for a given student and returns the new total. p_student_id: ID of the student. p_points_to_add: Number of points to add (can be negative to subtract). Consider RLS implications if SECURITY DEFINER is used.';
+COMMENT ON FUNCTION increment_points(UUID, INT) IS 'Increments the points for a given student and returns the new total. p_profile_id: UUID of the student profile. p_points_to_add: Number of points to add (can be negative to subtract). Consider RLS implications if SECURITY DEFINER is used.';
 
 --------------------------------------------------------------------------------
 -- FUNCTION: update_chat_engagement
 -- Updates or inserts user_lesson_progress on first chat engagement for a lesson.
 --------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_chat_engagement(
-    p_student_id BIGINT,
+    p_profile_id UUID,
     p_lesson_id INT
 )
 RETURNS VOID AS
@@ -978,7 +1032,7 @@ BEGIN
 UPDATE user_lesson_progress
 SET chat_activity_engaged_at = NOW(),
 last_progress_at = NOW() -- Also update last_progress_at
-WHERE student_id = p_student_id
+WHERE profile_id = p_profile_id
 AND lesson_id = p_lesson_id
 AND chat_activity_engaged_at IS NULL;
 
@@ -986,7 +1040,7 @@ AND chat_activity_engaged_at IS NULL;
     -- and specifically if no record exists, then insert.
     IF NOT FOUND THEN
         INSERT INTO user_lesson_progress (
-            student_id,
+            profile_id,
             lesson_id,
             started_at,
             chat_activity_engaged_at,
@@ -995,7 +1049,7 @@ AND chat_activity_engaged_at IS NULL;
             last_progress_at
         )
         SELECT
-            p_student_id,
+            p_profile_id,
             p_lesson_id,
             NOW(),
             NOW(),
@@ -1004,7 +1058,7 @@ AND chat_activity_engaged_at IS NULL;
             NOW()
         WHERE NOT EXISTS ( -- Ensure no record exists before inserting
             SELECT 1 FROM user_lesson_progress
-            WHERE student_id = p_student_id AND lesson_id = p_lesson_id
+            WHERE profile_id = p_profile_id AND lesson_id = p_lesson_id
         );
     END IF;
 
@@ -1013,7 +1067,7 @@ END;
 $$
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
 
-COMMENT ON FUNCTION update_chat_engagement(BIGINT, INT) IS 'Sets the chat_activity_engaged_at timestamp for a student''s lesson progress. If no progress record exists, it creates one. p_student_id: ID of the student. p_lesson_id: ID of the lesson. Consider RLS implications if SECURITY DEFINER is used.';
+COMMENT ON FUNCTION update_chat_engagement(UUID, INT) IS 'Sets the chat_activity_engaged_at timestamp for a student''s lesson progress. If no progress record exists, it creates one. p_profile_id: UUID of the student profile. p_lesson_id: ID of the lesson. Consider RLS implications if SECURITY DEFINER is used.';
 
 --------------------------------------------------------------------------------
 -- FUNCTION: update_lesson_phrase_count (Trigger Function)
@@ -1074,7 +1128,7 @@ COMMENT ON FUNCTION update_lesson_phrase_count() IS 'Trigger function to update 
 -- Upserts word pronunciation statistics for a student.
 --------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION upsert_word_pronunciation(
-    p_student_id BIGINT,
+    p_profile_id UUID,
     p_language_code CHAR(5),
     p_word_data JSONB -- Expects: {"word_text": "...", "accuracy_score": ..., "error_type": "...", "attempt_timestamp": "..."}
 )
@@ -1106,18 +1160,18 @@ v_accuracy_score := GREATEST(0, LEAST(100, v_accuracy_score));
     END IF;
 
     INSERT INTO user_word_pronunciation (
-        student_id, word_text, language_code,
+        profile_id, word_text, language_code,
         total_attempts, error_count, sum_accuracy_score, average_accuracy_score,
         last_accuracy_score, last_error_type, last_attempt_at,
         needs_practice, created_at, updated_at
     )
     VALUES (
-        p_student_id, v_word_text, p_language_code,
+        p_profile_id, v_word_text, p_language_code,
         1, v_error_increment, v_accuracy_score, v_accuracy_score,
         v_accuracy_score, v_error_type, v_attempt_timestamp,
         (v_error_increment = 1 OR v_accuracy_score < 70), NOW(), NOW()
     )
-    ON CONFLICT (student_id, word_text, language_code) DO UPDATE
+    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
     SET
         total_attempts = user_word_pronunciation.total_attempts + 1,
         error_count = user_word_pronunciation.error_count + v_error_increment,
@@ -1145,21 +1199,21 @@ v_accuracy_score := GREATEST(0, LEAST(100, v_accuracy_score));
 
     UPDATE user_word_pronunciation uwp
     SET average_accuracy_score = v_new_average_accuracy_score, needs_practice = v_final_needs_practice
-    WHERE uwp.student_id = p_student_id AND uwp.word_text = v_word_text AND uwp.language_code = p_language_code;
+    WHERE uwp.profile_id = p_profile_id AND uwp.word_text = v_word_text AND uwp.language_code = p_language_code;
 
 END;
 
 $$
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
 
-COMMENT ON FUNCTION upsert_word_pronunciation(BIGINT, CHAR(5), JSONB) IS 'Upserts word pronunciation statistics for a student. p_word_data expects {"word_text", "accuracy_score", "error_type", "attempt_timestamp"}. Consider RLS implications if SECURITY DEFINER is used.';
+COMMENT ON FUNCTION upsert_word_pronunciation(UUID, CHAR(5), JSONB) IS 'Upserts word pronunciation statistics for a student. p_word_data expects {"word_text", "accuracy_score", "error_type", "attempt_timestamp"}. Consider RLS implications if SECURITY DEFINER is used.';
 
 --------------------------------------------------------------------------------
 -- FUNCTION: upsert_word_spelling
 -- Upserts word spelling statistics for a student.
 --------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION upsert_word_spelling(
-    p_student_id BIGINT,
+    p_profile_id UUID,
     p_language_code CHAR(5),
     p_word_data JSONB -- Expects: {"word_text": "...", "similarity_score": ..., "is_error": boolean, "attempt_timestamp": "..."}
 )
@@ -1186,18 +1240,18 @@ v_similarity_score := GREATEST(0, LEAST(100, v_similarity_score));
     IF v_is_error THEN v_error_increment := 1; ELSE v_error_increment := 0; END IF;
 
     INSERT INTO user_word_spelling (
-        student_id, word_text, language_code,
+        profile_id, word_text, language_code,
         total_dictation_occurrences, dictation_error_count, sum_word_similarity_score, average_word_similarity_score,
         last_word_similarity_score, last_dictation_attempt_at,
         needs_spelling_practice, created_at, updated_at
     )
     VALUES (
-        p_student_id, v_word_text, p_language_code,
+        p_profile_id, v_word_text, p_language_code,
         1, v_error_increment, v_similarity_score, v_similarity_score,
         v_similarity_score, v_attempt_timestamp,
         (v_error_increment = 1 OR v_similarity_score < 75), NOW(), NOW()
     )
-    ON CONFLICT (student_id, word_text, language_code) DO UPDATE
+    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
     SET
         total_dictation_occurrences = user_word_spelling.total_dictation_occurrences + 1,
         dictation_error_count = user_word_spelling.dictation_error_count + v_error_increment,
@@ -1224,14 +1278,14 @@ v_similarity_score := GREATEST(0, LEAST(100, v_similarity_score));
 
     UPDATE user_word_spelling uws
     SET average_word_similarity_score = v_new_average_similarity_score, needs_spelling_practice = v_final_needs_practice
-    WHERE uws.student_id = p_student_id AND uws.word_text = v_word_text AND uws.language_code = p_language_code;
+    WHERE uws.profile_id = p_profile_id AND uws.word_text = v_word_text AND uws.language_code = p_language_code;
 
 END;
 
 $$
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER;
 
-COMMENT ON FUNCTION upsert_word_spelling(BIGINT, CHAR(5), JSONB) IS 'Upserts word spelling statistics for a student. p_word_data expects {"word_text", "similarity_score", "is_error", "attempt_timestamp"}. Consider RLS implications if SECURITY DEFINER is used.';
+COMMENT ON FUNCTION upsert_word_spelling(UUID, CHAR(5), JSONB) IS 'Upserts word spelling statistics for a student. p_word_data expects {"word_text", "similarity_score", "is_error", "attempt_timestamp"}. Consider RLS implications if SECURITY DEFINER is used.';
 
 --------------------------------------------------------------------------------
 -- FUNCTION: update_lesson_completion_stats (Trigger Function)
@@ -1255,7 +1309,7 @@ THEN
 SELECT COUNT(\*)
 INTO v_phrases_now_completed_for_lang
 FROM user_phrase_progress upp
-WHERE upp.student_id = NEW.student_id
+WHERE upp.profile_id = NEW.profile_id
 AND upp.lesson_id = NEW.lesson_id
 AND upp.language_code = NEW.language_code -- Specific to the language of the phrase progress
 AND upp.is_completed = TRUE;
@@ -1269,7 +1323,7 @@ AND upp.is_completed = TRUE;
         -- Check if a user_lesson_progress record exists
         SELECT EXISTS (
             SELECT 1 FROM user_lesson_progress
-            WHERE student_id = NEW.student_id AND lesson_id = NEW.lesson_id
+            WHERE profile_id = NEW.profile_id AND lesson_id = NEW.lesson_id
         ) INTO v_lesson_progress_exists;
 
         -- The definition of overall lesson completion in `user_lesson_progress` needs to be carefully considered.
@@ -1295,13 +1349,13 @@ AND upp.is_completed = TRUE;
                                     ELSE completed_at
                                 END),
                 last_progress_at = NOW()
-            WHERE student_id = NEW.student_id
+            WHERE profile_id = NEW.profile_id
               AND lesson_id = NEW.lesson_id;
         ELSE
              INSERT INTO user_lesson_progress (
-                student_id, lesson_id, started_at, phrases_completed, is_completed, completed_at, last_progress_at, chat_activity_engaged_at
+                profile_id, lesson_id, started_at, phrases_completed, is_completed, completed_at, last_progress_at, chat_activity_engaged_at
             ) VALUES (
-                NEW.student_id, NEW.lesson_id, NOW(), v_phrases_now_completed_for_lang,
+                NEW.profile_id, NEW.lesson_id, NOW(), v_phrases_now_completed_for_lang,
                 (CASE WHEN v_lesson_total_phrases > 0 AND v_phrases_now_completed_for_lang >= v_lesson_total_phrases THEN TRUE ELSE FALSE END),
                 (CASE WHEN v_lesson_total_phrases > 0 AND v_phrases_now_completed_for_lang >= v_lesson_total_phrases THEN NOW() ELSE NULL END),
                 NOW(), NULL
@@ -1318,6 +1372,34 @@ LANGUAGE plpgsql VOLATILE;
 
 COMMENT ON FUNCTION update_lesson_completion_stats() IS 'Trigger function to update user_lesson_progress (phrases_completed, is_completed, completed_at) when a user_phrase_progress record is inserted or its is_completed status changes. Assumes phrases_completed count is specific to the language of the phrase just updated.';
 
+-- Function to create a profile in public.profiles when a new user signs up
+CREATE OR REPLACE FUNCTION public.handle_new_user_profile()
+RETURNS TRIGGER AS
+$$
+
+BEGIN
+INSERT INTO public.profiles (id, first_name, last_name, created_at, updated_at)
+VALUES (
+NEW.id, -- The id of the new user from auth.users
+NEW.raw_user_meta_data->>'first_name', -- Attempt to get first_name from metadata
+NEW.raw_user_meta_data->>'last_name', -- Attempt to get last_name from metadata
+NOW(),
+NOW()
+);
+-- If first_name/last_name are not in raw_user_meta_data, they will be NULL,
+-- which is fine because we made them nullable in public.profiles.
+RETURN NEW;
+END;
+
+$$
+LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to call the function when a new user is created in auth.users
+CREATE TRIGGER on_auth_user_created_create_public_profile
+AFTER INSERT ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_new_user_profile();
+
 
 ## 12. Database Triggers
 This section contains all the CREATE TRIGGER statements.
@@ -1327,105 +1409,105 @@ This section contains all the CREATE TRIGGER statements.
 --------------------------------------------------------------------------------
 
 -- On 'persons' table
-DROP TRIGGER IF EXISTS trg_persons_update_updated_at ON persons;
+DROP TRIGGER IF EXISTS trg_persons_update_updated_at ON public.persons;
 CREATE TRIGGER trg_persons_update_updated_at
-BEFORE UPDATE ON persons
+BEFORE UPDATE ON public.persons
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'student_profiles' table
-DROP TRIGGER IF EXISTS trg_student_profiles_update_updated_at ON student_profiles;
+DROP TRIGGER IF EXISTS trg_student_profiles_update_updated_at ON public.student_profiles;
 CREATE TRIGGER trg_student_profiles_update_updated_at
-BEFORE UPDATE ON student_profiles
+BEFORE UPDATE ON public.student_profiles
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'units' table
-DROP TRIGGER IF EXISTS trg_units_update_updated_at ON units;
+DROP TRIGGER IF EXISTS trg_units_update_updated_at ON public.units;
 CREATE TRIGGER trg_units_update_updated_at
-BEFORE UPDATE ON units
+BEFORE UPDATE ON public.units
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'lessons' table
-DROP TRIGGER IF EXISTS trg_lessons_update_updated_at ON lessons;
+DROP TRIGGER IF EXISTS trg_lessons_update_updated_at ON public.lessons;
 CREATE TRIGGER trg_lessons_update_updated_at
-BEFORE UPDATE ON lessons
+BEFORE UPDATE ON public.lessons
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'vocabulary_phrases' table
-DROP TRIGGER IF EXISTS trg_vocabulary_phrases_update_updated_at ON vocabulary_phrases;
+DROP TRIGGER IF EXISTS trg_vocabulary_phrases_update_updated_at ON public.vocabulary_phrases;
 CREATE TRIGGER trg_vocabulary_phrases_update_updated_at
-BEFORE UPDATE ON vocabulary_phrases
+BEFORE UPDATE ON public.vocabulary_phrases
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'conversation_starters' table
-DROP TRIGGER IF EXISTS trg_conversation_starters_update_updated_at ON conversation_starters;
+DROP TRIGGER IF EXISTS trg_conversation_starters_update_updated_at ON public.conversation_starters;
 CREATE TRIGGER trg_conversation_starters_update_updated_at
-BEFORE UPDATE ON conversation_starters
+BEFORE UPDATE ON public.conversation_starters
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'unit_translations' table
-DROP TRIGGER IF EXISTS trg_unit_translations_update_updated_at ON unit_translations;
+DROP TRIGGER IF EXISTS trg_unit_translations_update_updated_at ON public.unit_translations;
 CREATE TRIGGER trg_unit_translations_update_updated_at
-BEFORE UPDATE ON unit_translations
+BEFORE UPDATE ON public.unit_translations
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'lesson_translations' table
-DROP TRIGGER IF EXISTS trg_lesson_translations_update_updated_at ON lesson_translations;
+DROP TRIGGER IF EXISTS trg_lesson_translations_update_updated_at ON public.lesson_translations;
 CREATE TRIGGER trg_lesson_translations_update_updated_at
-BEFORE UPDATE ON lesson_translations
+BEFORE UPDATE ON public.lesson_translations
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'learning_outcome_translations' table
-DROP TRIGGER IF EXISTS trg_learning_outcome_translations_update_updated_at ON learning_outcome_translations;
+DROP TRIGGER IF EXISTS trg_learning_outcome_translations_update_updated_at ON public.learning_outcome_translations;
 CREATE TRIGGER trg_learning_outcome_translations_update_updated_at
-BEFORE UPDATE ON learning_outcome_translations
+BEFORE UPDATE ON public.learning_outcome_translations
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'phrase_versions' table
-DROP TRIGGER IF EXISTS trg_phrase_versions_update_updated_at ON phrase_versions;
+DROP TRIGGER IF EXISTS trg_phrase_versions_update_updated_at ON public.phrase_versions;
 CREATE TRIGGER trg_phrase_versions_update_updated_at
-BEFORE UPDATE ON phrase_versions
+BEFORE UPDATE ON public.phrase_versions
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'conversation_starter_translations' table
-DROP TRIGGER IF EXISTS trg_conversation_starter_translations_update_updated_at ON conversation_starter_translations;
+DROP TRIGGER IF EXISTS trg_conversation_starter_translations_update_updated_at ON public.conversation_starter_translations;
 CREATE TRIGGER trg_conversation_starter_translations_update_updated_at
-BEFORE UPDATE ON conversation_starter_translations
+BEFORE UPDATE ON public.conversation_starter_translations
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'user_word_pronunciation' table
-DROP TRIGGER IF EXISTS trg_user_word_pronunciation_update_updated_at ON user_word_pronunciation;
+DROP TRIGGER IF EXISTS trg_user_word_pronunciation_update_updated_at ON public.user_word_pronunciation;
 CREATE TRIGGER trg_user_word_pronunciation_update_updated_at
-BEFORE UPDATE ON user_word_pronunciation
+BEFORE UPDATE ON public.user_word_pronunciation
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'user_word_spelling' table
-DROP TRIGGER IF EXISTS trg_user_word_spelling_update_updated_at ON user_word_spelling;
+DROP TRIGGER IF EXISTS trg_user_word_spelling_update_updated_at ON public.user_word_spelling;
 CREATE TRIGGER trg_user_word_spelling_update_updated_at
-BEFORE UPDATE ON user_word_spelling
+BEFORE UPDATE ON public.user_word_spelling
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'products' table
-DROP TRIGGER IF EXISTS trg_products_update_updated_at ON products;
+DROP TRIGGER IF EXISTS trg_products_update_updated_at ON public.products;
 CREATE TRIGGER trg_products_update_updated_at
-BEFORE UPDATE ON products
+BEFORE UPDATE ON public.products
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'prices' table
-DROP TRIGGER IF EXISTS trg_prices_update_updated_at ON prices;
+DROP TRIGGER IF EXISTS trg_prices_update_updated_at ON public.prices;
 CREATE TRIGGER trg_prices_update_updated_at
-BEFORE UPDATE ON prices
+BEFORE UPDATE ON public.prices
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'student_subscriptions' table
-DROP TRIGGER IF EXISTS trg_student_subscriptions_update_updated_at ON student_subscriptions;
+DROP TRIGGER IF EXISTS trg_student_subscriptions_update_updated_at ON public.student_subscriptions;
 CREATE TRIGGER trg_student_subscriptions_update_updated_at
-BEFORE UPDATE ON student_subscriptions
+BEFORE UPDATE ON public.student_subscriptions
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- On 'invoices' table
-DROP TRIGGER IF EXISTS trg_invoices_update_updated_at ON invoices;
+DROP TRIGGER IF EXISTS trg_invoices_update_updated_at ON public.invoices;
 CREATE TRIGGER trg_invoices_update_updated_at
-BEFORE UPDATE ON invoices
+BEFORE UPDATE ON public.invoices
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Note: `languages`, `learning_outcomes` currently only have `created_at` in your schema.
@@ -1440,21 +1522,21 @@ FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 --------------------------------------------------------------------------------
 
 -- On 'vocabulary_phrases' after DELETE
-DROP TRIGGER IF EXISTS trg_vocab_phrases_after_delete_update_lesson_count ON vocabulary_phrases;
+DROP TRIGGER IF EXISTS trg_vocab_phrases_after_delete_update_lesson_count ON public.vocabulary_phrases;
 CREATE TRIGGER trg_vocab_phrases_after_delete_update_lesson_count
-AFTER DELETE ON vocabulary_phrases
+AFTER DELETE ON public.vocabulary_phrases
 FOR EACH ROW EXECUTE FUNCTION update_lesson_phrase_count();
 
 -- On 'vocabulary_phrases' after INSERT
-DROP TRIGGER IF EXISTS trg_vocab_phrases_after_insert_update_lesson_count ON vocabulary_phrases;
+DROP TRIGGER IF EXISTS trg_vocab_phrases_after_insert_update_lesson_count ON public.vocabulary_phrases;
 CREATE TRIGGER trg_vocab_phrases_after_insert_update_lesson_count
-AFTER INSERT ON vocabulary_phrases
+AFTER INSERT ON public.vocabulary_phrases
 FOR EACH ROW EXECUTE FUNCTION update_lesson_phrase_count();
 
 -- On 'vocabulary_phrases' after UPDATE OF lesson_id (if phrases can change lessons)
-DROP TRIGGER IF EXISTS trg_vocab_phrases_after_update_update_lesson_count ON vocabulary_phrases;
+DROP TRIGGER IF EXISTS trg_vocab_phrases_after_update_update_lesson_count ON public.vocabulary_phrases;
 CREATE TRIGGER trg_vocab_phrases_after_update_update_lesson_count
-AFTER UPDATE OF lesson_id ON vocabulary_phrases
+AFTER UPDATE OF lesson_id ON public.vocabulary_phrases
 FOR EACH ROW
 WHEN (OLD.lesson_id IS DISTINCT FROM NEW.lesson_id)
 EXECUTE FUNCTION update_lesson_phrase_count();
@@ -1462,13 +1544,21 @@ EXECUTE FUNCTION update_lesson_phrase_count();
 --------------------------------------------------------------------------------
 -- Trigger for `update_lesson_completion_stats` function
 --------------------------------------------------------------------------------
-DROP TRIGGER IF EXISTS trg_user_phrase_progress_after_insert_update_completion ON user_phrase_progress;
+DROP TRIGGER IF EXISTS trg_user_phrase_progress_after_insert_update_completion ON public.user_phrase_progress;
 CREATE TRIGGER trg_user_phrase_progress_after_insert_update_completion
-AFTER INSERT ON user_phrase_progress -- Fire on insert if a phrase is immediately completed
+AFTER INSERT ON public.user_phrase_progress -- Fire on insert if a phrase is immediately completed
 FOR EACH ROW EXECUTE FUNCTION update_lesson_completion_stats();
 
-DROP TRIGGER IF EXISTS trg_user_phrase_progress_after_update_completion ON user_phrase_progress;
+DROP TRIGGER IF EXISTS trg_user_phrase_progress_after_update_completion ON public.user_phrase_progress;
 CREATE TRIGGER trg_user_phrase_progress_after_update_completion
-AFTER UPDATE OF is_completed ON user_phrase_progress -- Fire only when is_completed changes
+AFTER UPDATE OF is_completed ON public.user_phrase_progress -- Fire only when is_completed changes
 FOR EACH ROW EXECUTE FUNCTION update_lesson_completion_stats();
+
+-- Ensure profiles has updated_at trigger
+DROP TRIGGER IF EXISTS trg_profiles_update_updated_at ON public.profiles;
+CREATE TRIGGER trg_profiles_update_updated_at
+BEFORE UPDATE ON public.profiles
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
 $$
