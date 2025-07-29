@@ -105,7 +105,6 @@ const SidebarNav: React.FC<{
 };
 
 const Sidebar: React.FC<SidebarProps> = ({
-  user,
   isMobileOpen,
   toggleMobileSidebar,
 }) => {

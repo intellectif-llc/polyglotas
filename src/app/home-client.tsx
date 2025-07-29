@@ -43,10 +43,10 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
             "[AUTH_DEBUG] [home-client.tsx] Discrepancy: Server initialUser is null, but client SDK getSession found a user. Relying on onAuthStateChange to correct."
           );
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(
           "[AUTH_DEBUG] [home-client.tsx] Error in useEffect getSession async:",
-          e.message
+          e instanceof Error ? e.message : 'Unknown error'
         );
       }
     };
@@ -94,7 +94,7 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
         authListener.subscription.unsubscribe();
       }
     };
-  }, [initialUser, supabaseClient, router]);
+  }, [initialUser, user?.id, supabaseClient, router]);
 
   const handleSignIn = (provider: "google" | "github") => {
     console.log(
@@ -150,12 +150,13 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
           "[AUTH_DEBUG] [home-client.tsx] Server sign out API POST successful. Server will redirect."
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(
         "[AUTH_DEBUG] [home-client.tsx] Error during server sign out fetch:",
-        error.message
+        errorMessage
       );
-      alert(`Server sign out error: ${error.message}. Client was signed out.`);
+      alert(`Server sign out error: ${errorMessage}. Client was signed out.`);
     }
   };
 

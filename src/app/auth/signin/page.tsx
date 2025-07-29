@@ -2,14 +2,10 @@
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Github, Mail } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function SignInPage() {
-  const router = useRouter();
   const supabase = createSupabaseBrowserClient();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const handleSignInWithGoogle = async () => {

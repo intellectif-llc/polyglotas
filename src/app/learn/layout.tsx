@@ -1,6 +1,5 @@
 import React from "react";
 import { createClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 import LearnLayoutClient from "@/components/layout/LearnLayoutClient";
 
 export default async function LearnLayout({
@@ -8,7 +7,6 @@ export default async function LearnLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = cookies();
   const supabase = await createClient();
   const {
     data: { user },

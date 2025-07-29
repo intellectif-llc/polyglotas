@@ -2,8 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function createMiddlewareClient(
-  request: NextRequest,
-  response: NextResponse
+  request: NextRequest
 ) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,7 +51,7 @@ export async function createMiddlewareClient(
 
 // This function will be imported into the main middleware.ts file
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: request.headers,
     },

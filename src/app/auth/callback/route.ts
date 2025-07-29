@@ -60,14 +60,15 @@ export async function GET(request: NextRequest) {
         "[AUTH_DEBUG] [/auth/callback/route.ts] Successfully exchanged code for session. Session User:",
         sessionData?.user?.id
       );
-    } catch (catchError: any) {
+    } catch (catchError: unknown) {
+      const errorMessage = catchError instanceof Error ? catchError.message : 'Unknown error';
       console.error(
         "[AUTH_DEBUG] [/auth/callback/route.ts] Catch block error during code exchange:",
-        catchError.message
+        errorMessage
       );
       return NextResponse.redirect(
         `${origin}/auth/auth-code-error?message=Internal Server Error during code exchange: ${encodeURIComponent(
-          catchError.message
+          errorMessage
         )}`
       );
     }
