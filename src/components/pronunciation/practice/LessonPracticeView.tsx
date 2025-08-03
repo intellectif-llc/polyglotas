@@ -48,7 +48,7 @@ export default function LessonPracticeView() {
   React.useEffect(() => {
     if (data?.phrases?.[currentPhraseIndex]?.phrase_text) {
       setReferenceText(data.phrases[currentPhraseIndex].phrase_text);
-      
+
       // Load last attempt if it exists, otherwise reset state
       if (lastAttemptData?.attempt) {
         setAssessmentResults(lastAttemptData.attempt.assessmentResults);
@@ -57,7 +57,16 @@ export default function LessonPracticeView() {
         resetState();
       }
     }
-  }, [currentPhraseIndex, data?.phrases, setReferenceText, lastAttemptData, setAssessmentResults, setUiState, UIState, resetState]);
+  }, [
+    currentPhraseIndex,
+    data?.phrases,
+    setReferenceText,
+    lastAttemptData,
+    setAssessmentResults,
+    setUiState,
+    UIState,
+    resetState,
+  ]);
 
   // Auto-save attempt completion callback
   const handleRecognitionComplete = useCallback(
@@ -197,6 +206,8 @@ export default function LessonPracticeView() {
               <ReferenceTextDisplay
                 text={currentPhrase.phrase_text}
                 audioUrl={currentPhrase.audio_url}
+                phraseId={currentPhrase.id}
+                lessonId={lessonId}
               />
             ) : (
               <p className="text-center text-gray-400">Loading phrase...</p>
