@@ -14,10 +14,14 @@
     "@tailwindcss/forms": "^0.5.10",
     "@tanstack/react-query": "^5.84.1",
     "axios": "^1.11.0",
+    "fastest-levenshtein": "^1.0.16",
     "lucide-react": "^0.511.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.45.0",
     "next": "15.3.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-icons": "^5.5.0",
+    "recharts": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -16,8 +16,6 @@ interface ProgressFromDB {
   lessons: { unit_id: number };
 }
 
-
-
 export async function GET() {
   const supabase = await createClient();
 
