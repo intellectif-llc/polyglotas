@@ -17,6 +17,7 @@ export const config = {
      * - auth (auth-specific routes like login, callback, signout)
      * Feel free to modify this pattern to include more paths.
      */
-    "/((?!_next/static|_next/image|favicon.ico|auth/).*)", // Exclude /auth/*
+    "/((?!_next/static|_next/image|favicon.ico|auth/).*)",
+    "/api/:path*",
   ],
 };

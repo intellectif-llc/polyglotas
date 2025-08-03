@@ -1,16 +1,13 @@
-import React from "react";
-import { BookOpen } from "lucide-react";
+"use client";
+
+import PronunciationDashboard from "@/components/pronunciation/dashboard/PronunciationDashboard";
 
 export default function LearnPage() {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center text-gray-600 dark:text-gray-400">
-      <BookOpen size={64} className="mb-4 text-indigo-500" />
-      <h1 className="text-3xl font-semibold text-gray-800 dark:text-white mb-2">
-        Welcome to Polyglotas!
-      </h1>
-      <p className="text-lg">
-        Select an item from the sidebar to begin your learning journey.
-      </p>
+    <div className="container mx-auto px-2 sm:px-4 lg:px-8 py-2">
+      <div className="bg-white rounded-lg shadow-xl p-2 md:p-5 lg:p-6 min-h-[400px]">
+        <PronunciationDashboard />
+      </div>
     </div>
   );
 }
