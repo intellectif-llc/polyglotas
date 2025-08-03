@@ -10,3 +10,13 @@ export interface Unit {
     percent: number;
   };
 }
+
+export interface Lesson {
+  lesson_id: number;
+  unit_id: number;
+  lesson_order: number;
+  total_phrases: number;
+  lesson_title: string;
+  is_completed: boolean;
+  phrases_completed: number;
+}

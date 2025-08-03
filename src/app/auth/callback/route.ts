@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
         sessionData?.user?.id
       );
     } catch (catchError: unknown) {
-      const errorMessage = catchError instanceof Error ? catchError.message : 'Unknown error';
+      const errorMessage =
+        catchError instanceof Error ? catchError.message : "Unknown error";
       console.error(
         "[AUTH_DEBUG] [/auth/callback/route.ts] Catch block error during code exchange:",
         errorMessage

@@ -33,13 +33,3 @@ export async function POST() {
     status: 302, // Use 302 for temporary redirect
   });
 }
-
-// Optionally, a GET handler if you want to allow sign-out via GET requests (less common for actions)
-// export async function GET(request: NextRequest) {
-//   const requestUrl = new URL(request.url);
-//   const supabase = createSupabaseRouteHandlerClient();
-//   await supabase.auth.signOut();
-//   return NextResponse.redirect(`${requestUrl.origin}/auth/signin`, {
-//     status: 302,
-//   });
-// }

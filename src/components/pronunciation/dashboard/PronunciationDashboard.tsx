@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import LevelSelector from "@/components/pronunciation/dashboard/LevelSelector";
 import UnitsCarousel from "@/components/pronunciation/dashboard/UnitsCarousel";
 import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
@@ -9,6 +10,7 @@ import { Unit } from "@/types/pronunciation";
 const PronunciationDashboard = () => {
   const [selectedLevel, setSelectedLevel] = useState("A1");
   const { data: allUnits, isLoading, error } = usePronunciationUnits();
+  const router = useRouter();
 
   const unitsForLevel = useMemo(() => {
     if (!allUnits) return [];
@@ -17,6 +19,10 @@ const PronunciationDashboard = () => {
 
   const handleLevelSelect = (level: string) => {
     setSelectedLevel(level);
+  };
+
+  const handleUnitSelect = (unit: Unit) => {
+    router.push(`/learn/unit/${unit.unit_id}`);
   };
 
   return (
@@ -32,7 +38,7 @@ const PronunciationDashboard = () => {
       </div>
       <div
         className={`
-          px-4 sm:px-5 py-6 sm:py-8 
+          px-4 sm:px-5 py-6 sm:py-8
           transition-all duration-300
           bg-[#01d4dd] mx-4 sm:mx-5 rounded-b-xl shadow
         `}
@@ -42,7 +48,10 @@ const PronunciationDashboard = () => {
           <div className="text-center text-red-200">Error fetching units.</div>
         )}
         {!isLoading && !error && (
-          <UnitsCarousel units={unitsForLevel} onUnitSelect={() => {}} />
+          <UnitsCarousel
+            units={unitsForLevel}
+            onUnitSelect={handleUnitSelect}
+          />
         )}
       </div>
     </div>
