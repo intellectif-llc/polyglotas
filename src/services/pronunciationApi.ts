@@ -35,16 +35,27 @@ export const fetchUnitLessons = async (unitId: string) => {
         (error.response?.data as { details?: string })?.details ||
         error.message;
       console.error(`Error fetching lessons for unit ${unitId}:`, errorMessage);
-      throw new Error(
-        errorMessage || `Failed to fetch lessons for unit ${unitId}`
-      );
+      throw new Error(errorMessage || `Failed to fetch lessons for unit ${unitId}`);
     }
-    console.error(
-      `Unexpected error fetching lessons for unit ${unitId}:`,
-      error
-    );
-    throw new Error(
-      `An unexpected error occurred while fetching lessons for unit ${unitId}.`
-    );
+    console.error(`Unexpected error fetching lessons for unit ${unitId}:`, error);
+    throw new Error(`An unexpected error occurred while fetching lessons for unit ${unitId}.`);
+  }
+};
+
+export const fetchLessonPhrases = async (lessonId: string) => {
+  try {
+    const response = await apiClient.get(`/lesson/${lessonId}/phrases`);
+    return response.data;
+  } catch (error) {
+    if (isAxiosError(error)) {
+      const errorMessage =
+        (error.response?.data as { error?: string })?.error ||
+        (error.response?.data as { details?: string })?.details ||
+        error.message;
+      console.error(`Error fetching phrases for lesson ${lessonId}:`, errorMessage);
+      throw new Error(errorMessage || `Failed to fetch phrases for lesson ${lessonId}`);
+    }
+    console.error(`Unexpected error fetching phrases for lesson ${lessonId}:`, error);
+    throw new Error(`An unexpected error occurred while fetching phrases for lesson ${lessonId}.`);
   }
 };

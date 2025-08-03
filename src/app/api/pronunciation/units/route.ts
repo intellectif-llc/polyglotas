@@ -2,30 +2,21 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Unit } from "@/types/pronunciation";
 
-// Matches the shape of data from user_lesson_progress
-interface ProgressData {
-  is_completed: boolean;
-  lessons: {
-    unit_id: number;
-  } | null;
-}
-
-// Matches the shape of data from lessons table
-interface LessonCount {
-  unit_id: number;
-}
-
-// Matches the shape of data from units table with translations
-interface RawUnit {
+// Define interfaces for structured data
+interface UnitFromDB {
   unit_id: number;
   level: string;
   unit_order: number;
-  unit_translations: {
-    unit_title: string;
-    description: string;
-    language_code: string;
-  }[];
+  unit_translations: { unit_title: string; description?: string }[];
 }
+
+interface ProgressFromDB {
+  lesson_id: number;
+  is_completed: boolean;
+  lessons: { unit_id: number };
+}
+
+
 
 export async function GET() {
   const supabase = await createClient();
@@ -42,46 +33,37 @@ export async function GET() {
       });
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from("student_profiles")
       .select("current_target_language_code")
       .eq("profile_id", session.user.id)
       .single();
 
-    if (profileError) {
-      console.error("Database error fetching profile:", profileError);
-    }
     const targetLanguage = profile?.current_target_language_code || "en";
 
-    const { data: units, error: dbError } = await supabase
+    // 1. Fetch all units with translations
+    const { data: units, error: unitsError } = await supabase
       .from("units")
       .select(
         `
         unit_id,
         level,
         unit_order,
-        unit_translations (
-          unit_title,
-          description,
-          language_code
-        )
+        unit_translations!inner(unit_title, description, language_code)
       `
       )
       .eq("unit_translations.language_code", targetLanguage)
       .order("level", { ascending: true })
       .order("unit_order", { ascending: true });
 
-    if (dbError) {
-      console.error("Database error fetching units:", dbError.message);
+    if (unitsError) {
+      console.error("Database error fetching units:", unitsError.message);
       return new NextResponse(
         JSON.stringify({
-          error: "Failed to fetch pronunciation units.",
-          details: dbError.message,
+          error: "Failed to fetch pronunciation units",
+          details: unitsError.message,
         }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
+        { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -89,33 +71,47 @@ export async function GET() {
       return NextResponse.json({ units: [] });
     }
 
-    const unitIds = units.map((u: RawUnit) => u.unit_id);
+    const unitIds = units.map((u) => u.unit_id);
 
+    // 2. Fetch user progress for all lessons in these units
     const { data: progressData, error: progressError } = await supabase
       .from("user_lesson_progress")
-      .select(`is_completed, lessons!inner(unit_id)`)
+      .select(
+        `
+        lesson_id,
+        is_completed,
+        lessons!inner(unit_id)
+      `
+      )
       .eq("profile_id", session.user.id)
       .in("lessons.unit_id", unitIds);
 
     if (progressError) {
-      console.error("Database error fetching progress:", progressError.message);
+      console.error(
+        "Database error fetching user lesson progress:",
+        progressError.message
+      );
+      // Continue without progress data rather than failing
     }
 
-    const { data: allLessons, error: lessonsError } = await supabase
+    // 3. Fetch total lesson counts for each unit
+    const { data: lessonCounts, error: countError } = await supabase
       .from("lessons")
       .select("unit_id")
       .in("unit_id", unitIds);
 
-    if (lessonsError) {
+    if (countError) {
       console.error(
         "Database error fetching lesson counts:",
-        lessonsError.message
+        countError.message
       );
+      // Continue without count data rather than failing
     }
 
+    // 4. Create lookup maps for efficient processing
     const progressMap = (
-      (progressData as unknown as ProgressData[]) || []
-    ).reduce((acc: Record<number, { completed: number }>, p: ProgressData) => {
+      (progressData as unknown as ProgressFromDB[]) || []
+    ).reduce((acc, p) => {
       const unitId = p.lessons?.unit_id;
       if (unitId) {
         if (!acc[unitId]) {
@@ -126,20 +122,19 @@ export async function GET() {
         }
       }
       return acc;
-    }, {});
+    }, {} as Record<number, { completed: number }>);
 
-    const totalLessonsMap = ((allLessons as LessonCount[]) || []).reduce(
-      (acc: Record<number, number>, lc: LessonCount) => {
-        if (!acc[lc.unit_id]) {
-          acc[lc.unit_id] = 0;
-        }
-        acc[lc.unit_id]++;
-        return acc;
-      },
-      {}
-    );
+    const totalLessonsMap = (lessonCounts || []).reduce((acc, lesson) => {
+      const unitId = lesson.unit_id;
+      if (!acc[unitId]) {
+        acc[unitId] = 0;
+      }
+      acc[unitId] += 1;
+      return acc;
+    }, {} as Record<number, number>);
 
-    const unitsWithProgress: Unit[] = (units as RawUnit[]).map((unit) => {
+    // 5. Combine units with their progress
+    const unitsWithProgress: Unit[] = (units as UnitFromDB[]).map((unit) => {
       const unitId = unit.unit_id;
       const completedLessons = progressMap[unitId]?.completed || 0;
       const totalLessons = totalLessonsMap[unitId] || 0;
@@ -148,14 +143,13 @@ export async function GET() {
           ? Math.round((completedLessons / totalLessons) * 100)
           : 0;
 
-      const translation = unit.unit_translations?.[0];
-
       return {
         unit_id: unit.unit_id,
         level: unit.level,
         unit_order: unit.unit_order,
-        unit_title: translation?.unit_title || `Unit ${unit.unit_order}`,
-        description: translation?.description || "",
+        unit_title:
+          unit.unit_translations[0]?.unit_title || `Unit ${unit.unit_order}`,
+        description: unit.unit_translations[0]?.description || "",
         progress: {
           completed_lessons: completedLessons,
           total_lessons: totalLessons,
@@ -165,22 +159,13 @@ export async function GET() {
     });
 
     return NextResponse.json({ units: unitsWithProgress });
-  } catch (err) {
+  } catch (err: unknown) {
     const errorMessage =
       err instanceof Error ? err.message : "An unknown error occurred";
-    console.error(
-      "Unhandled Error in GET /api/pronunciation/units:",
-      errorMessage
-    );
+    console.error("Unhandled error in getPronunciationUnits:", err);
     return new NextResponse(
-      JSON.stringify({
-        error: "Internal server error.",
-        details: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: "Internal server error", details: errorMessage }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }

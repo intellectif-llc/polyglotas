@@ -22,7 +22,7 @@ const PronunciationDashboard = () => {
   };
 
   const handleUnitSelect = (unit: Unit) => {
-    router.push(`/learn/unit/${unit.unit_id}`);
+    router.push(`/learn/${unit.unit_id}`);
   };
 
   return (

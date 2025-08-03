@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import {
   fetchPronunciationUnits,
   fetchUnitLessons,
+  fetchLessonPhrases,
 } from "@/services/pronunciationApi";
-import { Unit, Lesson } from "@/types/pronunciation";
+import { Unit, Lesson, Phrase } from "@/types/pronunciation";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
@@ -25,5 +26,16 @@ export const useUnitLessons = (unitId: string) => {
     gcTime: TEN_MINUTES_MS * 3,
     refetchOnWindowFocus: false,
     enabled: !!unitId,
+  });
+};
+
+export const useLessonPhrases = (lessonId: string) => {
+  return useQuery<{ phrases: Phrase[]; lesson: Lesson }, Error>({
+    queryKey: ["lessonPhrases", lessonId],
+    queryFn: () => fetchLessonPhrases(lessonId),
+    staleTime: TEN_MINUTES_MS,
+    gcTime: TEN_MINUTES_MS * 3,
+    refetchOnWindowFocus: false,
+    enabled: !!lessonId,
   });
 };

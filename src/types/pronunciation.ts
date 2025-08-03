@@ -19,4 +19,15 @@ export interface Lesson {
   lesson_title: string;
   is_completed: boolean;
   phrases_completed: number;
+  unit_title?: string;
+  level?: string;
+}
+
+export interface Phrase {
+  id: number;
+  phrase_order: number;
+  concept_description: string;
+  phrase_text: string;
+  audio_url: string;
+  is_completed: boolean;
 }

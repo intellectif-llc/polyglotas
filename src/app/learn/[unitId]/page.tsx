@@ -13,9 +13,7 @@ export default function UnitLessonsPage() {
   const { data, isLoading, error } = useUnitLessons(unitId);
 
   const handleLessonClick = (lessonId: number) => {
-    // For now, we'll just log this. Navigation will be implemented in the next step.
-    console.log(`Navigate to lesson ${lessonId}`);
-    // router.push(`/learn/pronunciation/lesson/${lessonId}`);
+    router.push(`/learn/${unitId}/lesson/${lessonId}/practice`);
   };
 
   const unitTitle = data?.unit?.unit_title || "Unit";
@@ -24,7 +22,7 @@ export default function UnitLessonsPage() {
     <div className="container mx-auto px-4 py-6">
       <div className="mb-6">
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push("/learn")}
           className="flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
         >
           <ArrowLeft size={20} className="mr-2" />
