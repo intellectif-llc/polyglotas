@@ -9,10 +9,13 @@ import {
   Trophy, 
   Settings, 
   BarChart3,
+  Loader2,
   LucideIcon 
 } from "lucide-react";
 import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
 import { useUserStats } from "@/hooks/useUserProfile";
+import { useNavigationState } from "@/hooks/useNavigationState";
+import NavigationSkeleton from "./NavigationSkeleton";
 
 interface NavigationSectionProps {
   isCollapsed: boolean;
@@ -31,6 +34,7 @@ interface NavItem {
 interface NavSection {
   title?: string;
   items: NavItem[];
+  isLoading?: boolean;
 }
 
 const NavigationSection: React.FC<NavigationSectionProps> = ({ 
@@ -39,21 +43,20 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
   onNavigate 
 }) => {
   const pathname = usePathname();
+  const { pendingHref, handleNavigation } = useNavigationState(onNavigate);
   const { data: units, isLoading: unitsLoading } = usePronunciationUnits();
   const { data: userStats } = useUserStats();
 
   const iconSize = isCollapsed && !isMobile ? 24 : 20;
   const textHidden = isCollapsed && !isMobile;
 
+
+
   // Show loading state for units section
   const unitsSection = unitsLoading ? {
     title: "Learning",
-    items: Array(3).fill(null).map(() => ({
-      href: "#",
-      label: "Loading...",
-      icon: Trophy,
-      isActive: false,
-    }))
+    items: [],
+    isLoading: true,
   } : {
     title: "Learning",
     items: units?.slice(0, 5).map(unit => ({
@@ -102,57 +105,85 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
     },
   ];
 
-  const renderNavItem = (item: NavItem, index: number) => (
-    <Link
-      key={`${item.href}-${index}`}
-      href={item.href}
-      onClick={onNavigate}
-      className={`flex items-center p-2 text-sm font-medium rounded-lg transition-colors group ${
-        isCollapsed && !isMobile ? "justify-center" : ""
-      } ${
-        item.isActive
-          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-      }`}
-    >
-      <item.icon
-        size={iconSize}
-        className={`transition-all duration-300 ${
-          textHidden ? "" : "mr-3"
+  const renderNavItem = (item: NavItem, index: number) => {
+
+    const isNavigating = pendingHref === item.href;
+    const IconComponent = isNavigating ? Loader2 : item.icon;
+
+    return (
+      <Link
+        key={`${item.href}-${index}`}
+        href={item.href}
+        onClick={(e) => handleNavigation(item.href, e)}
+        className={`flex items-center p-2 text-sm font-medium rounded-lg transition-all duration-200 group relative ${
+          isCollapsed && !isMobile ? "justify-center" : ""
         } ${
           item.isActive
-            ? "text-blue-600 dark:text-blue-400"
-            : "text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
+            ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+            : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+        } ${
+          isNavigating ? "opacity-75" : ""
         }`}
-      />
-      {!textHidden && (
-        <>
-          <span className="flex-1 whitespace-nowrap">{item.label}</span>
-          {item.badge && (
-            <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-              item.badge === "✓"
-                ? "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-            }`}>
-              {item.badge}
+        title={textHidden ? item.label : undefined}
+      >
+        <IconComponent
+          size={iconSize}
+          className={`transition-all duration-200 ${
+            textHidden ? "" : "mr-3"
+          } ${
+            item.isActive
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
+          } ${
+            isNavigating ? "animate-spin" : ""
+          }`}
+        />
+        {!textHidden && (
+          <>
+            <span 
+              className="flex-1 truncate" 
+              title={item.label.length > 20 ? item.label : undefined}
+            >
+              {item.label}
             </span>
-          )}
-        </>
-      )}
-    </Link>
-  );
+            {item.badge && (
+              <span className={`ml-2 px-2 py-0.5 text-xs rounded-full shrink-0 ${
+                item.badge === "✓"
+                  ? "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+              }`}>
+                {item.badge}
+              </span>
+            )}
+          </>
+        )}
+        {isNavigating && (
+          <div className="absolute inset-0 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg" />
+        )}
+      </Link>
+    );
+  };
 
   return (
-    <nav className="flex-1 py-4 px-2 space-y-6 overflow-y-auto">
+    <nav className={`flex-1 py-4 px-2 space-y-6 overflow-y-auto transition-all duration-200 ${
+      unitsLoading ? "opacity-75" : "opacity-100"
+    }`}>
       {navSections.map((section, sectionIndex) => (
         <div key={sectionIndex}>
           {section.title && !textHidden && (
-            <h3 className="px-2 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <h3 className="px-2 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center">
               {section.title}
+              {section.isLoading && (
+                <Loader2 size={12} className="ml-2 animate-spin" />
+              )}
             </h3>
           )}
           <div className="space-y-1">
-            {section.items.map((item, itemIndex) => renderNavItem(item, itemIndex))}
+            {section.isLoading ? (
+              <NavigationSkeleton isCollapsed={textHidden} count={3} />
+            ) : (
+              section.items.map((item, itemIndex) => renderNavItem(item, itemIndex))
+            )}
           </div>
         </div>
       ))}
