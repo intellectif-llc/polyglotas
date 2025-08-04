@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { WordResult } from "@/hooks/speech/useRecognitionState";
 
 interface PhonemeLevelFeedbackProps {
@@ -8,124 +8,119 @@ interface PhonemeLevelFeedbackProps {
 }
 
 /**
- * Phoneme level feedback component
+ * Component for displaying phoneme-level feedback in IPA
  */
 function PhonemeLevelFeedback({ words }: PhonemeLevelFeedbackProps) {
-  // Collect all phonemes from all words
-  const allPhonemes: Array<{
-    phoneme: string;
-    score: number;
-    word: string;
-  }> = [];
+  // State to track if the IPA info is expanded
+  const [isInfoExpanded, setIsInfoExpanded] = useState(false);
 
-  words.forEach((word) => {
-    // Check phonemes directly on the word
-    if (word.phonemes) {
-      word.phonemes.forEach((phoneme) => {
-        allPhonemes.push({
-          phoneme: phoneme.phoneme,
-          score: phoneme.accuracyScore,
-          word: word.word,
-        });
-      });
-    }
+  // Filter out words without phonemes for phoneme display
+  const displayWords = words.filter((word) => word.phonemes && word.phonemes.length > 0);
 
-    // Check phonemes in syllables
-    if (word.syllables) {
-      word.syllables.forEach((syllable) => {
-        if (syllable.phonemes) {
-          syllable.phonemes.forEach((phoneme) => {
-            allPhonemes.push({
-              phoneme: phoneme.phoneme,
-              score: phoneme.accuracyScore,
-              word: word.word,
-            });
-          });
-        }
-      });
-    }
-  });
-
-  if (allPhonemes.length === 0) {
-    return (
-      <div className="p-6 text-center text-gray-500">
-        No phoneme-level data available for this assessment.
-      </div>
-    );
-  }
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return "bg-green-100 text-green-800 border-green-300";
-    if (score >= 70) return "bg-yellow-100 text-yellow-800 border-yellow-300";
-    return "bg-red-100 text-red-800 border-red-300";
+  // Helper function to determine phoneme styling based on score
+  const getPhonemeStyle = (score: number | undefined) => {
+    if (score === undefined) return "text-gray-500"; // Handle undefined scores
+    if (score >= 85) return "text-green-400"; // High accuracy
+    if (score >= 60) return "text-yellow-400"; // Medium accuracy
+    return "text-red-400 font-semibold"; // Low accuracy
   };
 
-  // Group phonemes by word for better organization
-  const phonesByWord: {
-    [word: string]: Array<{ phoneme: string; score: number }>;
-  } = {};
-  allPhonemes.forEach((item) => {
-    if (!phonesByWord[item.word]) {
-      phonesByWord[item.word] = [];
-    }
-    phonesByWord[item.word].push({
-      phoneme: item.phoneme,
-      score: item.score,
-    });
-  });
-
   return (
-    <div className="p-6">
-      <h3 className="text-lg font-semibold mb-4 text-gray-800">
-        Phoneme-Level Pronunciation Feedback
+    <div className="p-6 rounded-b-lg" style={{ backgroundColor: "#021016" }}>
+      <h3 className="text-lg font-semibold mb-4 text-white">
+        Phoneme Feedback (IPA)
+        <button
+          onClick={() => setIsInfoExpanded(!isInfoExpanded)}
+          className="ml-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition-colors"
+        >
+          {isInfoExpanded ? "Hide Info" : "What is IPA?"}
+        </button>
       </h3>
 
-      <div className="space-y-4">
-        {Object.entries(phonesByWord).map(([word, phonemes]) => (
-          <div key={word} className="border rounded-lg p-4 bg-white">
-            <h4 className="font-semibold text-gray-800 mb-3">
-              &quot;{word}&quot;
-            </h4>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {phonemes.map((phoneme, index) => (
-                <div
-                  key={index}
-                  className={`px-2 py-1 rounded border text-center text-sm font-mono ${getScoreColor(
-                    phoneme.score
-                  )}`}
-                >
-                  <div className="font-semibold">{phoneme.phoneme}</div>
-                  <div className="text-xs">{Math.round(phoneme.score)}%</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Show problematic phonemes */}
-      <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-200">
-        <h4 className="font-semibold text-red-800 mb-2">
-          Phonemes Needing Practice (&lt;70%)
-        </h4>
-        <div className="flex flex-wrap gap-2">
-          {allPhonemes
-            .filter((p) => p.score < 70)
-            .map((phoneme, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 bg-red-100 text-red-800 rounded text-sm font-mono border border-red-300"
-              >
-                {phoneme.phoneme} ({Math.round(phoneme.score)}%)
-              </span>
-            ))}
-        </div>
-        {allPhonemes.filter((p) => p.score < 70).length === 0 && (
-          <p className="text-red-700">
-            Great job! No problematic phonemes detected.
+      {/* Collapsible information section */}
+      {isInfoExpanded && (
+        <div className="mb-4 text-sm text-gray-300 bg-gray-800 p-4 rounded border border-gray-700 transition-all">
+          <h4 className="font-medium text-blue-300 mb-1">
+            About IPA Phonemes:
+          </h4>
+          <p>
+            International Phonetic Alphabet (IPA) symbols represent the actual
+            sounds of speech rather than the written letters. Each symbol
+            represents a specific sound used in spoken language, allowing
+            precise analysis of pronunciation across different languages. The
+            colors indicate pronunciation accuracy for each individual sound.
           </p>
-        )}
+        </div>
+      )}
+
+      {displayWords.some(
+        (word) => word.phonemes?.length && word.phonemes.length > 0
+      ) ? (
+        <div className="text-2xl text-center font-mono bg-gray-800 p-6 rounded-lg break-words leading-relaxed border border-gray-700">
+          {displayWords.map((wordData, wordIndex) => {
+            // Convert phonemes array to correct format if needed
+            const phonemes = wordData.phonemes || [];
+
+            if (phonemes.length === 0) return null;
+
+            return (
+              <React.Fragment key={`word-${wordIndex}`}>
+                {/* Group phonemes by word */}
+                <span className="px-2 mx-1 border-b-2 border-gray-600 inline-flex gap-1">
+                  {phonemes.map((phonemeData, phonemeIndex) => {
+                    const score = phonemeData.accuracyScore;
+                    const phonemeSymbol = phonemeData.phoneme;
+
+                    if (!phonemeSymbol) return null;
+
+                    return (
+                      <span
+                        key={`phoneme-${wordIndex}-${phonemeIndex}`}
+                        className={`${getPhonemeStyle(
+                          score
+                        )} hover:bg-gray-700 rounded px-1 py-0.5 transition-colors cursor-help`}
+                        title={`${phonemeSymbol}: ${
+                          score !== undefined ? score + "%" : "N/A"
+                        }`}
+                      >
+                        {phonemeSymbol}
+                      </span>
+                    );
+                  })}
+                </span>
+                {/* Add space between words */}
+                {wordIndex <
+                  displayWords.filter(
+                    (w) => w.phonemes?.length && w.phonemes.length > 0
+                  ).length -
+                    1 && <span className="mx-2 text-gray-500">·</span>}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-center text-gray-400 py-4">
+          No phoneme data available for this assessment.
+        </p>
+      )}
+
+      {/* Legend */}
+      <div className="mt-6 border-t border-gray-800 pt-4">
+        <h4 className="text-sm font-medium text-gray-300 mb-2">Legend:</h4>
+        <div className="flex flex-wrap gap-4 text-xs">
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-green-400 mr-2"></span>
+            <span className="text-gray-300">Good (85%+)</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-yellow-400 mr-2"></span>
+            <span className="text-gray-300">Fair (60-84%)</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-red-400 mr-2"></span>
+            <span className="text-gray-300">Needs Work (0-59%)</span>
+          </div>
+        </div>
       </div>
     </div>
   );

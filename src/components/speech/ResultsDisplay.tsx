@@ -51,28 +51,39 @@ function ResultsDisplay({
       return null;
     }
 
-    const {
-      words = [],
-      isScripted = true,
-    } = displayResults;
+    const { words = [], isScripted = true, omittedWords = [] } = displayResults;
 
     return (
-      <div className="mt-6 border rounded-lg shadow-sm bg-white overflow-hidden">
-        <h2 className="text-xl font-semibold p-4 text-center border-b">
+      <div className="mt-6 border border-gray-700 rounded-lg shadow-xl bg-gray-900 overflow-hidden">
+        <h2 className="text-xl font-semibold p-4 text-center border-b border-gray-700 text-white bg-gray-800">
           {title} {!isScripted && "(Unscripted Mode)"}
         </h2>
 
-        {/* Score Gauges - Disabled for now */}
+        {/* OMITTED WORDS SECTION - Display if we detected omissions and in scripted mode */}
+        {isScripted && omittedWords && omittedWords.length > 0 && (
+          <div className="mx-4 my-3 p-4 bg-orange-900/20 border border-orange-500/30 rounded-lg">
+            <h3 className="font-bold text-orange-400 mb-2">Omitted Words:</h3>
+            <div className="flex flex-wrap gap-2">
+              {omittedWords.map((word, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1 bg-orange-800/40 text-orange-300 rounded-full text-sm font-medium border border-orange-600/30"
+                >
+                  {word}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
-        {/* Detailed Feedback Tabs */}
-        <div className="p-4">
-          <FeedbackTabs
-            results={displayResults}
-            words={words}
-            recognizedText={displayResults.recognizedText || ""}
-            referenceText={displayResults.referenceText || ""}
-          />
-        </div>
+        {/* Tabbed detailed feedback - Pass the selected results and score gauge size */}
+        <FeedbackTabs
+          results={displayResults}
+          words={words}
+          recognizedText={displayResults.recognizedText || ""}
+          referenceText={displayResults.referenceText || ""}
+          scoreGaugesSize="small"
+        />
       </div>
     );
   };

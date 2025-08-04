@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import ScoreTooltip from "./ScoreTooltip";
 import { WordResult } from "@/hooks/speech/useRecognitionState";
 
@@ -21,20 +21,25 @@ interface WordLevelFeedbackProps {
 /**
  * Word level feedback component displayed in paragraph format with hover details
  */
-function WordLevelFeedback({ words, recognizedText, referenceText }: WordLevelFeedbackProps) {
-  // Track which word is being hovered (if any)
+function WordLevelFeedback({ words }: WordLevelFeedbackProps) {
   const [hoveredWordIndex, setHoveredWordIndex] = useState<number | null>(null);
+  const [triggerElement, setTriggerElement] = useState<HTMLElement | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Display all words for the paragraph display
+  const displayWords = words;
 
   // Function to determine text styling based on error type
   const getWordStyle = (errorTypeString: string | undefined, score: number) => {
     // Basic color scheme based on score
     let colorClass = "";
     if (score >= 90) {
-      colorClass = "text-green-600";
+      colorClass = "text-green-400";
     } else if (score >= 70) {
-      colorClass = "text-yellow-600";
+      colorClass = "text-yellow-400";
     } else {
-      colorClass = "text-red-600";
+      colorClass = "text-red-400";
     }
 
     // Additional styling based on error type
@@ -42,73 +47,130 @@ function WordLevelFeedback({ words, recognizedText, referenceText }: WordLevelFe
       case ErrorType.Mispronunciation:
         return `${colorClass} font-bold underline`;
       case ErrorType.Omission:
-        return `text-orange-600 line-through`;
+        return `text-orange-400 line-through`;
       case ErrorType.Insertion:
-        return `text-purple-600 italic`;
+        return `text-purple-400 italic`;
       case ErrorType.None:
         return colorClass;
       default:
-        return "text-gray-600";
+        return "text-gray-400";
     }
   };
 
   return (
-    <div className="p-6 rounded-b-lg bg-gray-50">
-      <h3 className="text-lg font-semibold mb-4 text-gray-800">
-        Word-Level Pronunciation Feedback
+    <div className="p-6 rounded-b-lg" style={{ backgroundColor: "#021016" }}>
+      <h3 className="text-lg font-semibold mb-4 text-white">
+        Recognized Speech
       </h3>
-      
-      {/* Display recognized vs reference text */}
-      <div className="mb-4 p-3 bg-white rounded border">
-        <div className="mb-2">
-          <strong className="text-gray-700">Reference:</strong>
-          <p className="text-gray-800">{referenceText}</p>
-        </div>
-        <div>
-          <strong className="text-gray-700">Recognized:</strong>
-          <p className="text-gray-800">{recognizedText}</p>
-        </div>
-      </div>
 
-      {/* Interactive word display */}
-      <div className="relative">
-        <div className="text-xl leading-relaxed">
-          {words.map((word, index) => (
+      <div className="text-lg leading-relaxed">
+        {/* Display words in paragraph format */}
+        {displayWords.map((wordData, index) => (
+          <span key={index} className="relative inline-block">
             <span
-              key={index}
+              ref={(el) => {
+                if (hoveredWordIndex === index && el && showTooltip) {
+                  setTriggerElement(el);
+                }
+              }}
               className={`${getWordStyle(
-                word.errorType,
-                word.accuracyScore
-              )} cursor-pointer hover:bg-gray-200 px-1 py-0.5 rounded transition-colors`}
-              onMouseEnter={() => setHoveredWordIndex(index)}
-              onMouseLeave={() => setHoveredWordIndex(null)}
+                wordData.errorType,
+                wordData.accuracyScore
+              )} px-1 py-0.5 rounded cursor-pointer transition-colors hover:bg-gray-900 touch-manipulation`}
+              onMouseEnter={() => {
+                if (hoverTimeoutRef.current) {
+                  clearTimeout(hoverTimeoutRef.current);
+                }
+                hoverTimeoutRef.current = setTimeout(() => {
+                  setHoveredWordIndex(index);
+                  setShowTooltip(true);
+                }, 300);
+              }}
+              onMouseLeave={() => {
+                if (hoverTimeoutRef.current) {
+                  clearTimeout(hoverTimeoutRef.current);
+                }
+                setShowTooltip(false);
+                setHoveredWordIndex(null);
+              }}
+              onClick={() => {
+                if (hoveredWordIndex === index && showTooltip) {
+                  setShowTooltip(false);
+                  setHoveredWordIndex(null);
+                } else {
+                  setHoveredWordIndex(index);
+                  setShowTooltip(true);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (hoveredWordIndex === index && showTooltip) {
+                    setShowTooltip(false);
+                    setHoveredWordIndex(null);
+                  } else {
+                    setHoveredWordIndex(index);
+                    setShowTooltip(true);
+                  }
+                }
+              }}
+              aria-label={`View details for word "${wordData.word}"`}
             >
-              {word.word}
+              {wordData.word}
             </span>
-          ))}
-        </div>
 
-        {/* Tooltip */}
-        {hoveredWordIndex !== null && words[hoveredWordIndex] && (
+            {/* Add space after each word except the last one */}
+            {index < displayWords.length - 1 && (
+              <span className="text-gray-400"> </span>
+            )}
+          </span>
+        ))}
+
+        {/* Show tooltip when a word is selected */}
+        {hoveredWordIndex !== null && showTooltip && displayWords[hoveredWordIndex] && (
           <ScoreTooltip
-            word={words[hoveredWordIndex]}
-            onClose={() => setHoveredWordIndex(null)}
+            word={displayWords[hoveredWordIndex]}
+            onClose={() => {
+              setShowTooltip(false);
+              setHoveredWordIndex(null);
+            }}
+            triggerElement={triggerElement}
           />
         )}
       </div>
 
-      {/* Legend */}
-      <div className="mt-6 p-3 bg-white rounded border">
-        <h4 className="font-semibold mb-2 text-gray-800">Color Legend:</h4>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <span className="text-green-600">■ Excellent (90-100%)</span>
-          <span className="text-yellow-600">■ Good (70-89%)</span>
-          <span className="text-red-600">■ Needs Improvement (&lt;70%)</span>
-        </div>
-        <div className="flex flex-wrap gap-4 text-sm mt-2">
-          <span className="underline">Mispronunciation</span>
-          <span className="line-through">Omission</span>
-          <span className="italic">Insertion</span>
+      {/* Legend to explain colors */}
+      <div className="mt-6 border-t border-gray-800 pt-4">
+        <h4 className="text-sm font-medium text-gray-300 mb-2">Legend:</h4>
+        <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-green-400 mr-2"></span>
+            <span className="text-gray-300">Good (90%+)</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-yellow-400 mr-2"></span>
+            <span className="text-gray-300">Fair (70-89%)</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-red-400 mr-2"></span>
+            <span className="text-gray-300">Needs Work (0-69%)</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-orange-400 mr-2"></span>
+            <span className="text-gray-300">Omitted Words</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-purple-400 mr-2"></span>
+            <span className="text-gray-300">Inserted Words</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-yellow-400 mr-2"></span>
+            <span className="text-gray-300 border-b border-yellow-400">
+              Mispronounced
+            </span>
+          </div>
         </div>
       </div>
     </div>

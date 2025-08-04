@@ -14,7 +14,8 @@ const SCORE_COLORS = {
 
 // Get appropriate color based on score value
 const getColorForScore = (score: number, type: string = "accuracy") => {
-  const colors = SCORE_COLORS[type as keyof typeof SCORE_COLORS] || SCORE_COLORS.accuracy;
+  const colors =
+    SCORE_COLORS[type as keyof typeof SCORE_COLORS] || SCORE_COLORS.accuracy;
   if (score >= 90) return colors[4];
   if (score >= 80) return colors[3];
   if (score >= 70) return colors[2];
@@ -29,15 +30,16 @@ interface AnimatedScoreGaugeProps {
   size?: "small" | "medium" | "large";
 }
 
-const AnimatedScoreGauge: React.FC<AnimatedScoreGaugeProps> = ({ 
-  score, 
-  label, 
-  type = "accuracy", 
-  size = "medium" 
+const AnimatedScoreGauge: React.FC<AnimatedScoreGaugeProps> = ({
+  score,
+  label,
+  type = "accuracy",
+  size = "medium",
 }) => {
   // Handle undefined or null scores
-  const targetScore = score !== undefined && score !== null ? Math.round(score) : 0;
-  
+  const targetScore =
+    score !== undefined && score !== null ? Math.round(score) : 0;
+
   // Animation state
   const [displayScore, setDisplayScore] = useState(0);
   const [displayValue, setDisplayValue] = useState(0);
@@ -59,7 +61,10 @@ const AnimatedScoreGauge: React.FC<AnimatedScoreGaugeProps> = ({
 
     const timer = setInterval(() => {
       currentStep++;
-      const newValue = Math.min(Math.round(increment * currentStep), targetScore);
+      const newValue = Math.min(
+        Math.round(increment * currentStep),
+        targetScore
+      );
       setDisplayValue(newValue);
       setDisplayScore(newValue);
 
@@ -128,24 +133,27 @@ const AnimatedScoreGauge: React.FC<AnimatedScoreGaugeProps> = ({
               stroke="none"
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Pie>
           </PieChart>
         </ResponsiveContainer>
-        
+
         {/* Score text overlay */}
         <div
           className="absolute inset-0 flex items-center justify-center"
           style={{ fontSize: `${fontSize}px` }}
         >
-          <span className="font-bold text-gray-800">{displayValue}%</span>
+          <span className="font-bold text-white">{displayValue}%</span>
         </div>
       </div>
-      
+
       {/* Label */}
       <span
-        className="mt-2 text-center text-gray-600 font-medium"
+        className="mt-2 text-center text-gray-300 font-medium"
         style={{ fontSize: `${labelSize}px` }}
       >
         {label}
@@ -165,7 +173,10 @@ interface ScoreGaugesProps {
   size?: "small" | "medium" | "large";
 }
 
-const ScoreGauges: React.FC<ScoreGaugesProps> = ({ results, size = "medium" }) => {
+const ScoreGauges: React.FC<ScoreGaugesProps> = ({
+  results,
+  size = "medium",
+}) => {
   // If no results, show empty state or return null
   if (!results) return null;
 
