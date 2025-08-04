@@ -9,6 +9,12 @@ import { submitSpeechAttempt } from "@/services/speechApi";
 import { useQueryClient } from "@tanstack/react-query";
 import { UIStateType, UIState, AssessmentResults } from "./useRecognitionState";
 
+interface LessonPhrasesData {
+  lesson: {
+    unit_id: number;
+  };
+}
+
 interface UseSpeechRecognitionParams {
   referenceText: string;
   setUiState: (state: UIStateType) => void;
@@ -255,13 +261,32 @@ export const useSpeechRecognition = ({
 
                 // Invalidate relevant queries
                 queryClient.invalidateQueries({
-                  queryKey: ["lesson", lessonId, "phrases"],
+                  queryKey: ["userStats"],
                 });
                 queryClient.invalidateQueries({
-                  queryKey: ["speech-attempt", lessonId, phraseId],
+                  queryKey: ["userProfile"],
+                });
+                queryClient.invalidateQueries({
+                  queryKey: ["lessonPhrases", lessonId],
                 });
                 queryClient.invalidateQueries({
                   queryKey: ["lastSpeechAttempt", lessonId, phraseId],
+                });
+                queryClient.invalidateQueries({
+                  queryKey: ["pronunciationUnits"],
+                });
+                queryClient.invalidateQueries({
+                  queryKey: [
+                    "unitLessons",
+                    lessonId
+                      ? (
+                          queryClient.getQueryData([
+                            "lessonPhrases",
+                            lessonId,
+                          ]) as LessonPhrasesData | undefined
+                        )?.lesson?.unit_id
+                      : undefined,
+                  ],
                 });
               } catch (error) {
                 console.error("❌ Error saving speech attempt:", error);

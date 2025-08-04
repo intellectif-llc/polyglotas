@@ -8,7 +8,10 @@ import {
   FaTrophy,
   FaStar,
 } from "react-icons/fa";
-import { AssessmentResults, WordResult } from "@/hooks/speech/useRecognitionState";
+import {
+  AssessmentResults,
+  WordResult,
+} from "@/hooks/speech/useRecognitionState";
 
 // Score thresholds for feedback categories
 const SCORE_THRESHOLDS = {
@@ -177,16 +180,10 @@ const FeedbackMessage: React.FC<FeedbackMessageProps> = ({ results }) => {
   const feedback = useMemo(() => {
     if (!results) return null;
 
-    const {
-      accuracyScore = 0,
-      fluencyScore = 0,
-      completenessScore = 0,
-      words = [],
-    } = results;
+    const { pronScore = 0, words = [] } = results;
 
     // Calculate weighted overall score (similar to sample project)
-    const overallScore =
-      accuracyScore * 0.4 + fluencyScore * 0.4 + (completenessScore || 0) * 0.2;
+    const overallScore = pronScore;
 
     // Use the overall score as a seed for message selection
     const messageSeed = Math.floor(overallScore);
