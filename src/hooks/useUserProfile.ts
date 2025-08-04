@@ -155,3 +155,27 @@ export const useUpdateTargetLanguage = () => {
     },
   });
 };
+
+export const useUpdateNativeLanguage = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (languageCode: string) => {
+      const supabase = createSupabaseBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("student_profiles")
+        .update({ native_language_code: languageCode })
+        .eq("profile_id", session.user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+      queryClient.invalidateQueries({ queryKey: ["userStats"] });
+    },
+  });
+};

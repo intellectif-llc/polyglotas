@@ -25,8 +25,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="bg-white rounded-lg shadow-xl p-6">
+    <div className="bg-white rounded-lg shadow-xl p-6">
         <div className="flex items-center space-x-4 mb-8">
           <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center">
             <User size={32} className="text-white" />
@@ -121,6 +120,5 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

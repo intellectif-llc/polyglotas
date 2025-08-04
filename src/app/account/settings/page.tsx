@@ -1,11 +1,16 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Settings, Globe, Bell, Shield, Palette } from "lucide-react";
+import LanguageManagement from "@/components/settings/LanguageManagement";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export default function SettingsPage() {
+  const [showLanguageManagement, setShowLanguageManagement] = useState(false);
+  const { data: profile } = useUserProfile();
+
   return (
-    <div className="container mx-auto px-4 py-6">
+    <>
       <div className="bg-white rounded-lg shadow-xl p-6">
         <div className="flex items-center space-x-4 mb-8">
           <div className="w-16 h-16 bg-gray-500 rounded-full flex items-center justify-center">
@@ -25,10 +30,33 @@ export default function SettingsPage() {
               <h2 className="text-lg font-semibold text-gray-900">Language Settings</h2>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-gray-600 mb-4">
-                Language preferences and learning targets will be available soon.
-              </p>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <div className="mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Native Language
+                    </label>
+                    <p className="text-gray-900 bg-white p-2 rounded border">
+                      {profile?.native_language_code?.toUpperCase() || "Not set"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Target Language
+                    </label>
+                    <p className="text-gray-900 bg-white p-2 rounded border">
+                      {profile?.current_target_language_code?.toUpperCase() || "EN"} (Default)
+                    </p>
+                  </div>
+                </div>
+                <p className="text-gray-600 text-sm mb-4">
+                  Set your native language to get better learning recommendations. Target language is currently fixed to English.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowLanguageManagement(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
                 Manage Languages
               </button>
             </div>
@@ -83,6 +111,10 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-    </div>
+
+      {showLanguageManagement && (
+        <LanguageManagement onClose={() => setShowLanguageManagement(false)} />
+      )}
+    </>
   );
 }
