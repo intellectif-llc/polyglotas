@@ -30,7 +30,6 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
     translation,
     isTranslating,
     error: translationError,
-    isSuccess: translationSuccess,
     reset: resetTranslation,
   } = useTranslation({
     phraseId,

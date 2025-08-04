@@ -1,0 +1,186 @@
+"use client";
+
+import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { 
+  BookOpen, 
+  User, 
+  Trophy, 
+  Settings, 
+  BarChart3,
+  LucideIcon 
+} from "lucide-react";
+import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
+import { useUserStats } from "@/hooks/useUserProfile";
+
+interface NavigationSectionProps {
+  isCollapsed: boolean;
+  isMobile: boolean;
+  onNavigate?: () => void;
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badge?: string | number;
+  isActive?: boolean;
+}
+
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
+const NavigationSection: React.FC<NavigationSectionProps> = ({ 
+  isCollapsed, 
+  isMobile, 
+  onNavigate 
+}) => {
+  const pathname = usePathname();
+  const { data: units, isLoading: unitsLoading } = usePronunciationUnits();
+  const { data: userStats } = useUserStats();
+
+  const iconSize = isCollapsed && !isMobile ? 24 : 20;
+  const textHidden = isCollapsed && !isMobile;
+
+  // Show loading state for units section
+  const unitsSection = unitsLoading ? {
+    title: "Learning",
+    items: Array(3).fill(null).map(() => ({
+      href: "#",
+      label: "Loading...",
+      icon: Trophy,
+      isActive: false,
+    }))
+  } : {
+    title: "Learning",
+    items: units?.slice(0, 5).map(unit => ({
+      href: `/learn/${unit.unit_id}`,
+      label: unit.unit_title,
+      icon: Trophy,
+      badge: unit.progress.percent === 100 ? "✓" : unit.progress.percent > 0 ? `${unit.progress.percent}%` : undefined,
+      isActive: pathname.startsWith(`/learn/${unit.unit_id}`),
+    })) || [],
+  };
+
+  const navSections: NavSection[] = [
+    {
+      items: [
+        {
+          href: "/learn",
+          label: "Dashboard",
+          icon: BookOpen,
+          isActive: pathname === "/learn",
+        },
+        {
+          href: "/learn/progress",
+          label: "Progress",
+          icon: BarChart3,
+          isActive: pathname === "/learn/progress",
+        },
+      ],
+    },
+    unitsSection,
+    {
+      title: "Account",
+      items: [
+        {
+          href: "/account",
+          label: "Profile",
+          icon: User,
+          isActive: pathname === "/account",
+        },
+        {
+          href: "/account/settings",
+          label: "Settings",
+          icon: Settings,
+          isActive: pathname === "/account/settings",
+        },
+      ],
+    },
+  ];
+
+  const renderNavItem = (item: NavItem, index: number) => (
+    <Link
+      key={`${item.href}-${index}`}
+      href={item.href}
+      onClick={onNavigate}
+      className={`flex items-center p-2 text-sm font-medium rounded-lg transition-colors group ${
+        isCollapsed && !isMobile ? "justify-center" : ""
+      } ${
+        item.isActive
+          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+      }`}
+    >
+      <item.icon
+        size={iconSize}
+        className={`transition-all duration-300 ${
+          textHidden ? "" : "mr-3"
+        } ${
+          item.isActive
+            ? "text-blue-600 dark:text-blue-400"
+            : "text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
+        }`}
+      />
+      {!textHidden && (
+        <>
+          <span className="flex-1 whitespace-nowrap">{item.label}</span>
+          {item.badge && (
+            <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+              item.badge === "✓"
+                ? "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+            }`}>
+              {item.badge}
+            </span>
+          )}
+        </>
+      )}
+    </Link>
+  );
+
+  return (
+    <nav className="flex-1 py-4 px-2 space-y-6 overflow-y-auto">
+      {navSections.map((section, sectionIndex) => (
+        <div key={sectionIndex}>
+          {section.title && !textHidden && (
+            <h3 className="px-2 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              {section.title}
+            </h3>
+          )}
+          <div className="space-y-1">
+            {section.items.map((item, itemIndex) => renderNavItem(item, itemIndex))}
+          </div>
+        </div>
+      ))}
+
+      {/* Quick Stats - Only show when not collapsed */}
+      {!textHidden && userStats && (
+        <div className="px-2 py-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+          <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+            Quick Stats
+          </h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Streak</span>
+              <span className="font-medium text-orange-600 dark:text-orange-400">
+                {userStats.currentStreak} days
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Points</span>
+              <span className="font-medium text-blue-600 dark:text-blue-400">
+                {userStats.totalPoints.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+};
+
+export default NavigationSection;

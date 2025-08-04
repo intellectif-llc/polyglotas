@@ -251,12 +251,14 @@ export const processRecognitionResult = (
       const allProps = Object.getOwnPropertyNames(result);
       allProps.forEach((prop) => {
         try {
-          const descriptor = Object.getOwnPropertyDescriptor(result, prop);
+          Object.getOwnPropertyDescriptor(result, prop);
         } catch (propErr) {
           console.log(`- ${prop}: [Error: ${(propErr as Error).message}]`);
         }
       });
-    } catch (propErr) {}
+    } catch {
+      // Ignore property enumeration errors
+    }
 
     try {
       // Save the raw result to window object for debugging

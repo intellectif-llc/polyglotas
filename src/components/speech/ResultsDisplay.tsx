@@ -52,11 +52,6 @@ function ResultsDisplay({
     }
 
     const {
-      accuracyScore = 0,
-      fluencyScore = 0,
-      completenessScore = 0,
-      prosodyScore = 0,
-      pronScore = 0,
       words = [],
       isScripted = true,
     } = displayResults;

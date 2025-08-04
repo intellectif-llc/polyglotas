@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { User } from "@supabase/supabase-js";
-import { BookOpen, Folder, ChevronsLeft, ChevronsRight, X } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, X } from "lucide-react";
+import LevelSelector from "./LevelSelector";
+import NavigationSection from "./NavigationSection";
 
 interface SidebarProps {
   user: User | null; // User prop can be used later for role-based items, etc.
@@ -66,43 +68,7 @@ const SidebarHeader: React.FC<{
   </div>
 );
 
-const SidebarNav: React.FC<{
-  isDesktopCollapsed: boolean;
-  isMobile: boolean;
-}> = ({ isDesktopCollapsed, isMobile }) => {
-  const iconSize = isDesktopCollapsed && !isMobile ? 24 : 20;
-  const itemPadding = isDesktopCollapsed && !isMobile ? "justify-center" : "";
-  const textHidden = isDesktopCollapsed && !isMobile;
 
-  const navItems = [
-    { href: "/learn", label: "Dashboard", icon: BookOpen },
-    { href: "#", label: "Course Item 1", icon: Folder, isPlaceholder: true },
-    { href: "#", label: "Course Item 2", icon: Folder, isPlaceholder: true },
-    { href: "#", label: "Course Item 3", icon: Folder, isPlaceholder: true },
-  ];
-
-  return (
-    <nav className="flex-1 py-4 px-2 space-y-2">
-      {navItems.map((item, index) => (
-        <Link
-          key={index}
-          href={item.href}
-          className={`flex items-center p-2 text-base font-normal rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 group ${itemPadding}`}
-        >
-          <item.icon
-            size={iconSize}
-            className={`transition-all duration-300 ${
-              textHidden ? "" : "mr-3"
-            } text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white`}
-          />
-          {!textHidden && (
-            <span className="flex-1 whitespace-nowrap">{item.label}</span>
-          )}
-        </Link>
-      ))}
-    </nav>
-  );
-};
 
 const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
@@ -159,9 +125,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           isMobile={isMobileView}
           closeMobileSidebar={toggleMobileSidebar}
         />
-        <SidebarNav
-          isDesktopCollapsed={trulyCollapsed}
+        <LevelSelector isCollapsed={trulyCollapsed} />
+        <NavigationSection
+          isCollapsed={trulyCollapsed}
           isMobile={isMobileView}
+          onNavigate={isMobileView ? toggleMobileSidebar : undefined}
         />
 
         {/* Footer or other elements can be added here */}
