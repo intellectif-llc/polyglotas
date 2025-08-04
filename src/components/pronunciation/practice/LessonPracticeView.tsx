@@ -207,7 +207,6 @@ export default function LessonPracticeView() {
                 text={currentPhrase.phrase_text}
                 audioUrl={currentPhrase.audio_url}
                 phraseId={currentPhrase.id}
-                lessonId={lessonId}
               />
             ) : (
               <p className="text-center text-gray-400">Loading phrase...</p>
