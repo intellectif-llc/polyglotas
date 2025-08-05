@@ -3,6 +3,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* Polyglotas Brand Colors */
+  --brand-primary: #a855f7;
+  --brand-secondary: #ec4899;
+  --brand-accent: #6366f1;
+  --brand-gradient: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  --brand-hero-gradient: linear-gradient(135deg, #1e1b4b 0%, #581c87 50%, #be185d 100%);
 }
 
 @theme inline {

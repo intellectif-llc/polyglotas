@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createSupabaseBrowserClient as createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation"; // Removed unused import
 import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js";
+import LandingHero from "@/components/landing/LandingHero";
+import AuthenticatedDashboard from "@/components/landing/AuthenticatedDashboard";
 
 interface HomeClientProps {
   initialUser: User | null;
@@ -12,8 +14,8 @@ interface HomeClientProps {
 export default function HomeClient({ initialUser }: HomeClientProps) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const supabaseClient = createClient();
+  // const router = useRouter(); // Removed unused variable
+  const supabaseClient = useMemo(() => createClient(), []);
 
   useEffect(() => {
     console.log(
@@ -94,7 +96,7 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
         authListener.subscription.unsubscribe();
       }
     };
-  }, [initialUser, user?.id, supabaseClient, router]);
+  }, [initialUser?.id, initialUser, user?.id, supabaseClient]);
 
   const handleSignIn = (provider: "google" | "github") => {
     console.log(
@@ -162,66 +164,23 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-hero-gradient flex flex-col items-center justify-center p-4">
         <h1 className="text-4xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
           Polyglotas
         </h1>
-        <p className="text-xl">Loading user session...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+        <p className="text-xl text-white mt-4">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-4">
-      <h1 className="text-center text-5xl font-bold mb-12 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 leading-tight">
-        Welcome to Polyglotas
-      </h1>
-
+    <>
       {user ? (
-        <div className="text-center">
-          <p className="text-xl mb-4">You are signed in as: {user.email}</p>
-          <p className="text-sm mb-6">User ID: {user.id}</p>
-          <button
-            onClick={handleSignOut}
-            disabled={loading}
-            className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg text-white font-semibold transition duration-150 ease-in-out disabled:opacity-50"
-          >
-            {loading ? "Signing out..." : "Sign Out"}
-          </button>
-          <div className="mt-8">
-            <p className="text-lg">Navigation:</p>
-            <button
-              onClick={() => router.push("/learn")}
-              className="text-purple-400 hover:text-purple-300 underline"
-            >
-              Go to Learning Page (Test)
-            </button>
-          </div>
-        </div>
+        <AuthenticatedDashboard user={user} onSignOut={handleSignOut} />
       ) : (
-        <div className="space-y-6 text-center">
-          <p className="text-xl mb-6">Please sign in to continue.</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => handleSignIn("google")}
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-semibold transition duration-150 ease-in-out flex items-center justify-center space-x-2"
-            >
-              <span>Sign In with Google</span>
-            </button>
-            <button
-              onClick={() => handleSignIn("github")}
-              className="px-8 py-4 bg-gray-700 hover:bg-gray-800 rounded-lg text-white font-semibold transition duration-150 ease-in-out flex items-center justify-center space-x-2"
-            >
-              <span>Sign In with GitHub</span>
-            </button>
-          </div>
-        </div>
+        <LandingHero onSignIn={handleSignIn} />
       )}
-
-      <footer className="absolute bottom-8 text-gray-500">
-        <p>Polyglotas Authentication Demo</p>
-        <a href="https://lordicon.com/">Icons by Lordicon.com</a>
-      </footer>
-    </div>
+    </>
   );
 }
