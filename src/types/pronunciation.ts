@@ -28,6 +28,7 @@ export interface Phrase {
   phrase_order: number;
   concept_description: string;
   phrase_text: string;
-  audio_url: string;
+  audio_url_normal: string;
+  audio_url_slow: string;
   is_completed: boolean;
 }

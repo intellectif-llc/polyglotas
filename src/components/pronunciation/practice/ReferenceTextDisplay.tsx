@@ -1,22 +1,26 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Volume2 } from "lucide-react";
+import { Volume2, Turtle } from "lucide-react";
 import WordTooltip from "@/components/speech/WordTooltip";
 
 interface ReferenceTextDisplayProps {
   text: string;
-  audioUrl?: string;
+  audioUrlNormal?: string;
+  audioUrlSlow?: string;
   phraseId: number;
   lessonId?: string | number;
 }
 
 const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
   text,
-  audioUrl,
+  audioUrlNormal,
+  audioUrlSlow,
 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlayingNormal, setIsPlayingNormal] = useState(false);
+  const [isPlayingSlow, setIsPlayingSlow] = useState(false);
+  const audioNormalRef = useRef<HTMLAudioElement>(null);
+  const audioSlowRef = useRef<HTMLAudioElement>(null);
 
   const [tooltipConfig, setTooltipConfig] = useState<{
     visible: boolean;
@@ -94,29 +98,65 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
   }, [tooltipConfig.visible, closeTooltip]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      audio.onended = () => setIsPlaying(false);
+    const audioNormal = audioNormalRef.current;
+    const audioSlow = audioSlowRef.current;
+    
+    if (audioNormal) {
+      audioNormal.onended = () => setIsPlayingNormal(false);
     }
+    if (audioSlow) {
+      audioSlow.onended = () => setIsPlayingSlow(false);
+    }
+    
     return () => {
-      if (audio) {
-        audio.onended = null;
+      if (audioNormal) {
+        audioNormal.onended = null;
+      }
+      if (audioSlow) {
+        audioSlow.onended = null;
       }
     };
   }, []);
 
-  const togglePlayback = useCallback(() => {
-    const audio = audioRef.current;
+  const toggleNormalPlayback = useCallback(() => {
+    const audio = audioNormalRef.current;
+    const audioSlow = audioSlowRef.current;
     if (!audio) return;
 
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-    } else {
-      audio.play().catch((e) => console.error("Error playing audio:", e));
-      setIsPlaying(true);
+    // Stop slow audio if playing
+    if (isPlayingSlow && audioSlow) {
+      audioSlow.pause();
+      setIsPlayingSlow(false);
     }
-  }, [isPlaying]);
+
+    if (isPlayingNormal) {
+      audio.pause();
+      setIsPlayingNormal(false);
+    } else {
+      audio.play().catch((e) => console.error("Error playing normal audio:", e));
+      setIsPlayingNormal(true);
+    }
+  }, [isPlayingNormal, isPlayingSlow]);
+
+  const toggleSlowPlayback = useCallback(() => {
+    const audio = audioSlowRef.current;
+    const audioNormal = audioNormalRef.current;
+    if (!audio) return;
+
+    // Stop normal audio if playing
+    if (isPlayingNormal && audioNormal) {
+      audioNormal.pause();
+      setIsPlayingNormal(false);
+    }
+
+    if (isPlayingSlow) {
+      audio.pause();
+      setIsPlayingSlow(false);
+    } else {
+      audio.play().catch((e) => console.error("Error playing slow audio:", e));
+      setIsPlayingSlow(true);
+    }
+  }, [isPlayingSlow, isPlayingNormal]);
 
   return (
     <div className="reference-text-container text-center mb-4 relative">
@@ -129,14 +169,18 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
       </div>
 
       <div className="flex items-center justify-center gap-3 my-3">
-        {audioUrl && (
+        {/* Normal Speed Audio */}
+        {audioUrlNormal && (
           <>
-            <audio ref={audioRef} src={audioUrl} preload="auto" />
+            <audio ref={audioNormalRef} src={audioUrlNormal} preload="auto" />
             <button
-              onClick={togglePlayback}
+              onClick={toggleNormalPlayback}
               className={`
                 cursor-pointer p-3 rounded-full 
-                bg-blue-50 text-blue-600 border border-blue-200
+                ${isPlayingNormal 
+                  ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                  : 'bg-blue-50 text-blue-600 border-blue-200'
+                }
                 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300
                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
                 transition-all duration-200 ease-in-out
@@ -145,11 +189,43 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
                 w-12 h-12
               `}
               aria-label={
-                isPlaying ? "Pause phrase audio" : "Play phrase audio"
+                isPlayingNormal ? "Pause normal speed audio" : "Play normal speed audio"
               }
-              title="Listen to phrase"
+              title="Listen at normal speed"
             >
               <Volume2 className="h-6 w-6" />
+            </button>
+          </>
+        )}
+        
+        {/* Slow Speed Audio */}
+        {audioUrlSlow && (
+          <>
+            <audio ref={audioSlowRef} src={audioUrlSlow} preload="auto" />
+            <button
+              onClick={toggleSlowPlayback}
+              className={`
+                cursor-pointer p-3 rounded-full 
+                ${isPlayingSlow 
+                  ? 'bg-orange-100 text-orange-700 border-orange-300' 
+                  : 'bg-orange-50 text-orange-600 border-orange-200'
+                }
+                hover:bg-orange-100 hover:text-orange-700 hover:border-orange-300
+                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 
+                transition-all duration-200 ease-in-out
+                shadow-sm hover:shadow
+                inline-flex items-center justify-center
+                w-12 h-12 relative
+              `}
+              aria-label={
+                isPlayingSlow ? "Pause slow speed audio" : "Play slow speed audio"
+              }
+              title="Listen at slow speed"
+            >
+              <Turtle className="h-5 w-5" />
+              <span className="absolute -bottom-1 -right-1 text-xs font-bold bg-orange-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                S
+              </span>
             </button>
           </>
         )}

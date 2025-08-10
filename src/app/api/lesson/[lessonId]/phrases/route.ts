@@ -80,7 +80,8 @@ export async function GET(
         phrase_order: phrase.phrase_order,
         concept_description: phrase.concept_description,
         phrase_text: phrase.phrase_versions[0]?.phrase_text || "",
-        audio_url: phrase.phrase_versions[0]?.audio_url_normal,
+        audio_url_normal: phrase.phrase_versions[0]?.audio_url_normal,
+        audio_url_slow: phrase.phrase_versions[0]?.audio_url_slow,
         // We'll add user progress later
         is_completed: false,
       })

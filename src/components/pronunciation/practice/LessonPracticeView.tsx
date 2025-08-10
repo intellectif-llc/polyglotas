@@ -205,7 +205,8 @@ export default function LessonPracticeView() {
             {currentPhrase ? (
               <ReferenceTextDisplay
                 text={currentPhrase.phrase_text}
-                audioUrl={currentPhrase.audio_url}
+                audioUrlNormal={currentPhrase.audio_url_normal}
+                audioUrlSlow={currentPhrase.audio_url_slow}
                 phraseId={currentPhrase.id}
               />
             ) : (
