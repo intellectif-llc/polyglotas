@@ -21,10 +21,10 @@ export async function GET() {
 
   try {
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -34,7 +34,7 @@ export async function GET() {
     const { data: profile } = await supabase
       .from("student_profiles")
       .select("current_target_language_code")
-      .eq("profile_id", session.user.id)
+      .eq("profile_id", user.id)
       .single();
 
     const targetLanguage = profile?.current_target_language_code || "en";
@@ -81,7 +81,7 @@ export async function GET() {
         lessons!inner(unit_id)
       `
       )
-      .eq("profile_id", session.user.id)
+      .eq("profile_id", user.id)
       .in("lessons.unit_id", unitIds);
 
     if (progressError) {

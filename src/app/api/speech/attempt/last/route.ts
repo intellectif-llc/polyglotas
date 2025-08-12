@@ -7,10 +7,10 @@ export async function GET(request: NextRequest) {
   try {
     // Get authenticated user
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     const lesson_id = parseInt(lessonId, 10);
     const phrase_id = parseInt(phraseId, 10);
-    const profile_id = session.user.id;
+    const profile_id = user.id;
 
     if (isNaN(lesson_id) || isNaN(phrase_id)) {
       return new NextResponse(

@@ -11,27 +11,23 @@ import { useSpeechRecognition } from "@/hooks/speech/useSpeechRecognition";
 import { AssessmentResults } from "@/hooks/speech/useRecognitionState";
 import { ArrowLeft, ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
 
-interface WordPracticeViewProps {
-  initialWord?: string;
-}
-
-export default function WordPracticeView({ initialWord }: WordPracticeViewProps) {
+export default function WordPracticeView() {
   const router = useRouter();
-  const { data: words, isLoading } = useWordsNeedingPractice();
+  const { data: words, isLoading, refetch } = useWordsNeedingPractice();
   const wordPracticeAttempt = useWordPracticeAttempt();
   
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [completedWords, setCompletedWords] = useState<Set<string>>(new Set());
+  const [wordResults, setWordResults] = useState<Map<string, AssessmentResults>>(new Map());
 
-  // Find initial word index if provided
+  // Reset index if it's out of bounds after words list changes
   useEffect(() => {
-    if (initialWord && words) {
-      const index = words.findIndex(word => word.word_text === initialWord);
-      if (index !== -1) {
-        setCurrentWordIndex(index);
-      }
+    if (words && currentWordIndex >= words.length && words.length > 0) {
+      setCurrentWordIndex(words.length - 1);
     }
-  }, [initialWord, words]);
+  }, [words, currentWordIndex]);
+
+
 
   // Speech assessment state management
   const {
@@ -50,10 +46,19 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
   // Update reference text when word changes
   useEffect(() => {
     if (words && words[currentWordIndex]) {
-      setReferenceText(words[currentWordIndex].word_text);
-      resetState();
+      const currentWord = words[currentWordIndex];
+      setReferenceText(currentWord.word_text);
+      
+      // Check if we have saved results for this word
+      const savedResults = wordResults.get(currentWord.word_text);
+      if (savedResults) {
+        setAssessmentResults(savedResults);
+        setUiState(UIState.DisplayingResults);
+      } else {
+        resetState();
+      }
     }
-  }, [currentWordIndex, words, setReferenceText, resetState]);
+  }, [currentWordIndex, words, setReferenceText, resetState, wordResults, setAssessmentResults, setUiState, UIState]);
 
   // Handle recognition completion
   const handleRecognitionComplete = useCallback(
@@ -61,19 +66,31 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
       const currentWord = words?.[currentWordIndex];
       if (!currentWord || !results.accuracyScore) return;
 
+      // Save results for this word
+      setWordResults(prev => new Map(prev.set(currentWord.word_text, results)));
+
       // Submit word practice attempt
+      console.log(`💾 Submitting word practice attempt for "${currentWord.word_text}" with score: ${results.accuracyScore}%`);
       wordPracticeAttempt.mutate({
         wordText: currentWord.word_text,
         accuracyScore: results.accuracyScore,
       }, {
         onSuccess: (response) => {
+          console.log(`✅ Word practice attempt saved successfully:`, response);
           if (response.wordCompleted) {
             setCompletedWords(prev => new Set([...prev, currentWord.word_text]));
+            console.log(`✅ Word "${currentWord.word_text}" completed! Average score: ${response.newAverageScore}%`);
+          } else {
+            console.log(`🔄 Word "${currentWord.word_text}" still needs practice. Average score: ${response.newAverageScore}%`);
           }
+        },
+        onError: (error) => {
+          console.error('❌ Failed to save word practice attempt:', error);
+          setErrorMessages(prev => [...prev, 'Failed to save your attempt. Please try again.']);
         }
       });
     },
-    [words, currentWordIndex, wordPracticeAttempt]
+    [words, currentWordIndex, wordPracticeAttempt, setErrorMessages, setWordResults]
   );
 
   // Speech recognition hook
@@ -92,21 +109,61 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
     };
   }, [cleanupRecognizer]);
 
-  const handleNext = () => {
-    if (words && currentWordIndex < words.length - 1) {
+  const handleNext = useCallback(() => {
+    if (!words) return;
+    
+    // If current word is completed, refetch data to get updated list
+    const currentWord = words[currentWordIndex];
+    if (currentWord && completedWords.has(currentWord.word_text)) {
+      refetch().then(() => {
+        // After refetch, adjust index if needed
+        if (currentWordIndex >= (words?.length || 0)) {
+          setCurrentWordIndex(Math.max(0, (words?.length || 1) - 1));
+        }
+      });
+    } else if (currentWordIndex < words.length - 1) {
       setCurrentWordIndex(currentWordIndex + 1);
     }
-  };
+  }, [words, currentWordIndex, completedWords, refetch]);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (currentWordIndex > 0) {
       setCurrentWordIndex(currentWordIndex - 1);
     }
-  };
+  }, [currentWordIndex]);
 
-  const handleBackToLearn = () => {
+  const handleBackToLearn = useCallback(() => {
     router.push("/learn");
-  };
+  }, [router]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Don't interfere when recording or processing
+      if (uiState === UIState.Listening || uiState === UIState.Processing) {
+        return;
+      }
+
+      switch (event.key) {
+        case 'ArrowLeft':
+          if (currentWordIndex > 0) {
+            handlePrevious();
+          }
+          break;
+        case 'ArrowRight':
+          if (words && currentWordIndex < words.length - 1) {
+            handleNext();
+          }
+          break;
+        case 'Escape':
+          handleBackToLearn();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [currentWordIndex, words, uiState, UIState, handleNext, handlePrevious, handleBackToLearn]);
 
   if (isLoading) {
     return (
@@ -121,21 +178,29 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
 
   if (!words || words.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto p-8">
           <CheckCircle size={64} className="mx-auto text-green-500 mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Great job! No words need practice.
+            Excellent work! 🎉
           </h1>
           <p className="text-gray-600 mb-6">
-            All your words are performing well. Keep up the good work!
+            All your words are performing well. You have mastered the challenging words and your pronunciation is improving!
           </p>
-          <button
-            onClick={handleBackToLearn}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Back to Learning
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={handleBackToLearn}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Continue Learning
+            </button>
+            <button
+              onClick={() => router.push('/learn')}
+              className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -143,7 +208,32 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
 
   const currentWord = words[currentWordIndex];
   const totalWords = words.length;
-  const isCompleted = completedWords.has(currentWord.word_text);
+  const isCompleted = currentWord ? completedWords.has(currentWord.word_text) : false;
+
+  // Safety check - if currentWord is undefined, show completion screen
+  if (!currentWord) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto p-8">
+          <CheckCircle size={64} className="mx-auto text-green-500 mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Excellent work! 🎉
+          </h1>
+          <p className="text-gray-600 mb-6">
+            All your words are performing well. You have mastered the challenging words and your pronunciation is improving!
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={handleBackToLearn}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Continue Learning
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -157,11 +247,19 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
             <ArrowLeft size={20} className="mr-2" />
             Back to Learning
           </button>
-          <h1 className="text-2xl font-bold text-gray-900 mt-2">
-            Word Practice
-          </h1>
-          <div className="text-sm text-gray-500 mt-1">
-            Improve pronunciation of challenging words
+          <div className="flex items-center justify-between mt-2">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Word Practice
+              </h1>
+              <div className="text-sm text-gray-500 mt-1">
+                Improve pronunciation of challenging words
+              </div>
+            </div>
+            <div className="text-xs text-gray-400 text-right">
+              <div>← → Navigate words</div>
+              <div>Esc Back to learning</div>
+            </div>
           </div>
         </div>
       </div>
@@ -174,15 +272,24 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
             <span className="text-sm font-medium text-gray-700">
               Word {currentWordIndex + 1} of {totalWords}
             </span>
-            <span className="text-sm text-gray-500">
-              Avg: {Math.round(currentWord.average_accuracy_score)}%
-            </span>
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-green-600">
+                ✓ {completedWords.size} completed
+              </span>
+              <span className="text-gray-500">
+                Avg: {Math.round(currentWord.average_accuracy_score)}%
+              </span>
+            </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${((currentWordIndex + 1) / totalWords) * 100}%` }}
             />
+          </div>
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>Progress through words</span>
+            <span>{Math.round(((currentWordIndex + 1) / totalWords) * 100)}%</span>
           </div>
         </div>
 
@@ -195,11 +302,20 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
             </div>
           )}
 
-          <div className="text-center mb-4 text-sm text-gray-500">
-            Practice Word: <strong>{currentWord.word_text}</strong>
+          <div className="text-center mb-4">
+            <div className="text-sm text-gray-500 mb-1">
+              Practice Word
+            </div>
+            <div className="text-lg font-semibold text-gray-900">
+              {currentWord.word_text}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              Current average: {Math.round(currentWord.average_accuracy_score)}% 
+              {isCompleted && <span className="text-green-600 ml-2">✓ Mastered!</span>}
+            </div>
           </div>
 
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-center mb-6">
             <ReferenceTextDisplay
               text={currentWord.word_text}
               phraseId={0} // Not applicable for word practice
@@ -212,7 +328,7 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
             onStartRecording={startRecording}
             onStopRecording={stopRecording}
             assessmentResults={assessmentResults}
-            className="mb-20"
+            className="mb-6"
           />
 
           {/* Navigation Buttons */}
@@ -246,19 +362,21 @@ export default function WordPracticeView({ initialWord }: WordPracticeViewProps)
                 }
                 className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Next
+                {isCompleted ? 'Remove & Next' : 'Next'}
                 <ChevronRight className="ml-2 -mr-1 h-5 w-5" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Results Area */}
-        <ResultsDisplay
-          results={assessmentResults}
-          errorMessages={errorMessages}
-          uiState={uiState}
-        />
+        {/* Results Area - Show feedback tabs when we have results */}
+        {(assessmentResults || errorMessages.length > 0) && (
+          <ResultsDisplay
+            results={assessmentResults}
+            errorMessages={errorMessages}
+            uiState={uiState}
+          />
+        )}
       </div>
     </div>
   );

@@ -247,6 +247,12 @@ export const useSpeechRecognition = ({
             setAssessmentResults(assessmentResults);
             setUiState(UIState.DisplayingResults);
 
+            // Call the completion callback FIRST, before any async operations
+            if (onRecognitionComplete) {
+              console.log("📞 Calling onRecognitionComplete callback with results:", assessmentResults);
+              onRecognitionComplete(assessmentResults);
+            }
+
             // Auto-save the attempt if lessonId and phraseId are provided
             if (lessonId && phraseId) {
               try {
@@ -295,11 +301,6 @@ export const useSpeechRecognition = ({
                   "Failed to save assessment results",
                 ]);
               }
-            }
-
-            // Call the completion callback if provided
-            if (onRecognitionComplete && latestAssessmentResultsRef.current) {
-              onRecognitionComplete(latestAssessmentResultsRef.current);
             }
           }
 

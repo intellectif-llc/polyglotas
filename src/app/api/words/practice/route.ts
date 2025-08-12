@@ -6,10 +6,10 @@ export async function GET() {
 
   try {
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -19,7 +19,7 @@ export async function GET() {
     const { data: profile } = await supabase
       .from("student_profiles")
       .select("current_target_language_code")
-      .eq("profile_id", session.user.id)
+      .eq("profile_id", user.id)
       .single();
 
     const targetLanguage = profile?.current_target_language_code || "en";
@@ -27,8 +27,10 @@ export async function GET() {
     // Fetch words that need practice
     const { data: wordsNeedingPractice, error } = await supabase
       .from("user_word_pronunciation")
-      .select("word_text, average_accuracy_score, last_accuracy_score, total_attempts, error_count")
-      .eq("profile_id", session.user.id)
+      .select(
+        "word_text, average_accuracy_score, last_accuracy_score, total_attempts, error_count"
+      )
+      .eq("profile_id", user.id)
       .eq("language_code", targetLanguage)
       .eq("needs_practice", true)
       .order("last_attempt_at", { ascending: false });

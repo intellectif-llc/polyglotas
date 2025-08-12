@@ -4,11 +4,7 @@ import React from "react";
 import { useWordsNeedingPractice } from "@/hooks/useWordPractice";
 import { AlertCircle, Target, TrendingDown } from "lucide-react";
 
-interface WordsPracticeListProps {
-  onWordSelect: (word: string) => void;
-}
-
-const WordsPracticeList: React.FC<WordsPracticeListProps> = ({ onWordSelect }) => {
+const WordsPracticeList: React.FC = () => {
   const { data: words, isLoading, error } = useWordsNeedingPractice();
 
   if (isLoading) {
@@ -67,7 +63,7 @@ const WordsPracticeList: React.FC<WordsPracticeListProps> = ({ onWordSelect }) =
         {words.map((word, index) => (
           <button
             key={`${word.word_text}-${index}`}
-            onClick={() => onWordSelect(word.word_text)}
+            onClick={() => window.location.href = '/learn/practice/words'}
             className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-orange-300 hover:bg-orange-50 transition-colors text-left"
           >
             <div className="flex-1">
@@ -95,8 +91,8 @@ const WordsPracticeList: React.FC<WordsPracticeListProps> = ({ onWordSelect }) =
         <div className="flex items-start">
           <AlertCircle size={16} className="text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-blue-800">
-            <strong>Tip:</strong> Click on any word to practice it in isolation. 
-            Words will be removed from this list once you achieve consistent accuracy.
+<strong>Tip:</strong> Click on any word to start practicing. 
+            Words will be removed from your practice list once you achieve consistent accuracy and manually navigate to the next word.
           </div>
         </div>
       </div>

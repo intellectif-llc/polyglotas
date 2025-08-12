@@ -7,15 +7,24 @@ interface WordPracticeRequest {
   languageCode?: string;
 }
 
+interface WordPracticeResponse {
+  success: boolean;
+  word_completed: boolean;
+  new_average_score: number;
+  total_attempts: number;
+  points_awarded: number;
+  needs_practice: boolean;
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
   try {
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -25,7 +34,7 @@ export async function POST(request: NextRequest) {
     let requestBody: WordPracticeRequest;
     try {
       requestBody = await request.json();
-    } catch (error) {
+    } catch {
       return new NextResponse(
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -44,65 +53,54 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await supabase
       .from("student_profiles")
       .select("current_target_language_code")
-      .eq("profile_id", session.user.id)
+      .eq("profile_id", user.id)
       .single();
 
-    const targetLanguage = languageCode || profile?.current_target_language_code || "en";
+    const targetLanguage =
+      languageCode || profile?.current_target_language_code || "en";
 
-    // Get current word data
-    const { data: currentWord } = await supabase
-      .from("user_word_pronunciation")
-      .select("*")
-      .eq("profile_id", session.user.id)
-      .eq("word_text", wordText)
-      .eq("language_code", targetLanguage)
-      .single();
+    console.log(
+      `🎯 Processing word practice attempt for "${wordText}" with score: ${accuracyScore}%`
+    );
 
-    if (!currentWord) {
-      return new NextResponse(
-        JSON.stringify({ error: "Word not found in practice list" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    // Update word pronunciation data
-    const newTotalAttempts = currentWord.total_attempts + 1;
-    const newSumAccuracyScore = currentWord.sum_accuracy_score + accuracyScore;
-    const newAverageAccuracyScore = newSumAccuracyScore / newTotalAttempts;
-    
-    // Determine if word still needs practice (threshold: 85% accuracy)
-    const needsPractice = newAverageAccuracyScore < 85;
-
-    const { error: updateError } = await supabase
-      .from("user_word_pronunciation")
-      .update({
-        total_attempts: newTotalAttempts,
-        sum_accuracy_score: newSumAccuracyScore,
-        average_accuracy_score: newAverageAccuracyScore,
-        last_accuracy_score: accuracyScore,
-        last_attempt_at: new Date().toISOString(),
-        needs_practice: needsPractice,
-        last_reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+    // Use the proper database function for word practice
+    const { data: rpcData, error: rpcError } = await supabase
+      .rpc("process_word_practice_attempt", {
+        profile_id_param: user.id,
+        word_text_param: wordText,
+        language_code_param: targetLanguage,
+        accuracy_score_param: accuracyScore,
       })
-      .eq("id", currentWord.id);
+      .single();
 
-    if (updateError) {
-      console.error("Error updating word pronunciation:", updateError);
+    if (rpcError) {
+      console.error("❌ Error calling word practice RPC function:", rpcError);
       return new NextResponse(
         JSON.stringify({
-          error: "Failed to update word practice data",
-          details: updateError.message,
+          error: "Failed to process word practice attempt",
+          details: rpcError.message,
         }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
+    const typedRpcData = rpcData as WordPracticeResponse;
+
+    console.log(`✅ Word practice processed successfully:`, {
+      word: wordText,
+      completed: typedRpcData.word_completed,
+      averageScore: typedRpcData.new_average_score,
+      needsPractice: typedRpcData.needs_practice,
+      pointsAwarded: typedRpcData.points_awarded,
+    });
+
     return NextResponse.json({
       success: true,
-      wordCompleted: !needsPractice,
-      newAverageScore: Math.round(newAverageAccuracyScore),
-      totalAttempts: newTotalAttempts,
+      wordCompleted: typedRpcData.word_completed,
+      newAverageScore: typedRpcData.new_average_score,
+      totalAttempts: typedRpcData.total_attempts,
+      pointsAwarded: typedRpcData.points_awarded,
+      needsPractice: typedRpcData.needs_practice,
     });
   } catch (err: unknown) {
     const errorMessage =

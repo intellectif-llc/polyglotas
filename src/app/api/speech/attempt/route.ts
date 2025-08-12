@@ -37,16 +37,16 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Get authenticated user
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
-    const profile_id = session.user.id;
+    const profile_id = user.id;
 
     // 2. Parse and validate request body
     let requestBody: SpeechAttemptRequest;
