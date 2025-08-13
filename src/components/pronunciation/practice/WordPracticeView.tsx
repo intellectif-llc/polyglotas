@@ -2,23 +2,33 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useWordsNeedingPractice, useWordPracticeAttempt } from "@/hooks/useWordPractice";
-import ReferenceTextDisplay from "./ReferenceTextDisplay";
+import {
+  useWordsNeedingPractice,
+  useWordPracticeAttempt,
+} from "@/hooks/useWordPractice";
+import WordReferenceDisplay from "./WordReferenceDisplay";
 import AudioRecorderUI from "@/components/speech/AudioRecorderUI";
 import ResultsDisplay from "@/components/speech/ResultsDisplay";
 import { useRecognitionState } from "@/hooks/speech/useRecognitionState";
 import { useSpeechRecognition } from "@/hooks/speech/useSpeechRecognition";
 import { AssessmentResults } from "@/hooks/speech/useRecognitionState";
-import { ArrowLeft, ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle,
+} from "lucide-react";
 
 export default function WordPracticeView() {
   const router = useRouter();
   const { data: words, isLoading, refetch } = useWordsNeedingPractice();
   const wordPracticeAttempt = useWordPracticeAttempt();
-  
+
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [completedWords, setCompletedWords] = useState<Set<string>>(new Set());
-  const [wordResults, setWordResults] = useState<Map<string, AssessmentResults>>(new Map());
+  const [wordResults, setWordResults] = useState<
+    Map<string, AssessmentResults>
+  >(new Map());
 
   // Reset index if it's out of bounds after words list changes
   useEffect(() => {
@@ -26,8 +36,6 @@ export default function WordPracticeView() {
       setCurrentWordIndex(words.length - 1);
     }
   }, [words, currentWordIndex]);
-
-
 
   // Speech assessment state management
   const {
@@ -48,7 +56,7 @@ export default function WordPracticeView() {
     if (words && words[currentWordIndex]) {
       const currentWord = words[currentWordIndex];
       setReferenceText(currentWord.word_text);
-      
+
       // Check if we have saved results for this word
       const savedResults = wordResults.get(currentWord.word_text);
       if (savedResults) {
@@ -58,7 +66,16 @@ export default function WordPracticeView() {
         resetState();
       }
     }
-  }, [currentWordIndex, words, setReferenceText, resetState, wordResults, setAssessmentResults, setUiState, UIState]);
+  }, [
+    currentWordIndex,
+    words,
+    setReferenceText,
+    resetState,
+    wordResults,
+    setAssessmentResults,
+    setUiState,
+    UIState,
+  ]);
 
   // Handle recognition completion
   const handleRecognitionComplete = useCallback(
@@ -67,41 +84,67 @@ export default function WordPracticeView() {
       if (!currentWord || !results.accuracyScore) return;
 
       // Save results for this word
-      setWordResults(prev => new Map(prev.set(currentWord.word_text, results)));
+      setWordResults(
+        (prev) => new Map(prev.set(currentWord.word_text, results))
+      );
 
       // Submit word practice attempt
-      console.log(`💾 Submitting word practice attempt for "${currentWord.word_text}" with score: ${results.accuracyScore}%`);
-      wordPracticeAttempt.mutate({
-        wordText: currentWord.word_text,
-        accuracyScore: results.accuracyScore,
-      }, {
-        onSuccess: (response) => {
-          console.log(`✅ Word practice attempt saved successfully:`, response);
-          if (response.wordCompleted) {
-            setCompletedWords(prev => new Set([...prev, currentWord.word_text]));
-            console.log(`✅ Word "${currentWord.word_text}" completed! Average score: ${response.newAverageScore}%`);
-          } else {
-            console.log(`🔄 Word "${currentWord.word_text}" still needs practice. Average score: ${response.newAverageScore}%`);
-          }
+      console.log(
+        `💾 Submitting word practice attempt for "${currentWord.word_text}" with score: ${results.accuracyScore}%`
+      );
+      wordPracticeAttempt.mutate(
+        {
+          wordText: currentWord.word_text,
+          accuracyScore: results.accuracyScore,
         },
-        onError: (error) => {
-          console.error('❌ Failed to save word practice attempt:', error);
-          setErrorMessages(prev => [...prev, 'Failed to save your attempt. Please try again.']);
+        {
+          onSuccess: (response) => {
+            console.log(
+              `✅ Word practice attempt saved successfully:`,
+              response
+            );
+            if (response.wordCompleted) {
+              setCompletedWords(
+                (prev) => new Set([...prev, currentWord.word_text])
+              );
+              console.log(
+                `✅ Word "${currentWord.word_text}" completed! Average score: ${response.newAverageScore}%`
+              );
+            } else {
+              console.log(
+                `🔄 Word "${currentWord.word_text}" still needs practice. Average score: ${response.newAverageScore}%`
+              );
+            }
+          },
+          onError: (error) => {
+            console.error("❌ Failed to save word practice attempt:", error);
+            setErrorMessages((prev) => [
+              ...prev,
+              "Failed to save your attempt. Please try again.",
+            ]);
+          },
         }
-      });
+      );
     },
-    [words, currentWordIndex, wordPracticeAttempt, setErrorMessages, setWordResults]
+    [
+      words,
+      currentWordIndex,
+      wordPracticeAttempt,
+      setErrorMessages,
+      setWordResults,
+    ]
   );
 
   // Speech recognition hook
-  const { startRecording, stopRecording, cleanupRecognizer } = useSpeechRecognition({
-    referenceText,
-    setUiState,
-    setAssessmentResults,
-    setErrorMessages,
-    UIState,
-    onRecognitionComplete: handleRecognitionComplete,
-  });
+  const { startRecording, stopRecording, cleanupRecognizer } =
+    useSpeechRecognition({
+      referenceText,
+      setUiState,
+      setAssessmentResults,
+      setErrorMessages,
+      UIState,
+      onRecognitionComplete: handleRecognitionComplete,
+    });
 
   useEffect(() => {
     return () => {
@@ -111,7 +154,7 @@ export default function WordPracticeView() {
 
   const handleNext = useCallback(() => {
     if (!words) return;
-    
+
     // If current word is completed, refetch data to get updated list
     const currentWord = words[currentWordIndex];
     if (currentWord && completedWords.has(currentWord.word_text)) {
@@ -145,25 +188,33 @@ export default function WordPracticeView() {
       }
 
       switch (event.key) {
-        case 'ArrowLeft':
+        case "ArrowLeft":
           if (currentWordIndex > 0) {
             handlePrevious();
           }
           break;
-        case 'ArrowRight':
+        case "ArrowRight":
           if (words && currentWordIndex < words.length - 1) {
             handleNext();
           }
           break;
-        case 'Escape':
+        case "Escape":
           handleBackToLearn();
           break;
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentWordIndex, words, uiState, UIState, handleNext, handlePrevious, handleBackToLearn]);
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [
+    currentWordIndex,
+    words,
+    uiState,
+    UIState,
+    handleNext,
+    handlePrevious,
+    handleBackToLearn,
+  ]);
 
   if (isLoading) {
     return (
@@ -185,7 +236,8 @@ export default function WordPracticeView() {
             Excellent work! 🎉
           </h1>
           <p className="text-gray-600 mb-6">
-            All your words are performing well. You have mastered the challenging words and your pronunciation is improving!
+            All your words are performing well. You have mastered the
+            challenging words and your pronunciation is improving!
           </p>
           <div className="space-y-3">
             <button
@@ -195,7 +247,7 @@ export default function WordPracticeView() {
               Continue Learning
             </button>
             <button
-              onClick={() => router.push('/learn')}
+              onClick={() => router.push("/learn")}
               className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
             >
               Back to Dashboard
@@ -208,7 +260,9 @@ export default function WordPracticeView() {
 
   const currentWord = words[currentWordIndex];
   const totalWords = words.length;
-  const isCompleted = currentWord ? completedWords.has(currentWord.word_text) : false;
+  const isCompleted = currentWord
+    ? completedWords.has(currentWord.word_text)
+    : false;
 
   // Safety check - if currentWord is undefined, show completion screen
   if (!currentWord) {
@@ -220,7 +274,8 @@ export default function WordPracticeView() {
             Excellent work! 🎉
           </h1>
           <p className="text-gray-600 mb-6">
-            All your words are performing well. You have mastered the challenging words and your pronunciation is improving!
+            All your words are performing well. You have mastered the
+            challenging words and your pronunciation is improving!
           </p>
           <div className="space-y-3">
             <button
@@ -282,19 +337,23 @@ export default function WordPracticeView() {
             </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
+            <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${((currentWordIndex + 1) / totalWords) * 100}%` }}
+              style={{
+                width: `${((currentWordIndex + 1) / totalWords) * 100}%`,
+              }}
             />
           </div>
           <div className="flex justify-between text-xs text-gray-400 mt-1">
             <span>Progress through words</span>
-            <span>{Math.round(((currentWordIndex + 1) / totalWords) * 100)}%</span>
+            <span>
+              {Math.round(((currentWordIndex + 1) / totalWords) * 100)}%
+            </span>
           </div>
         </div>
 
         {/* Word Practice Area */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 relative min-h-[350px]">
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6 relative min-h-[480px]">
           {isCompleted && (
             <div className="absolute top-4 right-4 flex items-center text-green-600 bg-green-50 px-3 py-1 rounded-full text-sm">
               <CheckCircle size={16} className="mr-1" />
@@ -302,24 +361,40 @@ export default function WordPracticeView() {
             </div>
           )}
 
-          <div className="text-center mb-4">
-            <div className="text-sm text-gray-500 mb-1">
-              Practice Word
-            </div>
-            <div className="text-lg font-semibold text-gray-900">
-              {currentWord.word_text}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              Current average: {Math.round(currentWord.average_accuracy_score)}% 
-              {isCompleted && <span className="text-green-600 ml-2">✓ Mastered!</span>}
-            </div>
+          {/* Word Display with Speech Synthesis */}
+          <div className="mb-6">
+            <WordReferenceDisplay word={currentWord.word_text} />
           </div>
 
-          <div className="flex items-center justify-center mb-6">
-            <ReferenceTextDisplay
-              text={currentWord.word_text}
-              phraseId={0} // Not applicable for word practice
-            />
+          {/* Word Stats */}
+          <div className="text-center mb-6 p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-center gap-6 text-sm">
+              <div className="flex flex-col items-center">
+                <span className="text-gray-500">Current Average</span>
+                <span className="text-lg font-semibold text-blue-600">
+                  {Math.round(currentWord.average_accuracy_score)}%
+                </span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-gray-500">Attempts</span>
+                <span className="text-lg font-semibold text-gray-700">
+                  {currentWord.total_attempts}
+                </span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-gray-500">Errors</span>
+                <span className="text-lg font-semibold text-orange-600">
+                  {currentWord.error_count}
+                </span>
+              </div>
+              {isCompleted && (
+                <div className="flex flex-col items-center">
+                  <span className="text-green-600 font-medium">
+                    ✓ Mastered!
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Audio Recorder UI */}
@@ -332,40 +407,55 @@ export default function WordPracticeView() {
           />
 
           {/* Navigation Buttons */}
-          <div className="absolute bottom-6 left-6 right-6 flex justify-between">
-            <button
-              onClick={handlePrevious}
-              disabled={
-                currentWordIndex === 0 ||
-                uiState === UIState.Listening ||
-                uiState === UIState.Processing
-              }
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="-ml-1 mr-2 h-5 w-5" />
-              Previous
-            </button>
-
-            {currentWordIndex >= totalWords - 1 ? (
+          <div className="absolute bottom-6 left-6 right-6">
+            <div className="flex justify-between items-center">
               <button
-                onClick={handleBackToLearn}
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Finish Practice
-              </button>
-            ) : (
-              <button
-                onClick={handleNext}
+                onClick={handlePrevious}
                 disabled={
+                  currentWordIndex === 0 ||
                   uiState === UIState.Listening ||
                   uiState === UIState.Processing
                 }
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isCompleted ? 'Remove & Next' : 'Next'}
-                <ChevronRight className="ml-2 -mr-1 h-5 w-5" />
+                <ChevronLeft className="-ml-1 mr-2 h-5 w-5" />
+                Previous
               </button>
-            )}
+
+              {/* Center guidance text */}
+              <div className="text-center px-4">
+                <p className="text-xs text-gray-500">
+                  {uiState === UIState.Listening
+                    ? "Listening..."
+                    : uiState === UIState.Processing
+                    ? "Processing..."
+                    : assessmentResults
+                    ? "Practice completed!"
+                    : "Press record to practice pronunciation"}
+                </p>
+              </div>
+
+              {currentWordIndex >= totalWords - 1 ? (
+                <button
+                  onClick={handleBackToLearn}
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                >
+                  Finish Practice
+                </button>
+              ) : (
+                <button
+                  onClick={handleNext}
+                  disabled={
+                    uiState === UIState.Listening ||
+                    uiState === UIState.Processing
+                  }
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isCompleted ? "Remove & Next" : "Next"}
+                  <ChevronRight className="ml-2 -mr-1 h-5 w-5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
