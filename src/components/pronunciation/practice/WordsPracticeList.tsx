@@ -1,100 +1,100 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { useWordsNeedingPractice } from "@/hooks/useWordPractice";
-import { AlertCircle, Target, TrendingDown } from "lucide-react";
+import { Target, BookOpen, ChevronRight } from "lucide-react";
+import WordChip from "./WordChip";
+import WordPracticeEmptyState from "./WordPracticeEmptyState";
 
 const WordsPracticeList: React.FC = () => {
   const { data: words, isLoading, error } = useWordsNeedingPractice();
+  const router = useRouter();
 
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+  const handleWordClick = () => {
+    router.push("/learn/practice/words");
+  };
+
+  const handleViewAllClick = () => {
+    router.push("/learn/practice/words");
+  };
+
+  // Don't render anything if loading or error
+  if (isLoading || error) {
+    return null;
   }
 
-  if (error) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center text-red-600 mb-4">
-          <AlertCircle size={20} className="mr-2" />
-          <span>Error loading words that need practice</span>
-        </div>
-      </div>
-    );
-  }
-
+  // Show encouraging empty state when no words need practice
   if (!words || words.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6 text-center">
-        <Target size={48} className="mx-auto text-green-500 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Great job! No words need practice right now.
-        </h3>
-        <p className="text-gray-600">
-          Keep practicing lessons to improve your pronunciation skills.
-        </p>
-      </div>
-    );
+    return <WordPracticeEmptyState />;
   }
+
+  // Limit displayed words to prevent overwhelming the interface
+  const displayedWords = words.slice(0, 8); // Show max 8 words
+  const hasMoreWords = words.length > 8;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex items-center mb-6">
-        <TrendingDown size={24} className="text-orange-500 mr-3" />
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Words Needing Practice</h2>
-          <p className="text-gray-600 text-sm">
-            {words.length} word{words.length !== 1 ? 's' : ''} need improvement
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-3">
-        {words.map((word, index) => (
-          <button
-            key={`${word.word_text}-${index}`}
-            onClick={() => window.location.href = '/learn/practice/words'}
-            className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-orange-300 hover:bg-orange-50 transition-colors text-left"
-          >
-            <div className="flex-1">
-              <div className="font-semibold text-gray-900 text-lg">
-                {word.word_text}
-              </div>
-              <div className="text-sm text-gray-600 mt-1">
-                {word.total_attempts} attempt{word.total_attempts !== 1 ? 's' : ''} • 
-                Last score: {Math.round(word.last_accuracy_score || 0)}%
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-medium text-orange-600">
-                Avg: {Math.round(word.average_accuracy_score)}%
-              </div>
-              <div className="text-xs text-gray-500">
-                {word.error_count} error{word.error_count !== 1 ? 's' : ''}
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <div className="flex items-start">
-          <AlertCircle size={16} className="text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-800">
-<strong>Tip:</strong> Click on any word to start practicing. 
-            Words will be removed from your practice list once you achieve consistent accuracy and manually navigate to the next word.
+    <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl border border-orange-200 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-orange-100 rounded-lg">
+            <BookOpen size={20} className="text-orange-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Practice Words
+            </h3>
+            <p className="text-sm text-gray-600">
+              {words.length} word{words.length !== 1 ? "s" : ""} need
+              {words.length === 1 ? "s" : ""} improvement
+            </p>
           </div>
         </div>
+
+        {hasMoreWords && (
+          <button
+            onClick={handleViewAllClick}
+            className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors"
+          >
+            View All
+            <ChevronRight size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Words Grid */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {displayedWords.map((word, index) => (
+          <WordChip
+            key={`${word.word_text}-${index}`}
+            word={word}
+            onClick={handleWordClick}
+          />
+        ))}
+
+        {hasMoreWords && (
+          <button
+            onClick={handleViewAllClick}
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-full border border-dashed border-orange-300 text-sm text-orange-600 hover:bg-orange-100 transition-colors"
+          >
+            +{words.length - 8} more
+          </button>
+        )}
+      </div>
+
+      {/* Quick Action */}
+      <div className="flex items-center justify-between pt-4 border-t border-orange-200">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Target size={14} />
+          <span>Click any word to start practicing</span>
+        </div>
+
+        <button
+          onClick={handleViewAllClick}
+          className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
+        >
+          Start Practice
+        </button>
       </div>
     </div>
   );
