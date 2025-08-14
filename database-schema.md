@@ -369,7 +369,6 @@ last_accuracy_score numeric,
 last_error_type character varying,
 last_attempt_at timestamp with time zone,
 needs_practice boolean DEFAULT false,
-last_reviewed_at timestamp with time zone,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_word_pronunciation_pkey PRIMARY KEY (id),
@@ -894,98 +893,11 @@ v_word_text TEXT := lower(word_data->>'word');
 v_accuracy_score NUMERIC := (word_data->>'accuracyScore')::NUMERIC;
 v_error_type TEXT := word_data->>'errorType';
 v_error_increment INT;
-new_average_accuracy_score NUMERIC;
 BEGIN
 -- Exit if essential data is missing
 IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
 RETURN;
 END IF;
-
-    -- Determine if the attempt had an error
-    v_error_increment := CASE WHEN v_error_type IS NOT NULL AND v_error_type <> 'None' THEN 1 ELSE 0 END;
-
-    -- Upsert the word pronunciation record
-    INSERT INTO public.user_word_pronunciation (
-        profile_id, word_text, language_code, total_attempts, error_count,
-        sum_accuracy_score, average_accuracy_score, last_accuracy_score,
-        last_error_type, last_attempt_at, updated_at
-    )
-    VALUES (
-        profile_id_param, v_word_text, language_code_param, 1, v_error_increment,
-        v_accuracy_score, v_accuracy_score, v_accuracy_score, v_error_type,
-        NOW(), NOW()
-    )
-    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
-    SET
-        total_attempts = user_word_pronunciation.total_attempts + 1,
-        error_count = user_word_pronunciation.error_count + v_error_increment,
-        sum_accuracy_score = user_word_pronunciation.sum_accuracy_score + v_accuracy_score,
-        average_accuracy_score = (user_word_pronunciation.sum_accuracy_score + v_accuracy_score) / (user_word_pronunciation.total_attempts + 1),
-        last_accuracy_score = v_accuracy_score,
-        last_error_type = v_error_type,
-        last_attempt_at = NOW(),
-        updated_at = NOW()
-    RETURNING average_accuracy_score INTO new_average_accuracy_score;
-
-    -- After inserting or updating, determine the `needs_practice` flag based on the new average
-    IF new_average_accuracy_score IS NULL THEN
-        -- This handles the INSERT case when RETURNING does not execute
-        new_average_accuracy_score := v_accuracy_score;
-    END IF;
-
-    UPDATE public.user_word_pronunciation
-    SET needs_practice = (new_average_accuracy_score < 70)
-    WHERE
-        profile_id = profile_id_param AND
-        word_text = v_word_text AND
-        language_code = language_code_param;
-
-END;
-
-## handle_new_user_profile
-
-BEGIN
--- Create entry in public.profiles
-INSERT INTO public.profiles (id, first_name, last_name)
-VALUES (
-NEW.id,
-NEW.raw_user_meta_data->>'first_name',
-NEW.raw_user_meta_data->>'last_name'
-); -- Relies on DB default for created_at, updated_at
-
-     -- Create corresponding entry in public.student_profiles
-     INSERT INTO public.student_profiles (
-       profile_id,
-       status
-       -- native_language_code, current_target_language_code, etc., will be NULL or use DB defaults
-     )
-     VALUES (
-       NEW.id,
-       'active'::public.account_status_enum -- Or 'pending_verification' if more appropriate
-     ); -- Relies on DB defaults for subscription_tier, points, current_streak_days
-     RETURN NEW;
-
-END;
-
-## handle_user_word_pronunciation_update 
-CREATE OR REPLACE FUNCTION public.handle_user_word_pronunciation_update(
-    profile_id_param uuid,
-    language_code_param character varying,
-    word_data jsonb
-)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    v_word_text TEXT := lower(word_data->>'word');
-    v_accuracy_score NUMERIC := (word_data->>'accuracyScore')::NUMERIC;
-    v_error_type TEXT := word_data->>'errorType';
-    v_error_increment INT;
-BEGIN
-    -- Exit if essential data is missing
-    IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
-        RETURN;
-    END IF;
 
     -- Determine if the attempt had an error
     v_error_increment := CASE WHEN v_error_type IS NOT NULL AND v_error_type <> 'None' THEN 1 ELSE 0 END;
@@ -1014,4 +926,132 @@ BEGIN
         needs_practice = (v_accuracy_score < 70); -- Correct logic on update
 
 END;
-$$;
+
+## handle_new_user_profile
+
+BEGIN
+-- Create entry in public.profiles
+INSERT INTO public.profiles (id, first_name, last_name)
+VALUES (
+NEW.id,
+NEW.raw_user_meta_data->>'first_name',
+NEW.raw_user_meta_data->>'last_name'
+); -- Relies on DB default for created_at, updated_at
+
+     -- Create corresponding entry in public.student_profiles
+     INSERT INTO public.student_profiles (
+       profile_id,
+       status
+       -- native_language_code, current_target_language_code, etc., will be NULL or use DB defaults
+     )
+     VALUES (
+       NEW.id,
+       'active'::public.account_status_enum -- Or 'pending_verification' if more appropriate
+     ); -- Relies on DB defaults for subscription_tier, points, current_streak_days
+     RETURN NEW;
+
+END;
+
+## handle_user_word_pronunciation_update
+
+DECLARE
+v_word_text TEXT := lower(word_data->>'word');
+v_accuracy_score NUMERIC := (word_data->>'accuracyScore')::NUMERIC;
+v_error_type TEXT := word_data->>'errorType';
+v_error_increment INT;
+BEGIN
+-- Exit if essential data is missing
+IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
+RETURN;
+END IF;
+
+    -- Determine if the attempt had an error
+    v_error_increment := CASE WHEN v_error_type IS NOT NULL AND v_error_type <> 'None' THEN 1 ELSE 0 END;
+
+    -- Upsert the word pronunciation record, setting `needs_practice` based on the CURRENT attempt's score.
+    INSERT INTO public.user_word_pronunciation (
+        profile_id, word_text, language_code, total_attempts, error_count,
+        sum_accuracy_score, average_accuracy_score, last_accuracy_score,
+        last_error_type, last_attempt_at, updated_at, needs_practice
+    )
+    VALUES (
+        profile_id_param, v_word_text, language_code_param, 1, v_error_increment,
+        v_accuracy_score, v_accuracy_score, v_accuracy_score, v_error_type,
+        NOW(), NOW(), (v_accuracy_score < 70) -- Correct logic on insert
+    )
+    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
+    SET
+        total_attempts = user_word_pronunciation.total_attempts + 1,
+        error_count = user_word_pronunciation.error_count + v_error_increment,
+        sum_accuracy_score = user_word_pronunciation.sum_accuracy_score + v_accuracy_score,
+        average_accuracy_score = (user_word_pronunciation.sum_accuracy_score + v_accuracy_score) / (user_word_pronunciation.total_attempts + 1),
+        last_accuracy_score = v_accuracy_score,
+        last_error_type = v_error_type,
+        last_attempt_at = NOW(),
+        updated_at = NOW(),
+        needs_practice = (v_accuracy_score < 70); -- Correct logic on update
+
+END;
+
+## process_word_practice_attempt
+
+DECLARE
+word_jsonb jsonb;
+points_for_this_attempt integer := 0;
+was_needing_practice boolean;
+is_now_completed boolean;
+v_new_average_score numeric;
+v_total_attempts integer;
+v_needs_practice boolean;
+BEGIN
+-- Check if the word was previously needing practice for a potential bonus
+SELECT uwp.needs_practice INTO was_needing_practice
+FROM public.user_word_pronunciation uwp
+WHERE uwp.profile_id = profile_id_param
+AND uwp.word_text = word_text_param
+AND uwp.language_code = language_code_param;
+
+    -- Construct the JSONB object that handle_user_word_pronunciation_update expects
+    word_jsonb := jsonb_build_object(
+        'word', word_text_param,
+        'accuracyScore', accuracy_score_param,
+        'errorType', 'None'
+    );
+
+    -- Call the centralized word update logic.
+    -- Note: handle_user_word_pronunciation_update now also sets the `needs_practice` flag.
+    PERFORM public.handle_user_word_pronunciation_update(profile_id_param, language_code_param, word_jsonb);
+
+    -- Get the updated word stats to return to the client
+    SELECT uwp.average_accuracy_score, uwp.total_attempts, uwp.needs_practice
+    INTO v_new_average_score, v_total_attempts, v_needs_practice
+    FROM public.user_word_pronunciation uwp
+    WHERE uwp.profile_id = profile_id_param
+      AND uwp.word_text = word_text_param
+      AND uwp.language_code = language_code_param;
+
+    -- Award a "comeback bonus" if a difficult word is now mastered
+    is_now_completed := v_new_average_score >= 70;
+    IF COALESCE(was_needing_practice, false) AND is_now_completed THEN
+        points_for_this_attempt := points_for_this_attempt + 1;
+        INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_word_text, related_word_language_code)
+        VALUES (profile_id_param, 1, 'COMEBACK_BONUS', word_text_param, language_code_param);
+    END IF;
+
+    -- Update user's total points if any were awarded
+    IF points_for_this_attempt > 0 THEN
+        UPDATE public.student_profiles
+        SET points = points + points_for_this_attempt, updated_at = now()
+        WHERE profile_id = profile_id_param;
+    END IF;
+
+    -- Return the results for the client to update the UI
+    RETURN QUERY SELECT
+        true as success,
+        is_now_completed as word_completed,
+        v_new_average_score as new_average_score,
+        v_total_attempts as total_attempts,
+        points_for_this_attempt as points_awarded,
+        v_needs_practice as needs_practice;
+
+END;
