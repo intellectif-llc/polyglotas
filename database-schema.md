@@ -149,6 +149,9 @@ lesson_order integer NOT NULL,
 total_phrases integer NOT NULL DEFAULT 0,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
+has_dictation boolean NOT NULL DEFAULT false,
+has_pronunciation boolean NOT NULL DEFAULT false,
+has_chat boolean NOT NULL DEFAULT false,
 CONSTRAINT lessons_pkey PRIMARY KEY (lesson_id),
 CONSTRAINT lessons_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.units(unit_id)
 );
@@ -268,9 +271,9 @@ created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
 partnership_id bigint,
 CONSTRAINT student_profiles_pkey PRIMARY KEY (profile_id),
+CONSTRAINT student_profiles_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
 CONSTRAINT fk_student_profiles_native_lang FOREIGN KEY (native_language_code) REFERENCES public.languages(language_code),
 CONSTRAINT fk_student_profiles_target_lang FOREIGN KEY (current_target_language_code) REFERENCES public.languages(language_code),
-CONSTRAINT student_profiles_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
 CONSTRAINT student_profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id)
 );
 CREATE TABLE public.student_subscriptions (
@@ -300,8 +303,8 @@ profile_id uuid NOT NULL,
 language_code character varying NOT NULL,
 added_at timestamp with time zone DEFAULT now(),
 CONSTRAINT student_target_languages_pkey PRIMARY KEY (profile_id, language_code),
-CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.unit_translations (
 unit_translation_id integer NOT NULL DEFAULT nextval('unit_translations_unit_translation_id_seq'::regclass),
@@ -323,19 +326,25 @@ created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT units_pkey PRIMARY KEY (unit_id)
 );
+CREATE TABLE public.user_lesson_activity_progress (
+activity_progress_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+user_lesson_progress_id integer NOT NULL,
+activity_type USER-DEFINED NOT NULL,
+status USER-DEFINED NOT NULL DEFAULT 'not_started'::activity_status_enum,
+started_at timestamp with time zone,
+completed_at timestamp with time zone,
+CONSTRAINT user_lesson_activity_progress_pkey PRIMARY KEY (activity_progress_id),
+CONSTRAINT user_lesson_activity_progress_user_lesson_progress_id_fkey FOREIGN KEY (user_lesson_progress_id) REFERENCES public.user_lesson_progress(progress_id)
+);
 CREATE TABLE public.user_lesson_progress (
 progress_id integer NOT NULL DEFAULT nextval('user_lesson_progress_progress_id_seq'::regclass),
 profile_id uuid NOT NULL,
 lesson_id integer NOT NULL,
 started_at timestamp with time zone DEFAULT now(),
-completed_at timestamp with time zone,
-chat_activity_engaged_at timestamp with time zone,
-is_completed boolean DEFAULT false,
-phrases_completed integer DEFAULT 0,
 last_progress_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_lesson_progress_pkey PRIMARY KEY (progress_id),
-CONSTRAINT user_lesson_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT user_lesson_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+CONSTRAINT user_lesson_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT user_lesson_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_phrase_progress (
 phrase_progress_id integer NOT NULL DEFAULT nextval('user_phrase_progress_phrase_progress_id_seq'::regclass),
@@ -361,10 +370,10 @@ best_dictation_score numeric CHECK (best_dictation_score IS NULL OR best_dictati
 is_completed boolean DEFAULT false,
 last_progress_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_phrase_progress_pkey PRIMARY KEY (phrase_progress_id),
-CONSTRAINT user_phrase_progress_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
-CONSTRAINT fk_user_phrase_progress_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
 CONSTRAINT user_phrase_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-CONSTRAINT user_phrase_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+CONSTRAINT fk_user_phrase_progress_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_phrase_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT user_phrase_progress_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id)
 );
 CREATE TABLE public.user_points_log (
 log_id integer NOT NULL DEFAULT nextval('user_points_log_log_id_seq'::regclass),
@@ -377,10 +386,11 @@ related_word_text character varying,
 related_word_language_code character varying,
 notes text,
 created_at timestamp with time zone DEFAULT now(),
+activity_type USER-DEFINED,
 CONSTRAINT user_points_log_pkey PRIMARY KEY (log_id),
-CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id),
-CONSTRAINT fk_user_points_log_related_word_lang FOREIGN KEY (related_word_language_code) REFERENCES public.languages(language_code),
 CONSTRAINT user_points_log_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT fk_user_points_log_related_word_lang FOREIGN KEY (related_word_language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id),
 CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id)
 );
 CREATE TABLE public.user_word_pronunciation (
@@ -418,8 +428,8 @@ last_reviewed_at timestamp with time zone,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_word_spelling_pkey PRIMARY KEY (id),
-CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT fk_user_word_spelling_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+CONSTRAINT fk_user_word_spelling_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.vocabulary_phrases (
 id integer NOT NULL DEFAULT nextval('vocabulary_phrases_id_seq'::regclass),
@@ -681,24 +691,391 @@ CONSTRAINT users_pkey PRIMARY KEY (id)
 | subscription_tier_enum      | free                 | 1             |
 | subscription_tier_enum      | starter              | 2             |
 | subscription_tier_enum      | pro                  | 3             |
+| activity_status_enum        | not_started          | 1             |
+| activity_status_enum        | in_progress          | 2             |
+| activity_status_enum        | completed            | 3             |
+| activity_type_enum          | dictation            | 1             |
+| activity_type_enum          | pronunciation        | 2             |
+| activity_type_enum          | chat                 | 3             |
 
 # Sql functions
 
+## check_and_award_unit_completion_bonus
+
+### Parameters
+profile_id_param (uuid)
+unit_id_param (integer)
+triggering_lesson_id_param (integer)
+
+### Function Definition
+CREATE OR REPLACE FUNCTION public.check_and_award_unit_completion_bonus(profile_id_param uuid, unit_id_param integer, triggering_lesson_id_param integer)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_level_code TEXT;
+    is_unit_now_completed BOOLEAN;
+    is_level_now_completed BOOLEAN;
+BEGIN
+    -- Check if a UNIT_COMPLETION bonus was already given for any lesson within this unit.
+    IF EXISTS (
+        SELECT 1 FROM public.user_points_log 
+        WHERE profile_id = profile_id_param 
+          AND reason_code = 'UNIT_COMPLETION' 
+          AND related_lesson_id IN (SELECT lesson_id FROM public.lessons WHERE unit_id = unit_id_param)
+    ) THEN
+        RETURN;
+    END IF;
+
+    -- This assumes you have a function to check unit completion based on the user's tier.
+    -- You will need to create is_unit_complete(profile_id, unit_id)
+    is_unit_now_completed := public.is_unit_complete(profile_id_param, unit_id_param);
+
+    IF is_unit_now_completed THEN
+        -- Award unit completion points, logging the lesson ID that triggered it.
+        INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id)
+        VALUES (profile_id_param, 25, 'UNIT_COMPLETION', triggering_lesson_id_param);
+        
+        UPDATE public.student_profiles SET points = points + 25 WHERE profile_id = profile_id_param;
+
+        -- Now, check for level completion.
+        SELECT u.level INTO v_level_code FROM public.units u WHERE u.unit_id = unit_id_param;
+
+        -- Check if a LEVEL_COMPLETION bonus was already given for any lesson within this level.
+        IF NOT EXISTS (
+            SELECT 1 FROM public.user_points_log
+            WHERE profile_id = profile_id_param
+              AND reason_code = 'LEVEL_COMPLETION'
+              AND related_lesson_id IN (
+                  SELECT l.lesson_id FROM public.lessons l
+                  JOIN public.units u ON l.unit_id = u.unit_id
+                  WHERE u.level = v_level_code
+              )
+        ) THEN
+            is_level_now_completed := NOT EXISTS (
+                SELECT 1 FROM public.units u
+                WHERE u.level = v_level_code AND NOT public.is_unit_complete(profile_id_param, u.unit_id)
+            );
+
+            IF is_level_now_completed THEN
+                -- Award level completion points, logging the lesson ID that triggered it.
+                INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id)
+                VALUES (profile_id_param, 100, 'LEVEL_COMPLETION', triggering_lesson_id_param);
+
+                UPDATE public.student_profiles SET points = points + 100 WHERE profile_id = profile_id_param;
+            END IF;
+        END IF;
+    END IF;
+END;
+$function$
+
+
+## handle_new_user_profile
+
+### Parameters
+None
+
+### Function Definition
+CREATE OR REPLACE FUNCTION public.handle_new_user_profile()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+    BEGIN
+      -- Create entry in public.profiles
+      INSERT INTO public.profiles (id, first_name, last_name)
+      VALUES (
+        NEW.id,
+        NEW.raw_user_meta_data->>'first_name',
+        NEW.raw_user_meta_data->>'last_name'
+      ); -- Relies on DB default for created_at, updated_at
+
+      -- Create corresponding entry in public.student_profiles
+      INSERT INTO public.student_profiles (
+        profile_id,
+        status
+        -- native_language_code, current_target_language_code, etc., will be NULL or use DB defaults
+      )
+      VALUES (
+        NEW.id,
+        'active'::public.account_status_enum -- Or 'pending_verification' if more appropriate
+      ); -- Relies on DB defaults for subscription_tier, points, current_streak_days
+      RETURN NEW;
+    END;
+    $function$
+
+
 ## process_user_activity
 
+### Parameters
+profile_id_param (uuid)
+lesson_id_param (integer)
+phrase_id_param (integer)
+language_code_param (character varying)
+activity_type_param (activity_type_enum)
+reference_text_param (text)
+recognized_text_param (text DEFAULT NULL::text)
+accuracy_score_param (numeric DEFAULT NULL::numeric)
+fluency_score_param (numeric DEFAULT NULL::numeric)
+completeness_score_param (numeric DEFAULT NULL::numeric)
+pronunciation_score_param (numeric DEFAULT NULL::numeric)
+prosody_score_param (numeric DEFAULT NULL::numeric)
+phonetic_data_param (jsonb DEFAULT NULL::jsonb)
+written_text_param (text DEFAULT NULL::text)
+overall_similarity_score_param (numeric DEFAULT NULL::numeric)
+word_level_feedback_param (jsonb DEFAULT NULL::jsonb)
+
+### Function Definition
+CREATE OR REPLACE FUNCTION public.process_user_activity(profile_id_param uuid, lesson_id_param integer, phrase_id_param integer, language_code_param character varying, activity_type_param activity_type_enum, reference_text_param text, recognized_text_param text DEFAULT NULL::text, accuracy_score_param numeric DEFAULT NULL::numeric, fluency_score_param numeric DEFAULT NULL::numeric, completeness_score_param numeric DEFAULT NULL::numeric, pronunciation_score_param numeric DEFAULT NULL::numeric, prosody_score_param numeric DEFAULT NULL::numeric, phonetic_data_param jsonb DEFAULT NULL::jsonb, written_text_param text DEFAULT NULL::text, overall_similarity_score_param numeric DEFAULT NULL::numeric, word_level_feedback_param jsonb DEFAULT NULL::jsonb)
+ RETURNS TABLE(points_awarded_total integer)
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
--- Attempt & Progress
-next_attempt_number integer;
-was_phrase_already_completed boolean;
-is_phrase_now_completed boolean;
-was_lesson_already_completed boolean;
-is_lesson_now_completed boolean;
-was_unit_already_completed boolean;
-is_unit_now_completed boolean;
-was_level_already_completed boolean;
-is_level_now_completed boolean;
-total_phrases_in_lesson integer;
-phrases_completed_after_update integer;
+    -- IDs and Metadata
+    v_lesson_progress_id INT;
+    v_activity_progress_id INT;
+    v_unit_id INT;
+
+    -- Attempt & Progress Tracking
+    next_attempt_number INT;
+    was_phrase_already_completed BOOLEAN;
+    is_phrase_now_completed BOOLEAN;
+    was_activity_already_completed BOOLEAN;
+    total_phrases_in_lesson INT;
+    phrases_completed_for_activity INT;
+    v_score NUMERIC;
+
+    -- Points
+    total_points_for_this_attempt INT := 0;
+
+    -- Word-level loop variables (for pronunciation)
+    word_record JSONB;
+    v_word_text TEXT;
+    v_accuracy_score NUMERIC;
+    word_needs_practice BOOLEAN;
+    
+    -- Streak variables
+    current_streak INT;
+    last_streak DATE;
+    new_streak INT;
+    points_for_streak INT := 0;
+    today DATE := current_date;
+    yesterday DATE := current_date - 1;
+
+BEGIN
+    -- Step 1: Insert the specific attempt record
+    IF activity_type_param = 'pronunciation' THEN
+        SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number
+        FROM public.speech_attempts
+        WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+
+        INSERT INTO public.speech_attempts (
+            profile_id, lesson_id, phrase_id, language_code, attempt_number,
+            reference_text, recognized_text, accuracy_score, fluency_score,
+            completeness_score, pronunciation_score, prosody_score, phonetic_data
+        ) VALUES (
+            profile_id_param, lesson_id_param, phrase_id_param, language_code_param, next_attempt_number,
+            reference_text_param, recognized_text_param, accuracy_score_param, fluency_score_param,
+            completeness_score_param, pronunciation_score_param, prosody_score_param, phonetic_data_param
+        );
+        v_score := accuracy_score_param;
+    ELSIF activity_type_param = 'dictation' THEN
+        SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number
+        FROM public.dictation_attempts
+        WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+
+        INSERT INTO public.dictation_attempts (
+            profile_id, lesson_id, phrase_id, language_code, attempt_number,
+            reference_text, written_text, overall_similarity_score, word_level_feedback
+        ) VALUES (
+            profile_id_param, lesson_id_param, phrase_id_param, language_code_param, next_attempt_number,
+            reference_text_param, written_text_param, overall_similarity_score_param, word_level_feedback_param
+        );
+        v_score := overall_similarity_score_param;
+    END IF;
+
+    -- Step 2: Handle word-level analytics (for pronunciation only)
+    IF activity_type_param = 'pronunciation' AND jsonb_typeof(phonetic_data_param->'words') = 'array' THEN
+        FOR word_record IN SELECT * FROM jsonb_array_elements(phonetic_data_param->'words')
+        LOOP
+            v_word_text := lower(word_record->>'word');
+            v_accuracy_score := (word_record->>'accuracyScore')::numeric;
+
+            IF v_word_text IS NOT NULL AND v_accuracy_score IS NOT NULL THEN
+                SELECT needs_practice INTO word_needs_practice FROM public.user_word_pronunciation
+                WHERE profile_id = profile_id_param AND word_text = v_word_text AND language_code = language_code_param;
+
+                IF COALESCE(word_needs_practice, false) AND v_accuracy_score >= 70 THEN
+                    total_points_for_this_attempt := total_points_for_this_attempt + 1;
+                    INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_word_text, related_word_language_code, related_phrase_id, activity_type)
+                    VALUES (profile_id_param, 1, 'COMEBACK_BONUS', v_word_text, language_code_param, phrase_id_param, 'pronunciation');
+                END IF;
+                -- PERFORM public.handle_user_word_pronunciation_update(profile_id_param, language_code_param, word_record);
+            END IF;
+        END LOOP;
+    END IF;
+
+    -- Step 3: Upsert phrase progress & handle phrase-level bonuses
+    is_phrase_now_completed := (v_score >= 70);
+
+    IF activity_type_param = 'pronunciation' THEN
+        SELECT pronunciation_completed INTO was_phrase_already_completed FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+    ELSIF activity_type_param = 'dictation' THEN
+        SELECT dictation_completed INTO was_phrase_already_completed FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+    END IF;
+    was_phrase_already_completed := COALESCE(was_phrase_already_completed, false);
+
+    IF NOT was_phrase_already_completed AND is_phrase_now_completed THEN
+        IF next_attempt_number = 1 THEN
+            total_points_for_this_attempt := total_points_for_this_attempt + 1;
+            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, related_phrase_id, activity_type)
+            VALUES (profile_id_param, 1, 'FIRST_TRY_BONUS', lesson_id_param, phrase_id_param, activity_type_param);
+        END IF;
+        IF v_score >= 90 THEN
+            total_points_for_this_attempt := total_points_for_this_attempt + 1;
+            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, related_phrase_id, activity_type)
+            VALUES (profile_id_param, 1, 'PHRASE_ACCURACY_BONUS', lesson_id_param, phrase_id_param, activity_type_param);
+        END IF;
+    END IF;
+    
+    INSERT INTO public.user_phrase_progress (profile_id, lesson_id, phrase_id, language_code)
+    VALUES (profile_id_param, lesson_id_param, phrase_id_param, language_code_param)
+    ON CONFLICT (profile_id, lesson_id, phrase_id, language_code) DO NOTHING;
+
+    IF activity_type_param = 'pronunciation' THEN
+        UPDATE public.user_phrase_progress SET
+            pronunciation_attempts = COALESCE(pronunciation_attempts, 0) + 1,
+            pronunciation_last_attempt_at = NOW(),
+            best_accuracy_score = GREATEST(COALESCE(best_accuracy_score, 0), accuracy_score_param),
+            pronunciation_completed = was_phrase_already_completed OR is_phrase_now_completed,
+            last_progress_at = NOW()
+        WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+    ELSIF activity_type_param = 'dictation' THEN
+        UPDATE public.user_phrase_progress SET
+            dictation_attempts = COALESCE(dictation_attempts, 0) + 1,
+            dictation_last_attempt_at = NOW(),
+            best_dictation_score = GREATEST(COALESCE(best_dictation_score, 0), overall_similarity_score_param),
+            dictation_completed = was_phrase_already_completed OR is_phrase_now_completed,
+            last_progress_at = NOW()
+        WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+    END IF;
+
+    -- Step 4: Handle Activity Completion
+    INSERT INTO public.user_lesson_progress (profile_id, lesson_id, last_progress_at)
+    VALUES (profile_id_param, lesson_id_param, NOW())
+    ON CONFLICT (profile_id, lesson_id) DO UPDATE SET last_progress_at = NOW()
+    RETURNING progress_id INTO v_lesson_progress_id;
+
+    IF v_lesson_progress_id IS NULL THEN
+      SELECT progress_id INTO v_lesson_progress_id FROM public.user_lesson_progress 
+      WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param;
+    END IF;
+
+    SELECT activity_progress_id, (status = 'completed') 
+    INTO v_activity_progress_id, was_activity_already_completed
+    FROM public.user_lesson_activity_progress
+    WHERE user_lesson_progress_id = v_lesson_progress_id AND activity_type = activity_type_param;
+    
+    IF v_activity_progress_id IS NULL THEN
+        INSERT INTO public.user_lesson_activity_progress (user_lesson_progress_id, activity_type, status, started_at)
+        VALUES (v_lesson_progress_id, activity_type_param, 'in_progress', NOW())
+        RETURNING activity_progress_id INTO v_activity_progress_id;
+        was_activity_already_completed := FALSE;
+    END IF;
+
+    IF NOT COALESCE(was_activity_already_completed, false) THEN
+        SELECT l.total_phrases INTO total_phrases_in_lesson FROM public.lessons l WHERE l.lesson_id = lesson_id_param;
+        
+        IF activity_type_param = 'pronunciation' THEN
+            SELECT COUNT(*) INTO phrases_completed_for_activity FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND pronunciation_completed = TRUE;
+        ELSIF activity_type_param = 'dictation' THEN
+            SELECT COUNT(*) INTO phrases_completed_for_activity FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND dictation_completed = TRUE;
+        END IF;
+
+        IF phrases_completed_for_activity >= total_phrases_in_lesson THEN
+            UPDATE public.user_lesson_activity_progress
+            SET status = 'completed', completed_at = NOW()
+            WHERE activity_progress_id = v_activity_progress_id;
+
+            total_points_for_this_attempt := total_points_for_this_attempt + 10;
+            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, activity_type)
+            VALUES (profile_id_param, 10, 'ACTIVITY_COMPLETION', lesson_id_param, activity_type_param);
+
+            SELECT l.unit_id INTO v_unit_id FROM public.lessons l WHERE l.lesson_id = lesson_id_param;
+            PERFORM public.check_and_award_unit_completion_bonus(profile_id_param, v_unit_id, lesson_id_param);
+        END IF;
+    END IF;
+
+    -- Step 5: Handle Streaks
+    SELECT current_streak_days, last_streak_date INTO current_streak, last_streak
+    FROM public.student_profiles WHERE profile_id = profile_id_param;
+
+    IF last_streak IS NULL OR last_streak < today THEN
+        IF last_streak = yesterday THEN
+            new_streak := COALESCE(current_streak, 0) + 1;
+        ELSE
+            new_streak := 1;
+        END IF;
+
+        points_for_streak := floor((new_streak - 1) / 7) + 1;
+        IF points_for_streak > 0 THEN
+            total_points_for_this_attempt := total_points_for_this_attempt + points_for_streak;
+            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code)
+            VALUES (profile_id_param, points_for_streak, 'STREAK_BONUS');
+        END IF;
+
+        UPDATE public.student_profiles
+        SET current_streak_days = new_streak, last_streak_date = today
+        WHERE profile_id = profile_id_param;
+    END IF;
+
+    -- Step 6: Final point update
+    IF total_points_for_this_attempt > 0 THEN
+        UPDATE public.student_profiles SET points = points + total_points_for_this_attempt
+        WHERE profile_id = profile_id_param;
+    END IF;
+
+    points_awarded_total := total_points_for_this_attempt;
+    
+    RETURN NEXT;
+END;
+$function$
+
+## process_user_activity
+
+### Parameters
+profile_id_param (uuid)
+lesson_id_param (integer)
+phrase_id_param (integer)
+language_code_param (character varying)
+reference_text_param (text)
+recognized_text_param (text)
+accuracy_score_param (numeric)
+fluency_score_param (numeric)
+completeness_score_param (numeric)
+pronunciation_score_param (numeric)
+prosody_score_param (numeric)
+phonetic_data_param (jsonb)
+
+### Function Definition
+
+CREATE OR REPLACE FUNCTION public.process_user_activity(profile_id_param uuid, lesson_id_param integer, phrase_id_param integer, language_code_param character varying, reference_text_param text, recognized_text_param text, accuracy_score_param numeric, fluency_score_param numeric, completeness_score_param numeric, pronunciation_score_param numeric, prosody_score_param numeric, phonetic_data_param jsonb)
+ RETURNS TABLE(new_attempt_id integer, phrase_completed boolean, lesson_completed boolean, unit_completed boolean, level_completed boolean, points_awarded_total integer)
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    -- Attempt & Progress
+    next_attempt_number integer;
+    was_phrase_already_completed boolean;
+    is_phrase_now_completed boolean;
+    was_lesson_already_completed boolean;
+    is_lesson_now_completed boolean;
+    was_unit_already_completed boolean;
+    is_unit_now_completed boolean;
+    was_level_already_completed boolean;
+    is_level_now_completed boolean;
+    total_phrases_in_lesson integer;
+    phrases_completed_after_update integer;
 
     -- Points
     total_points_for_this_attempt integer := 0;
@@ -712,7 +1089,7 @@ phrases_completed_after_update integer;
     v_word_text text;
     v_accuracy_score numeric;
     word_needs_practice boolean;
-
+    
     -- Streak variables
     current_streak integer;
     last_streak date;
@@ -720,12 +1097,11 @@ phrases_completed_after_update integer;
     points_for_streak integer := 0;
     today date := current_date;
     yesterday date := current_date - 1;
-
 BEGIN
--- Step 1: Insert the speech attempt
-SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number
-FROM public.speech_attempts
-WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+    -- Step 1: Insert the speech attempt
+    SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number
+    FROM public.speech_attempts
+    WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
 
     INSERT INTO public.speech_attempts (
         profile_id, lesson_id, phrase_id, language_code, attempt_number,
@@ -778,13 +1154,13 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
         INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, related_phrase_id)
         VALUES (profile_id_param, 1, 'PHRASE_ACCURACY_BONUS', lesson_id_param, phrase_id_param);
     END IF;
-
+    
     INSERT INTO public.user_phrase_progress (
         profile_id, lesson_id, phrase_id, language_code, pronunciation_attempts,
         pronunciation_last_attempt_at, best_accuracy_score, best_pronunciation_score,
         is_completed, last_progress_at
     ) VALUES (
-        profile_id_param, lesson_id_param, phrase_id_param, language_code_param, 1, NOW(),
+        profile_id_param, lesson_id_param, phrase_id_param, language_code_param, 1, NOW(), 
         accuracy_score_param, pronunciation_score_param, is_phrase_now_completed, NOW()
     ) ON CONFLICT (profile_id, lesson_id, phrase_id, language_code) DO UPDATE SET
         pronunciation_attempts = user_phrase_progress.pronunciation_attempts + 1,
@@ -830,9 +1206,9 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
             total_points_for_this_attempt := total_points_for_this_attempt + 25;
             INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id)
             VALUES (profile_id_param, 25, 'UNIT_COMPLETION', lesson_id_param);
-
+            
             was_level_already_completed := (SELECT COUNT(*) > 0 FROM public.user_points_log WHERE profile_id = profile_id_param AND reason_code = 'LEVEL_COMPLETION' AND related_lesson_id IN (SELECT l.lesson_id FROM public.lessons l JOIN public.units u ON l.unit_id = u.unit_id WHERE u.level = current_level_code));
-
+            
             is_level_now_completed := NOT EXISTS (
                 SELECT 1 FROM public.units u
                 WHERE u.level = current_level_code AND NOT public.is_unit_complete(profile_id_param, u.unit_id)
@@ -879,164 +1255,36 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
     points_awarded_total := total_points_for_this_attempt;
 
     RETURN NEXT;
-
 END;
-
-## is_unit_complete
-
-DECLARE
-total_lessons_in_unit integer;
-completed_lessons_by_user integer;
-BEGIN
--- Get the total number of lessons in the unit
-SELECT COUNT(\*)
-INTO total_lessons_in_unit
-FROM public.lessons
-WHERE unit_id = p_unit_id;
-
-    -- If there are no lessons, the unit is not "completable"
-    IF total_lessons_in_unit = 0 THEN
-        RETURN FALSE;
-    END IF;
-
-    -- Get the number of completed lessons by the user in that unit
-    SELECT COUNT(*)
-    INTO completed_lessons_by_user
-    FROM public.user_lesson_progress ulp
-    JOIN public.lessons l ON ulp.lesson_id = l.lesson_id
-    WHERE ulp.profile_id = p_profile_id
-      AND l.unit_id = p_unit_id
-      AND ulp.is_completed = TRUE;
-
-    -- Return true if the counts match
-    RETURN total_lessons_in_unit = completed_lessons_by_user;
-
-END;
-
-## handle_user_word_pronunciation_update
-
-DECLARE
-v_word_text TEXT := lower(word_data->>'word');
-v_accuracy_score NUMERIC := (word_data->>'accuracyScore')::NUMERIC;
-v_error_type TEXT := word_data->>'errorType';
-v_error_increment INT;
-BEGIN
--- Exit if essential data is missing
-IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
-RETURN;
-END IF;
-
-    -- Determine if the attempt had an error
-    v_error_increment := CASE WHEN v_error_type IS NOT NULL AND v_error_type <> 'None' THEN 1 ELSE 0 END;
-
-    -- Upsert the word pronunciation record, setting `needs_practice` based on the CURRENT attempt's score.
-    INSERT INTO public.user_word_pronunciation (
-        profile_id, word_text, language_code, total_attempts, error_count,
-        sum_accuracy_score, average_accuracy_score, last_accuracy_score,
-        last_error_type, last_attempt_at, updated_at, needs_practice
-    )
-    VALUES (
-        profile_id_param, v_word_text, language_code_param, 1, v_error_increment,
-        v_accuracy_score, v_accuracy_score, v_accuracy_score, v_error_type,
-        NOW(), NOW(), (v_accuracy_score < 70) -- Correct logic on insert
-    )
-    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
-    SET
-        total_attempts = user_word_pronunciation.total_attempts + 1,
-        error_count = user_word_pronunciation.error_count + v_error_increment,
-        sum_accuracy_score = user_word_pronunciation.sum_accuracy_score + v_accuracy_score,
-        average_accuracy_score = (user_word_pronunciation.sum_accuracy_score + v_accuracy_score) / (user_word_pronunciation.total_attempts + 1),
-        last_accuracy_score = v_accuracy_score,
-        last_error_type = v_error_type,
-        last_attempt_at = NOW(),
-        updated_at = NOW(),
-        needs_practice = (v_accuracy_score < 70); -- Correct logic on update
-
-END;
-
-## handle_new_user_profile
-
-BEGIN
--- Create entry in public.profiles
-INSERT INTO public.profiles (id, first_name, last_name)
-VALUES (
-NEW.id,
-NEW.raw_user_meta_data->>'first_name',
-NEW.raw_user_meta_data->>'last_name'
-); -- Relies on DB default for created_at, updated_at
-
-     -- Create corresponding entry in public.student_profiles
-     INSERT INTO public.student_profiles (
-       profile_id,
-       status
-       -- native_language_code, current_target_language_code, etc., will be NULL or use DB defaults
-     )
-     VALUES (
-       NEW.id,
-       'active'::public.account_status_enum -- Or 'pending_verification' if more appropriate
-     ); -- Relies on DB defaults for subscription_tier, points, current_streak_days
-     RETURN NEW;
-
-END;
-
-## handle_user_word_pronunciation_update
-
-DECLARE
-v_word_text TEXT := lower(word_data->>'word');
-v_accuracy_score NUMERIC := (word_data->>'accuracyScore')::NUMERIC;
-v_error_type TEXT := word_data->>'errorType';
-v_error_increment INT;
-BEGIN
--- Exit if essential data is missing
-IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
-RETURN;
-END IF;
-
-    -- Determine if the attempt had an error
-    v_error_increment := CASE WHEN v_error_type IS NOT NULL AND v_error_type <> 'None' THEN 1 ELSE 0 END;
-
-    -- Upsert the word pronunciation record, setting `needs_practice` based on the CURRENT attempt's score.
-    INSERT INTO public.user_word_pronunciation (
-        profile_id, word_text, language_code, total_attempts, error_count,
-        sum_accuracy_score, average_accuracy_score, last_accuracy_score,
-        last_error_type, last_attempt_at, updated_at, needs_practice
-    )
-    VALUES (
-        profile_id_param, v_word_text, language_code_param, 1, v_error_increment,
-        v_accuracy_score, v_accuracy_score, v_accuracy_score, v_error_type,
-        NOW(), NOW(), (v_accuracy_score < 70) -- Correct logic on insert
-    )
-    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
-    SET
-        total_attempts = user_word_pronunciation.total_attempts + 1,
-        error_count = user_word_pronunciation.error_count + v_error_increment,
-        sum_accuracy_score = user_word_pronunciation.sum_accuracy_score + v_accuracy_score,
-        average_accuracy_score = (user_word_pronunciation.sum_accuracy_score + v_accuracy_score) / (user_word_pronunciation.total_attempts + 1),
-        last_accuracy_score = v_accuracy_score,
-        last_error_type = v_error_type,
-        last_attempt_at = NOW(),
-        updated_at = NOW(),
-        needs_practice = (v_accuracy_score < 70); -- Correct logic on update
-
-END;
+$function$
 
 ## process_word_practice_attempt
+### Parameters
+profile_id_param (uuid)
+word_text_param (character varying)
+language_code_param (character varying)
+accuracy_score_param (numeric)
 
+### Function Definition
+CREATE OR REPLACE FUNCTION public.process_word_practice_attempt(profile_id_param uuid, word_text_param character varying, language_code_param character varying, accuracy_score_param numeric)
+ RETURNS TABLE(success boolean, word_completed boolean, new_average_score numeric, total_attempts integer, points_awarded integer, needs_practice boolean)
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
-word_jsonb jsonb;
-points_for_this_attempt integer := 0;
-was_needing_practice boolean;
-is_now_completed boolean;
-v_new_average_score numeric;
-v_total_attempts integer;
-v_needs_practice boolean;
+    word_jsonb jsonb;
+    points_for_this_attempt integer := 0;
+    was_needing_practice boolean;
+    is_now_completed boolean;
+    v_new_average_score numeric;
+    v_total_attempts integer;
+    v_needs_practice boolean;
 BEGIN
--- Check if the word was previously needing practice for a potential bonus
-SELECT uwp.needs_practice INTO was_needing_practice
-FROM public.user_word_pronunciation uwp
-WHERE uwp.profile_id = profile_id_param
-AND uwp.word_text = word_text_param
-AND uwp.language_code = language_code_param;
+    -- Check if the word was previously needing practice for a potential bonus
+    SELECT uwp.needs_practice INTO was_needing_practice
+    FROM public.user_word_pronunciation uwp
+    WHERE uwp.profile_id = profile_id_param
+      AND uwp.word_text = word_text_param
+      AND uwp.language_code = language_code_param;
 
     -- Construct the JSONB object that handle_user_word_pronunciation_update expects
     word_jsonb := jsonb_build_object(
@@ -1080,5 +1328,98 @@ AND uwp.language_code = language_code_param;
         v_total_attempts as total_attempts,
         points_for_this_attempt as points_awarded,
         v_needs_practice as needs_practice;
+END;
+$function$
+
+## is_unit_complete
+### Parameters
+p_profile_id (uuid)
+p_unit_id (integer)
+
+### Function Definition
+
+CREATE OR REPLACE FUNCTION public.is_unit_complete(p_profile_id uuid, p_unit_id integer)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+    total_lessons_in_unit integer;
+    completed_lessons_by_user integer;
+BEGIN
+    -- Get the total number of lessons in the unit
+    SELECT COUNT(*)
+    INTO total_lessons_in_unit
+    FROM public.lessons
+    WHERE unit_id = p_unit_id;
+
+    -- If there are no lessons, the unit is not "completable"
+    IF total_lessons_in_unit = 0 THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Get the number of completed lessons by the user in that unit
+    SELECT COUNT(*)
+    INTO completed_lessons_by_user
+    FROM public.user_lesson_progress ulp
+    JOIN public.lessons l ON ulp.lesson_id = l.lesson_id
+    WHERE ulp.profile_id = p_profile_id
+      AND l.unit_id = p_unit_id
+      AND ulp.is_completed = TRUE;
+
+    -- Return true if the counts match
+    RETURN total_lessons_in_unit = completed_lessons_by_user;
+END;
+$function$
+
+## handle_user_word_pronunciation_update
+### Parameters
+profile_id_param (uuid)
+language_code_param (character varying)
+word_data (jsonb)
+
+### Function Definition
+
+CREATE OR REPLACE FUNCTION public.handle_user_word_pronunciation_update(profile_id_param uuid, language_code_param character varying, word_data jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_word_text TEXT := lower(word_data->>'word');
+    v_accuracy_score NUMERIC := (word_data->>'accuracyScore')::NUMERIC;
+    v_error_type TEXT := word_data->>'errorType';
+    v_error_increment INT;
+BEGIN
+    -- Exit if essential data is missing
+    IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
+        RETURN;
+    END IF;
+
+    -- Determine if the attempt had an error
+    v_error_increment := CASE WHEN v_error_type IS NOT NULL AND v_error_type <> 'None' THEN 1 ELSE 0 END;
+
+    -- Upsert the word pronunciation record, setting `needs_practice` based on the CURRENT attempt's score.
+    INSERT INTO public.user_word_pronunciation (
+        profile_id, word_text, language_code, total_attempts, error_count,
+        sum_accuracy_score, average_accuracy_score, last_accuracy_score,
+        last_error_type, last_attempt_at, updated_at, needs_practice
+    )
+    VALUES (
+        profile_id_param, v_word_text, language_code_param, 1, v_error_increment,
+        v_accuracy_score, v_accuracy_score, v_accuracy_score, v_error_type,
+        NOW(), NOW(), (v_accuracy_score < 70) -- Correct logic on insert
+    )
+    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
+    SET
+        total_attempts = user_word_pronunciation.total_attempts + 1,
+        error_count = user_word_pronunciation.error_count + v_error_increment,
+        sum_accuracy_score = user_word_pronunciation.sum_accuracy_score + v_accuracy_score,
+        average_accuracy_score = (user_word_pronunciation.sum_accuracy_score + v_accuracy_score) / (user_word_pronunciation.total_attempts + 1),
+        last_accuracy_score = v_accuracy_score,
+        last_error_type = v_error_type,
+        last_attempt_at = NOW(),
+        updated_at = NOW(),
+        needs_practice = (v_accuracy_score < 70); -- Correct logic on update
 
 END;
+$function$
