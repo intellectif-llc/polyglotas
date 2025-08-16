@@ -168,18 +168,20 @@ export default function LessonDictationView() {
           {/* Navigation Buttons */}
           <div className="absolute bottom-6 left-6 right-6 flex justify-between">
             <button
+              type="button"
               onClick={handlePrevious}
               disabled={currentPhraseIndex === 0 || isSubmitting}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed [&>*]:pointer-events-none"
             >
               <ChevronLeft className="-ml-1 mr-2 h-5 w-5" />
               Previous
             </button>
 
             <button
+              type="button"
               onClick={handleNext}
               disabled={currentPhraseIndex >= totalPhrases - 1 || isSubmitting}
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed [&>*]:pointer-events-none"
             >
               Next
               <ChevronRight className="ml-2 -mr-1 h-5 w-5" />
