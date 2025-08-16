@@ -11,9 +11,14 @@ interface UnitFromDB {
 }
 
 interface ProgressFromDB {
-  lesson_id: number;
-  is_completed: boolean;
-  lessons: { unit_id: number };
+  user_lesson_progress_id: number;
+  activity_type: string;
+  status: string;
+  user_lesson_progress: Array<{
+    lesson_id: number;
+    profile_id: string;
+    lessons: { unit_id: number };
+  }>;
 }
 
 export async function GET() {
@@ -73,16 +78,21 @@ export async function GET() {
 
     // 2. Fetch user progress for all lessons in these units
     const { data: progressData, error: progressError } = await supabase
-      .from("user_lesson_progress")
+      .from("user_lesson_activity_progress")
       .select(
         `
-        lesson_id,
-        is_completed,
-        lessons!inner(unit_id)
+        user_lesson_progress_id,
+        activity_type,
+        status,
+        user_lesson_progress!inner(
+          lesson_id,
+          profile_id,
+          lessons!inner(unit_id)
+        )
       `
       )
-      .eq("profile_id", user.id)
-      .in("lessons.unit_id", unitIds);
+      .eq("user_lesson_progress.profile_id", user.id)
+      .in("user_lesson_progress.lessons.unit_id", unitIds);
 
     if (progressError) {
       console.error(
@@ -110,12 +120,12 @@ export async function GET() {
     const progressMap = (
       (progressData as unknown as ProgressFromDB[]) || []
     ).reduce((acc, p) => {
-      const unitId = p.lessons?.unit_id;
+      const unitId = p.user_lesson_progress[0]?.lessons?.unit_id;
       if (unitId) {
         if (!acc[unitId]) {
           acc[unitId] = { completed: 0 };
         }
-        if (p.is_completed) {
+        if (p.activity_type === 'pronunciation' && p.status === 'completed') {
           acc[unitId].completed += 1;
         }
       }

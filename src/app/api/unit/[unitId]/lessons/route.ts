@@ -3,20 +3,6 @@ import { NextResponse } from "next/server";
 import { Lesson } from "@/types/pronunciation";
 
 // Define interfaces for structured data
-interface LessonFromDB {
-  lesson_id: number;
-  unit_id: number;
-  lesson_order: number;
-  total_phrases: number;
-  lesson_translations: { lesson_title: string }[];
-}
-
-interface UserProgressFromDB {
-  lesson_id: number;
-  is_completed: boolean;
-  phrases_completed: number;
-}
-
 interface UnitDataFromDB {
   level: string;
   unit_translations: { unit_title: string }[];
@@ -66,7 +52,10 @@ export async function GET(
         unit_id,
         lesson_order,
         total_phrases,
-        lesson_translations!inner(lesson_title, language_code)
+        lesson_translations(
+          lesson_title,
+          language_code
+        )
       `
       )
       .eq("unit_id", parsedUnitId)
@@ -83,45 +72,80 @@ export async function GET(
 
     const lessonIds = lessons.map((l) => l.lesson_id);
 
-    // 2. Fetch user progress for those lessons
+    // 2. Fetch user activity progress for those lessons
     const { data: progressData, error: progressError } = await supabase
-      .from("user_lesson_progress")
-      .select("lesson_id, is_completed, phrases_completed")
+      .from("user_lesson_activity_progress")
+      .select(`
+        user_lesson_progress_id,
+        activity_type,
+        status,
+        user_lesson_progress!inner(
+          lesson_id,
+          profile_id
+        )
+      `)
+      .eq("user_lesson_progress.profile_id", user.id)
+      .in("user_lesson_progress.lesson_id", lessonIds);
+
+    // 3. Fetch phrase progress for pronunciation activity
+    const { data: phraseProgressData, error: phraseProgressError } = await supabase
+      .from("user_phrase_progress")
+      .select("lesson_id, pronunciation_completed")
       .eq("profile_id", user.id)
       .in("lesson_id", lessonIds);
 
     if (progressError) {
-      // Log error but don't fail, as progress might not exist
       console.error("Error fetching user progress:", progressError.message);
     }
+    if (phraseProgressError) {
+      console.error("Error fetching phrase progress:", phraseProgressError.message);
+    }
 
-    // 3. Create a map for easy lookup
-    const progressMap = new Map<number, UserProgressFromDB>();
+    // 4. Create maps for easy lookup
+    const activityProgressMap = new Map<number, { pronunciationCompleted: boolean }>();
     if (progressData) {
       for (const progress of progressData) {
-        progressMap.set(progress.lesson_id, progress);
+        const lessonId = progress.user_lesson_progress[0]?.lesson_id;
+        if (lessonId && !activityProgressMap.has(lessonId)) {
+          activityProgressMap.set(lessonId, { pronunciationCompleted: false });
+        }
+        if (lessonId && progress.activity_type === 'pronunciation' && progress.status === 'completed') {
+          activityProgressMap.get(lessonId)!.pronunciationCompleted = true;
+        }
       }
     }
 
-    // 4. Combine lessons with their progress
-    const formattedLessons: Lesson[] = (lessons as LessonFromDB[]).map(
+    const phraseProgressMap = new Map<number, number>();
+    if (phraseProgressData) {
+      for (const phraseProgress of phraseProgressData) {
+        const lessonId = phraseProgress.lesson_id;
+        const currentCount = phraseProgressMap.get(lessonId) || 0;
+        if (phraseProgress.pronunciation_completed) {
+          phraseProgressMap.set(lessonId, currentCount + 1);
+        }
+      }
+    }
+
+    // 5. Combine lessons with their progress
+    const formattedLessons: Lesson[] = lessons.map(
       (lesson) => {
-        const progress = progressMap.get(lesson.lesson_id);
+        const activityProgress = activityProgressMap.get(lesson.lesson_id);
+        const phrasesCompleted = phraseProgressMap.get(lesson.lesson_id) || 0;
         return {
           lesson_id: lesson.lesson_id,
           unit_id: lesson.unit_id,
           lesson_order: lesson.lesson_order,
           total_phrases: lesson.total_phrases,
           lesson_title:
-            lesson.lesson_translations[0]?.lesson_title ||
+            lesson.lesson_translations?.[0]?.lesson_title ||
             `Lesson ${lesson.lesson_order}`,
-          is_completed: progress?.is_completed || false,
-          phrases_completed: progress?.phrases_completed || 0,
+          is_completed: activityProgress?.pronunciationCompleted || false,
+          phrases_completed: phrasesCompleted,
         };
       }
     );
 
-    // 5. Fetch unit details for the breadcrumb
+    // 6. Fetch unit details for the breadcrumb
     const { data: unitData } = await supabase
       .from("units")
       .select("level, unit_translations!inner(unit_title, language_code)")

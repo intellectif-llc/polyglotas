@@ -65,6 +65,21 @@ export async function GET(
       );
     }
 
+    // Fetch phrase progress for the user
+    const phraseIds = phrases.map(p => p.id);
+    const { data: phraseProgressData } = await supabase
+      .from("user_phrase_progress")
+      .select("phrase_id, pronunciation_completed")
+      .eq("profile_id", user.id)
+      .in("phrase_id", phraseIds);
+
+    const phraseProgressMap = new Map<number, boolean>();
+    if (phraseProgressData) {
+      for (const progress of phraseProgressData) {
+        phraseProgressMap.set(progress.phrase_id, progress.pronunciation_completed);
+      }
+    }
+
     const formattedPhrases = phrases.map(
       (phrase: {
         id: number;
@@ -82,8 +97,7 @@ export async function GET(
         phrase_text: phrase.phrase_versions[0]?.phrase_text || "",
         audio_url_normal: phrase.phrase_versions[0]?.audio_url_normal,
         audio_url_slow: phrase.phrase_versions[0]?.audio_url_slow,
-        // We'll add user progress later
-        is_completed: false,
+        is_completed: phraseProgressMap.get(phrase.id) || false,
       })
     );
 

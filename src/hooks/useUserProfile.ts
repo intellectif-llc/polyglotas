@@ -63,11 +63,19 @@ export const useUserStats = () => {
         .eq("profile_id", session.user.id)
         .single();
 
-      // Get user progress data
+      // Get user activity progress data
       const { data: progressData } = await supabase
-        .from("user_lesson_progress")
-        .select("lesson_id, is_completed")
-        .eq("profile_id", session.user.id);
+        .from("user_lesson_activity_progress")
+        .select(`
+          activity_type,
+          status,
+          user_lesson_progress!inner(
+            lesson_id,
+            profile_id
+          )
+        `)
+        .eq("user_lesson_progress.profile_id", session.user.id)
+        .eq("activity_type", "pronunciation");
 
       // Get lessons with unit info
       const { data: lessonsData } = await supabase
@@ -97,10 +105,11 @@ export const useUserStats = () => {
           unitProgress.get(unitId)!.total++;
         });
 
-        // Count completed lessons
+        // Count completed lessons (pronunciation activities)
         progressData.forEach((progress) => {
-          if (progress.is_completed) {
-            const lesson = lessonsData.find(l => l.lesson_id === progress.lesson_id);
+          if (progress.status === 'completed') {
+            const lessonId = progress.user_lesson_progress[0]?.lesson_id;
+            const lesson = lessonsData.find(l => l.lesson_id === lessonId);
             if (lesson) {
               const unitData = unitProgress.get(lesson.unit_id);
               if (unitData) {

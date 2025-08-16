@@ -25,9 +25,6 @@ interface SpeechAttemptRequest {
 }
 
 interface ProcessUserActivityResponse {
-  new_attempt_id: number;
-  phrase_completed: boolean;
-  lesson_completed: boolean;
   points_awarded_total: number;
 }
 
@@ -99,6 +96,7 @@ export async function POST(request: NextRequest) {
         lesson_id_param: lesson_id,
         phrase_id_param: phrase_id,
         language_code_param: targetLanguage,
+        activity_type_param: 'pronunciation',
         reference_text_param: referenceText,
         recognized_text_param:
           assessmentResults.recognizedText || "Recognition failed",
@@ -126,9 +124,6 @@ export async function POST(request: NextRequest) {
     const typedRpcData = rpcData as ProcessUserActivityResponse;
     return NextResponse.json({
       success: true,
-      attemptId: typedRpcData.new_attempt_id,
-      phraseCompleted: typedRpcData.phrase_completed,
-      lessonCompleted: typedRpcData.lesson_completed,
       pointsAwarded: typedRpcData.points_awarded_total,
       scores: {
         accuracy: assessmentResults.accuracyScore,
