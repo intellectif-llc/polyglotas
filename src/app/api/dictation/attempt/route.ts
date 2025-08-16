@@ -154,47 +154,73 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update phrase progress
-    const isDictationCorrect = overall_similarity_score >= 70;
-    
-    const { data: currentProgress } = await supabase
-      .from("user_phrase_progress")
-      .select("dictation_attempts, best_dictation_score, dictation_completed")
-      .eq("profile_id", user.id)
-      .eq("lesson_id", lesson_id)
-      .eq("phrase_id", phrase_id)
-      .maybeSingle();
-
-    const nextDictationAttemptNum = (currentProgress?.dictation_attempts || 0) + 1;
-    const currentBestScore = currentProgress?.best_dictation_score || 0;
-    const newBestScore = Math.max(currentBestScore, overall_similarity_score);
-    const dictationCompleted = isDictationCorrect || currentProgress?.dictation_completed || false;
-
-    const { error: upsertError } = await supabase
-      .from("user_phrase_progress")
-      .upsert({
-        profile_id: user.id,
-        lesson_id,
-        phrase_id,
-        language_code,
-        dictation_attempts: nextDictationAttemptNum,
-        dictation_last_attempt_at: new Date().toISOString(),
-        dictation_completed: dictationCompleted,
-        best_dictation_score: newBestScore,
-        last_progress_at: new Date().toISOString(),
-      }, {
-        onConflict: "profile_id, lesson_id, phrase_id, language_code",
+    // Use the centralized process_user_activity function
+    const { data: activityResult, error: activityError } = await supabase
+      .rpc("process_user_activity", {
+        profile_id_param: user.id,
+        lesson_id_param: lesson_id,
+        phrase_id_param: phrase_id,
+        language_code_param: language_code,
+        activity_type_param: "dictation",
+        reference_text_param: reference_text,
+        written_text_param: written_text,
+        overall_similarity_score_param: overall_similarity_score,
+        word_level_feedback_param: word_level_feedback,
       });
 
-    if (upsertError) {
-      console.error("Error updating phrase progress:", upsertError);
+    if (activityError) {
+      console.error("Error processing user activity:", activityError);
     }
+
+    // Update user_word_spelling for each word
+    for (const feedback of word_level_feedback) {
+      if (!feedback.reference_word) continue;
+
+      // Get current stats
+      const { data: currentSpelling } = await supabase
+        .from("user_word_spelling")
+        .select("total_dictation_occurrences, dictation_error_count, sum_word_similarity_score")
+        .eq("profile_id", user.id)
+        .eq("word_text", feedback.reference_word)
+        .eq("language_code", language_code)
+        .maybeSingle();
+
+      const newOccurrences = (currentSpelling?.total_dictation_occurrences || 0) + 1;
+      const newErrorCount = (currentSpelling?.dictation_error_count || 0) + (feedback.similarity_score < 70 ? 1 : 0);
+      const newSumScore = (currentSpelling?.sum_word_similarity_score || 0) + feedback.similarity_score;
+      const newAverage = newSumScore / newOccurrences;
+
+      const { error: spellingError } = await supabase
+        .from("user_word_spelling")
+        .upsert({
+          profile_id: user.id,
+          word_text: feedback.reference_word,
+          language_code,
+          total_dictation_occurrences: newOccurrences,
+          dictation_error_count: newErrorCount,
+          sum_word_similarity_score: newSumScore,
+          average_word_similarity_score: parseFloat(newAverage.toFixed(2)),
+          last_word_similarity_score: feedback.similarity_score,
+          last_dictation_attempt_at: new Date().toISOString(),
+          needs_spelling_practice: newAverage < 70 || (newOccurrences > 2 && newErrorCount / newOccurrences > 0.3),
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: "profile_id, word_text, language_code",
+        });
+
+      if (spellingError) {
+        console.error(`Error updating word spelling for '${feedback.reference_word}':`, spellingError);
+      }
+    }
+
+    const isDictationCorrect = overall_similarity_score >= 70;
+    const pointsAwarded = activityResult?.[0]?.points_awarded_total || 0;
 
     return NextResponse.json({
       overall_similarity_score,
       word_level_feedback,
       is_correct: isDictationCorrect,
-      best_score: newBestScore,
+      points_awarded: pointsAwarded,
     });
 
   } catch (error) {

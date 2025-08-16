@@ -44,5 +44,5 @@ export interface DictationAttempt {
     position_in_phrase: number;
   }>;
   is_correct: boolean;
-  best_score: number;
+  points_awarded?: number;
 }

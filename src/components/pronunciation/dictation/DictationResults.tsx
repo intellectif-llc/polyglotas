@@ -67,9 +67,9 @@ export default function DictationResults({
           Score: <span className="font-semibold">{attempt.overall_similarity_score}%</span>
         </div>
         
-        {attempt.best_score > attempt.overall_similarity_score && (
-          <div className="text-sm text-gray-500 mt-1">
-            Best Score: {attempt.best_score}%
+        {attempt.points_awarded && attempt.points_awarded > 0 && (
+          <div className="text-sm text-green-600 mt-1">
+            +{attempt.points_awarded} points earned!
           </div>
         )}
       </div>
