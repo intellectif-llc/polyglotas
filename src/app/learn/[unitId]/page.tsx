@@ -13,7 +13,7 @@ export default function UnitLessonsPage() {
   const { data, isLoading, error } = useUnitLessons(unitId);
 
   const handleLessonClick = (lessonId: number) => {
-    router.push(`/learn/${unitId}/lesson/${lessonId}/practice`);
+    router.push(`/learn/${unitId}/lesson/${lessonId}/dictation`);
   };
 
   const unitTitle = data?.unit?.unit_title || "Unit";

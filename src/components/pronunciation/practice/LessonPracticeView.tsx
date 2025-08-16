@@ -174,7 +174,7 @@ export default function LessonPracticeView() {
             Back to Lessons
           </button>
           <h1 className="text-2xl font-bold text-gray-900 mt-2">
-            {data.lesson?.lesson_title || "Lesson"}
+            {data.lesson?.lesson_title || "Lesson"} - Practice
           </h1>
           <div className="text-sm text-gray-500 mt-1">
             Unit {data.lesson?.unit_title || unitId} •{" "}
@@ -185,6 +185,21 @@ export default function LessonPracticeView() {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Activity Switcher */}
+        <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
+          <button
+            onClick={() => router.push(`/learn/${unitId}/lesson/${lessonId}/dictation`)}
+            className="flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center text-gray-600 hover:text-gray-900"
+          >
+            Dictation
+          </button>
+          <button
+            className="flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center bg-white text-blue-600 shadow-sm"
+          >
+            Practice
+          </button>
+        </div>
+
         {/* Phrase Stepper */}
         <PhraseStepper
           phrases={data.phrases}

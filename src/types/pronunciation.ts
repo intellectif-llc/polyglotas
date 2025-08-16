@@ -31,4 +31,18 @@ export interface Phrase {
   audio_url_normal: string;
   audio_url_slow: string;
   is_completed: boolean;
+  dictation_completed?: boolean;
+  pronunciation_completed?: boolean;
+}
+
+export interface DictationAttempt {
+  overall_similarity_score: number;
+  word_level_feedback: Array<{
+    reference_word: string;
+    written_word: string;
+    similarity_score: number;
+    position_in_phrase: number;
+  }>;
+  is_correct: boolean;
+  best_score: number;
 }

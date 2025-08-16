@@ -69,14 +69,17 @@ export async function GET(
     const phraseIds = phrases.map(p => p.id);
     const { data: phraseProgressData } = await supabase
       .from("user_phrase_progress")
-      .select("phrase_id, pronunciation_completed")
+      .select("phrase_id, pronunciation_completed, dictation_completed")
       .eq("profile_id", user.id)
       .in("phrase_id", phraseIds);
 
-    const phraseProgressMap = new Map<number, boolean>();
+    const phraseProgressMap = new Map<number, { pronunciation_completed: boolean; dictation_completed: boolean }>();
     if (phraseProgressData) {
       for (const progress of phraseProgressData) {
-        phraseProgressMap.set(progress.phrase_id, progress.pronunciation_completed);
+        phraseProgressMap.set(progress.phrase_id, {
+          pronunciation_completed: progress.pronunciation_completed || false,
+          dictation_completed: progress.dictation_completed || false,
+        });
       }
     }
 
@@ -97,7 +100,9 @@ export async function GET(
         phrase_text: phrase.phrase_versions[0]?.phrase_text || "",
         audio_url_normal: phrase.phrase_versions[0]?.audio_url_normal,
         audio_url_slow: phrase.phrase_versions[0]?.audio_url_slow,
-        is_completed: phraseProgressMap.get(phrase.id) || false,
+        is_completed: phraseProgressMap.get(phrase.id)?.pronunciation_completed || false,
+        dictation_completed: phraseProgressMap.get(phrase.id)?.dictation_completed || false,
+        pronunciation_completed: phraseProgressMap.get(phrase.id)?.pronunciation_completed || false,
       })
     );
 
