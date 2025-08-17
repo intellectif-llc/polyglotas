@@ -24,7 +24,6 @@ export default function DictationResults({
   };
 
   const renderTextWithFeedback = () => {
-    const words = userText.split(/\s+/);
     return (
       <div className="flex flex-wrap gap-1 p-4 bg-gray-50 rounded-lg">
         {attempt.word_level_feedback.map((feedback, index) => {

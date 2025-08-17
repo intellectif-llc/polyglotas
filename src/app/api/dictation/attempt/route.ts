@@ -70,9 +70,12 @@ const alignSequences = (refWords: string[], userWords: string[]): Array<{ref: st
     if (i > 0 && j > 0) {
       const match = refWords[i-1] === userWords[j-1] ? 0 : 1;
       if (dp[i][j] === dp[i-1][j-1] + match) {
-        // Match or substitution
-        const similarity = calculateWordSimilarity(refWords[i-1], userWords[j-1]);
-        aligned.unshift({ref: refWords[i-1], user: userWords[j-1], similarity});
+        // Match or substitution - use character-level similarity
+        const refWord = refWords[i-1];
+        const userWord = userWords[j-1];
+        const similarity = refWord === userWord ? 100 : 
+          parseFloat(((1 - distance(refWord, userWord) / Math.max(refWord.length, userWord.length)) * 100).toFixed(2));
+        aligned.unshift({ref: refWord, user: userWord, similarity});
         i--; j--;
       } else if (dp[i][j] === dp[i-1][j] + 1) {
         // Deletion (missing word in user input)
@@ -146,32 +149,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate similarity scores with sequence alignment
+    // Calculate character-level similarity for more accurate scoring
+    const normalizedRef = normalizeText(reference_text);
+    const normalizedUser = normalizeText(written_text);
+    
+    const refLength = normalizedRef.length;
+    const userLength = normalizedUser.length;
+    const maxLength = Math.max(refLength, userLength);
+    
+    let overall_similarity_score = 0;
+    if (maxLength > 0) {
+      const charDistance = distance(normalizedRef, normalizedUser);
+      overall_similarity_score = parseFloat(((1 - charDistance / maxLength) * 100).toFixed(2));
+    }
+    
+    // Generate word-level feedback for UI display
     const refWords = tokenize(reference_text);
     const userWords = tokenize(written_text);
-    
     const alignedWords = alignSequences(refWords, userWords);
-    const word_level_feedback = [];
-    let totalWordSimilaritySum = 0;
-    let matchedWordCount = 0;
-
-    alignedWords.forEach((alignment, index) => {
-      word_level_feedback.push({
-        reference_word: alignment.ref,
-        written_word: alignment.user,
-        similarity_score: alignment.similarity,
-        position_in_phrase: index,
-      });
-
-      if (alignment.ref) {
-        totalWordSimilaritySum += alignment.similarity;
-        matchedWordCount++;
-      }
-    });
-
-    const overall_similarity_score = matchedWordCount > 0
-      ? parseFloat((totalWordSimilaritySum / matchedWordCount).toFixed(2))
-      : 0;
+    const word_level_feedback = alignedWords.map((alignment, index) => ({
+      reference_word: alignment.ref,
+      written_word: alignment.user,
+      similarity_score: alignment.similarity,
+      position_in_phrase: index,
+    }));
 
     // Get next attempt number
     const { data: maxAttemptData } = await supabase
@@ -239,9 +240,14 @@ export async function POST(request: NextRequest) {
         .eq("language_code", language_code)
         .maybeSingle();
 
+      // Calculate character-level similarity for this word
+      const wordSimilarity = feedback.reference_word && feedback.written_word
+        ? parseFloat(((1 - distance(feedback.reference_word, feedback.written_word) / Math.max(feedback.reference_word.length, feedback.written_word.length)) * 100).toFixed(2))
+        : feedback.written_word ? 0 : 100; // 0 if wrong word, 100 if exact match
+      
       const newOccurrences = (currentSpelling?.total_dictation_occurrences || 0) + 1;
-      const newErrorCount = (currentSpelling?.dictation_error_count || 0) + (feedback.similarity_score < 70 ? 1 : 0);
-      const newSumScore = (currentSpelling?.sum_word_similarity_score || 0) + feedback.similarity_score;
+      const newErrorCount = (currentSpelling?.dictation_error_count || 0) + (wordSimilarity < 70 ? 1 : 0);
+      const newSumScore = (currentSpelling?.sum_word_similarity_score || 0) + wordSimilarity;
       const newAverage = newSumScore / newOccurrences;
 
       const { error: spellingError } = await supabase
@@ -254,7 +260,7 @@ export async function POST(request: NextRequest) {
           dictation_error_count: newErrorCount,
           sum_word_similarity_score: newSumScore,
           average_word_similarity_score: parseFloat(newAverage.toFixed(2)),
-          last_word_similarity_score: feedback.similarity_score,
+          last_word_similarity_score: wordSimilarity,
           last_dictation_attempt_at: new Date().toISOString(),
           needs_spelling_practice: newAverage < 70 || (newOccurrences > 2 && newErrorCount / newOccurrences > 0.3),
           updated_at: new Date().toISOString(),
