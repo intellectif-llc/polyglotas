@@ -40,6 +40,63 @@ const calculateWordSimilarity = (word1: string, word2: string): number => {
   return Math.max(0, (1 - levenshteinDist / maxLength) * 100);
 };
 
+const alignSequences = (refWords: string[], userWords: string[]): Array<{ref: string, user: string, similarity: number}> => {
+  const dp: number[][] = [];
+  const m = refWords.length;
+  const n = userWords.length;
+  
+  // Initialize DP table
+  for (let i = 0; i <= m; i++) {
+    dp[i] = [];
+    for (let j = 0; j <= n; j++) {
+      if (i === 0) dp[i][j] = j;
+      else if (j === 0) dp[i][j] = i;
+      else {
+        const match = refWords[i-1] === userWords[j-1] ? 0 : 1;
+        dp[i][j] = Math.min(
+          dp[i-1][j] + 1,     // deletion
+          dp[i][j-1] + 1,     // insertion
+          dp[i-1][j-1] + match // substitution
+        );
+      }
+    }
+  }
+  
+  // Backtrack to find alignment
+  const aligned = [];
+  let i = m, j = n;
+  
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0) {
+      const match = refWords[i-1] === userWords[j-1] ? 0 : 1;
+      if (dp[i][j] === dp[i-1][j-1] + match) {
+        // Match or substitution
+        const similarity = calculateWordSimilarity(refWords[i-1], userWords[j-1]);
+        aligned.unshift({ref: refWords[i-1], user: userWords[j-1], similarity});
+        i--; j--;
+      } else if (dp[i][j] === dp[i-1][j] + 1) {
+        // Deletion (missing word in user input)
+        aligned.unshift({ref: refWords[i-1], user: "", similarity: 0});
+        i--;
+      } else {
+        // Insertion (extra word in user input)
+        aligned.unshift({ref: "", user: userWords[j-1], similarity: 0});
+        j--;
+      }
+    } else if (i > 0) {
+      // Remaining reference words
+      aligned.unshift({ref: refWords[i-1], user: "", similarity: 0});
+      i--;
+    } else {
+      // Remaining user words
+      aligned.unshift({ref: "", user: userWords[j-1], similarity: 0});
+      j--;
+    }
+  }
+  
+  return aligned;
+};
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
@@ -89,31 +146,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate similarity scores with improved logic
+    // Calculate similarity scores with sequence alignment
     const refWords = tokenize(reference_text);
     const userWords = tokenize(written_text);
+    
+    const alignedWords = alignSequences(refWords, userWords);
     const word_level_feedback = [];
     let totalWordSimilaritySum = 0;
     let matchedWordCount = 0;
 
-    const maxLength = Math.max(refWords.length, userWords.length);
-    for (let i = 0; i < maxLength; i++) {
-      const refWord = refWords[i] || "";
-      const userWord = userWords[i] || "";
-      const similarity = calculateWordSimilarity(refWord, userWord);
-
+    alignedWords.forEach((alignment, index) => {
       word_level_feedback.push({
-        reference_word: refWord,
-        written_word: userWord,
-        similarity_score: similarity,
-        position_in_phrase: i,
+        reference_word: alignment.ref,
+        written_word: alignment.user,
+        similarity_score: alignment.similarity,
+        position_in_phrase: index,
       });
 
-      if (refWords[i]) {
-        totalWordSimilaritySum += similarity;
+      if (alignment.ref) {
+        totalWordSimilaritySum += alignment.similarity;
         matchedWordCount++;
       }
-    }
+    });
 
     const overall_similarity_score = matchedWordCount > 0
       ? parseFloat((totalWordSimilaritySum / matchedWordCount).toFixed(2))

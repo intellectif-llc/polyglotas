@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLessonPhrases } from "@/hooks/pronunciation/usePronunciationData";
 import { useDictation } from "@/hooks/dictation/useDictation";
+import { useLastDictationAttempt } from "@/hooks/dictation/useLastDictationAttempt";
 import PhraseStepper from "../practice/PhraseStepper";
 import DictationInterface from "./DictationInterface";
 import DictationResults from "./DictationResults";
@@ -23,6 +24,21 @@ export default function LessonDictationView() {
   const [lastAttempt, setLastAttempt] = useState<DictationAttempt | null>(null);
   
   const { submitDictation, isSubmitting } = useDictation();
+  const { data: lastAttemptData, refetch: refetchLastAttempt } = useLastDictationAttempt(
+    lessonId,
+    data?.phrases?.[currentPhraseIndex]?.id
+  );
+
+  // Load last attempt when phrase changes or data loads
+  useEffect(() => {
+    if (lastAttemptData?.attempt) {
+      setLastAttempt(lastAttemptData.attempt);
+      setUserText(lastAttemptData.attempt.written_text || "");
+    } else {
+      setLastAttempt(null);
+      setUserText("");
+    }
+  }, [lastAttemptData, currentPhraseIndex]);
 
   const handleSubmitDictation = useCallback(async () => {
     if (!data?.phrases?.[currentPhraseIndex] || !userText.trim()) return;
@@ -35,22 +51,22 @@ export default function LessonDictationView() {
     
     if (result) {
       setLastAttempt(result);
+      // Refetch to update cache
+      refetchLastAttempt();
     }
   }, [data, currentPhraseIndex, userText, lessonId, submitDictation]);
 
   const handleNext = () => {
     if (data && currentPhraseIndex < data.phrases.length - 1) {
       setCurrentPhraseIndex(currentPhraseIndex + 1);
-      setUserText("");
-      setLastAttempt(null);
+      // State will be loaded by useEffect
     }
   };
 
   const handlePrevious = () => {
     if (currentPhraseIndex > 0) {
       setCurrentPhraseIndex(currentPhraseIndex - 1);
-      setUserText("");
-      setLastAttempt(null);
+      // State will be loaded by useEffect
     }
   };
 
@@ -134,10 +150,10 @@ export default function LessonDictationView() {
         <PhraseStepper
           phrases={data.phrases}
           currentPhraseIndex={currentPhraseIndex}
+          activityType="dictation"
           onSelectPhrase={(index) => {
             setCurrentPhraseIndex(index);
-            setUserText("");
-            setLastAttempt(null);
+            // State will be loaded by useEffect
           }}
         />
 

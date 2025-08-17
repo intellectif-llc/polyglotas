@@ -45,4 +45,5 @@ export interface DictationAttempt {
   }>;
   is_correct: boolean;
   points_awarded?: number;
+  written_text?: string;
 }
