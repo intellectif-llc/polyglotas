@@ -911,7 +911,7 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
                     INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_word_text, related_word_language_code, related_phrase_id, activity_type)
                     VALUES (profile_id_param, 1, 'COMEBACK_BONUS', v_word_text, language_code_param, phrase_id_param, 'pronunciation');
                 END IF;
-                -- PERFORM public.handle_user_word_pronunciation_update(profile_id_param, language_code_param, word_record);
+                 PERFORM public.handle_user_word_pronunciation_update(profile_id_param, language_code_param, word_record);
             END IF;
         END LOOP;
     END IF;

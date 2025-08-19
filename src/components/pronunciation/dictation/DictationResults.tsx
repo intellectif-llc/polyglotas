@@ -13,7 +13,6 @@ interface DictationResultsProps {
 
 export default function DictationResults({
   attempt,
-  userText,
   onTryAgain,
   onContinue,
 }: DictationResultsProps) {
@@ -29,13 +28,15 @@ export default function DictationResults({
         {attempt.word_level_feedback.map((feedback, index) => {
           const userWord = feedback.written_word;
           const refWord = feedback.reference_word;
-          
+
           if (!userWord && !refWord) return null;
-          
+
           return (
             <span
               key={index}
-              className={`px-2 py-1 rounded text-sm font-medium ${getWordColor(feedback.similarity_score)}`}
+              className={`px-2 py-1 rounded text-sm font-medium ${getWordColor(
+                feedback.similarity_score
+              )}`}
               title={`Reference: "${refWord}" | Your input: "${userWord}" | Score: ${feedback.similarity_score}%`}
             >
               {userWord || "..."}
@@ -57,15 +58,18 @@ export default function DictationResults({
             <XCircle className="w-16 h-16 text-red-500" />
           )}
         </div>
-        
+
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
           {attempt.is_correct ? "Great Job!" : "Keep Trying!"}
         </h2>
-        
+
         <div className="text-lg text-gray-600">
-          Score: <span className="font-semibold">{attempt.overall_similarity_score}%</span>
+          Score:{" "}
+          <span className="font-semibold">
+            {attempt.overall_similarity_score}%
+          </span>
         </div>
-        
+
         {attempt.points_awarded && attempt.points_awarded > 0 && (
           <div className="text-sm text-green-600 mt-1">
             +{attempt.points_awarded} points earned!
@@ -75,9 +79,11 @@ export default function DictationResults({
 
       {/* Text Feedback */}
       <div className="w-full max-w-2xl">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Your Answer:</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">
+          Your Answer:
+        </h3>
         {renderTextWithFeedback()}
-        
+
         <div className="mt-4 text-sm text-gray-600">
           <div className="flex items-center space-x-4">
             <div className="flex items-center">
@@ -97,24 +103,24 @@ export default function DictationResults({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex space-x-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
         <button
           type="button"
           onClick={onTryAgain}
-          className="cursor-pointer flex items-center px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          className="flex items-center justify-center px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium min-h-[48px] touch-manipulation"
         >
-          <RotateCcw className="w-5 h-5 mr-2" />
-          Try Again
+          <RotateCcw className="w-5 h-5 mr-2 pointer-events-none" />
+          <span className="pointer-events-none">Try Again</span>
         </button>
 
         {attempt.is_correct && (
           <button
             type="button"
             onClick={onContinue}
-            className="cursor-pointer flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium min-h-[48px] touch-manipulation"
           >
-            Continue to Practice
-            <ArrowRight className="w-5 h-5 ml-2" />
+            <span className="pointer-events-none">Continue to Practice</span>
+            <ArrowRight className="w-5 h-5 ml-2 pointer-events-none" />
           </button>
         )}
       </div>

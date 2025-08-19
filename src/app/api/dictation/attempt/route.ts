@@ -31,14 +31,7 @@ const tokenize = (text: string): string[] => {
   return normalized.split(/\s+/).filter((w) => w.length > 0);
 };
 
-const calculateWordSimilarity = (word1: string, word2: string): number => {
-  if (word1 === word2) return 100;
-  if (!word1 || !word2) return 0;
-  
-  const maxLength = Math.max(word1.length, word2.length);
-  const levenshteinDist = distance(word1, word2);
-  return Math.max(0, (1 - levenshteinDist / maxLength) * 100);
-};
+
 
 const alignSequences = (refWords: string[], userWords: string[]): Array<{ref: string, user: string, similarity: number}> => {
   const dp: number[][] = [];

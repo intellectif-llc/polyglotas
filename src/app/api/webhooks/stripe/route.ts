@@ -7,17 +7,18 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-async function handleProductSync(productData: any) {
+async function handleProductSync(productData: Record<string, unknown>) {
   try {
+    const name = String(productData.name || '');
     const { error } = await supabase
       .from('products')
       .upsert({
-        stripe_product_id: productData.id,
-        active: productData.active,
-        name: productData.name,
-        description: productData.description,
-        tier_key: productData.name.toLowerCase().includes('pro') ? 'pro' : 
-                  productData.name.toLowerCase().includes('starter') ? 'starter' : null,
+        stripe_product_id: productData.id as string,
+        active: productData.active as boolean,
+        name,
+        description: productData.description as string,
+        tier_key: name.toLowerCase().includes('pro') ? 'pro' : 
+                  name.toLowerCase().includes('starter') ? 'starter' : null,
         metadata: productData.metadata,
         updated_at: new Date().toISOString()
       }, {
@@ -34,28 +35,29 @@ async function handleProductSync(productData: any) {
   }
 }
 
-async function handlePriceSync(priceData: any) {
+async function handlePriceSync(priceData: Record<string, unknown>) {
   try {
     // Get product_id from products table
     const { data: product } = await supabase
       .from('products')
       .select('id')
-      .eq('stripe_product_id', priceData.product)
+      .eq('stripe_product_id', priceData.product as string)
       .single();
 
+    const recurring = priceData.recurring as Record<string, unknown> | undefined;
     const { error } = await supabase
       .from('prices')
       .upsert({
-        stripe_price_id: priceData.id,
+        stripe_price_id: priceData.id as string,
         product_id: product?.id,
-        active: priceData.active,
-        unit_amount: priceData.unit_amount || priceData.amount,
-        currency: priceData.currency,
-        type: priceData.type || 'recurring',
-        billing_interval: priceData.recurring?.interval || priceData.interval,
-        interval_count: priceData.recurring?.interval_count || priceData.interval_count,
-        description: priceData.nickname,
-        trial_period_days: priceData.recurring?.trial_period_days || priceData.trial_period_days,
+        active: priceData.active as boolean,
+        unit_amount: (priceData.unit_amount || priceData.amount) as number,
+        currency: priceData.currency as string,
+        type: (priceData.type || 'recurring') as string,
+        billing_interval: (recurring?.interval || priceData.interval) as string,
+        interval_count: (recurring?.interval_count || priceData.interval_count) as number,
+        description: priceData.nickname as string,
+        trial_period_days: (recurring?.trial_period_days || priceData.trial_period_days) as number,
         metadata: priceData.metadata,
         updated_at: new Date().toISOString()
       }, {

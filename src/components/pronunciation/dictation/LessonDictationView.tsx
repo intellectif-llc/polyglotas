@@ -22,12 +22,10 @@ export default function LessonDictationView() {
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
   const [userText, setUserText] = useState("");
   const [lastAttempt, setLastAttempt] = useState<DictationAttempt | null>(null);
-  
+
   const { submitDictation, isSubmitting } = useDictation();
-  const { data: lastAttemptData, refetch: refetchLastAttempt } = useLastDictationAttempt(
-    lessonId,
-    data?.phrases?.[currentPhraseIndex]?.id
-  );
+  const { data: lastAttemptData, refetch: refetchLastAttempt } =
+    useLastDictationAttempt(lessonId, data?.phrases?.[currentPhraseIndex]?.id);
 
   // Load last attempt when phrase changes or data loads
   useEffect(() => {
@@ -48,13 +46,13 @@ export default function LessonDictationView() {
       data.phrases[currentPhraseIndex].id,
       userText
     );
-    
+
     if (result) {
       setLastAttempt(result);
       // Refetch to update cache
       refetchLastAttempt();
     }
-  }, [data, currentPhraseIndex, userText, lessonId, submitDictation]);
+  }, [data, currentPhraseIndex, userText, lessonId, submitDictation, refetchLastAttempt]);
 
   const handleNext = () => {
     if (data && currentPhraseIndex < data.phrases.length - 1) {
@@ -115,16 +113,17 @@ export default function LessonDictationView() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <button
             onClick={() => router.push(`/learn/${unitId}`)}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-3 min-h-[44px] touch-manipulation"
           >
-            <ArrowLeft size={20} className="mr-2" />
-            Back to Lessons
+            <ArrowLeft size={20} className="mr-2 pointer-events-none" />
+            <span className="pointer-events-none">Back to Lessons</span>
           </button>
-          <h1 className="text-2xl font-bold text-gray-900 mt-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
             {data.lesson?.lesson_title || "Lesson"} - Dictation
           </h1>
           <div className="text-sm text-gray-500 mt-1">
-            Unit {data.lesson?.unit_title || unitId} • {data.lesson?.level || ""}
+            Unit {data.lesson?.unit_title || unitId} •{" "}
+            {data.lesson?.level || ""}
           </div>
         </div>
       </div>
@@ -133,16 +132,16 @@ export default function LessonDictationView() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Activity Switcher */}
         <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-          <button
-            className="flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center bg-white text-blue-600 shadow-sm"
-          >
-            Dictation
+          <button className="flex items-center px-4 py-3 rounded-md text-sm font-medium transition-colors flex-1 justify-center bg-white text-blue-600 shadow-sm min-h-[44px] touch-manipulation">
+            <span className="pointer-events-none">Dictation</span>
           </button>
           <button
-            onClick={() => router.push(`/learn/${unitId}/lesson/${lessonId}/practice`)}
-            className="flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center text-gray-600 hover:text-gray-900"
+            onClick={() =>
+              router.push(`/learn/${unitId}/lesson/${lessonId}/practice`)
+            }
+            className="flex items-center px-4 py-3 rounded-md text-sm font-medium transition-colors flex-1 justify-center text-gray-600 hover:text-gray-900 min-h-[44px] touch-manipulation"
           >
-            Practice
+            <span className="pointer-events-none">Practice</span>
           </button>
         </div>
 
@@ -158,50 +157,58 @@ export default function LessonDictationView() {
         />
 
         {/* Main Dictation Area */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 relative min-h-[400px]">
-          <div className="text-center mb-4 text-sm text-gray-500">
-            Phrase {currentPhraseIndex + 1} of {totalPhrases}
+        <div className="bg-white rounded-lg shadow-md mb-6">
+          <div className="p-4 sm:p-6">
+            <div className="text-center mb-4 text-sm text-gray-500">
+              Phrase {currentPhraseIndex + 1} of {totalPhrases}
+            </div>
+
+            <div className="min-h-[300px] sm:min-h-[400px] pb-4">
+              {!lastAttempt ? (
+                <DictationInterface
+                  audioUrlNormal={currentPhrase.audio_url_normal}
+                  audioUrlSlow={currentPhrase.audio_url_slow}
+                  userText={userText}
+                  onTextChange={setUserText}
+                  onSubmit={handleSubmitDictation}
+                  isSubmitting={isSubmitting}
+                />
+              ) : (
+                <DictationResults
+                  attempt={lastAttempt}
+                  userText={userText}
+                  onTryAgain={handleTryAgain}
+                  onContinue={handleContinueToPractice}
+                />
+              )}
+            </div>
           </div>
 
-          {!lastAttempt ? (
-            <DictationInterface
-              audioUrlNormal={currentPhrase.audio_url_normal}
-              audioUrlSlow={currentPhrase.audio_url_slow}
-              userText={userText}
-              onTextChange={setUserText}
-              onSubmit={handleSubmitDictation}
-              isSubmitting={isSubmitting}
-            />
-          ) : (
-            <DictationResults
-              attempt={lastAttempt}
-              userText={userText}
-              onTryAgain={handleTryAgain}
-              onContinue={handleContinueToPractice}
-            />
-          )}
+          {/* Navigation Buttons - Now outside content area */}
+          <div className="border-t border-gray-200 px-4 py-4 sm:px-6">
+            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-between sm:items-center">
+              <button
+                type="button"
+                onClick={handlePrevious}
+                disabled={currentPhraseIndex === 0 || isSubmitting}
+                className="flex items-center justify-center sm:justify-start px-4 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px] touch-manipulation"
+              >
+                <ChevronLeft className="h-5 w-5 mr-2 pointer-events-none" />
+                <span className="pointer-events-none">Previous</span>
+              </button>
 
-          {/* Navigation Buttons */}
-          <div className="absolute bottom-6 left-6 right-6 flex justify-between">
-            <button
-              type="button"
-              onClick={handlePrevious}
-              disabled={currentPhraseIndex === 0 || isSubmitting}
-              className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed [&>*]:pointer-events-none"
-            >
-              <ChevronLeft className="-ml-1 mr-2 h-5 w-5" />
-              Previous
-            </button>
-
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={currentPhraseIndex >= totalPhrases - 1 || isSubmitting}
-              className="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed [&>*]:pointer-events-none"
-            >
-              Next
-              <ChevronRight className="ml-2 -mr-1 h-5 w-5" />
-            </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={
+                  currentPhraseIndex >= totalPhrases - 1 || isSubmitting
+                }
+                className="flex items-center justify-center sm:justify-start px-4 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px] touch-manipulation"
+              >
+                <span className="pointer-events-none">Next</span>
+                <ChevronRight className="h-5 w-5 ml-2 pointer-events-none" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

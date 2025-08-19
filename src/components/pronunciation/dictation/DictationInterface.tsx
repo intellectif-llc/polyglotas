@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Play, Volume2, VolumeX } from "lucide-react";
+import { Play, Volume2 } from "lucide-react";
 
 interface DictationInterfaceProps {
   audioUrlNormal?: string;
@@ -27,7 +27,7 @@ export default function DictationInterface({
     if (!url) return;
 
     const audio = new Audio(url);
-    
+
     if (isSlow) {
       setIsPlayingSlow(true);
       audio.onended = () => setIsPlayingSlow(false);
@@ -42,65 +42,72 @@ export default function DictationInterface({
   return (
     <div className="flex flex-col items-center space-y-6">
       {/* Instructions */}
-      <div className="text-center">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+      <div className="text-center px-4">
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
           Listen and Write
         </h2>
-        <p className="text-gray-600">
+        <p className="text-gray-600 text-sm sm:text-base">
           Listen to the audio and write what you hear in the text box below
         </p>
       </div>
 
       {/* Audio Controls */}
-      <div className="flex space-x-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full max-w-md">
         <button
           onClick={() => playAudio(audioUrlNormal || "", false)}
           disabled={isPlayingNormal || !audioUrlNormal}
-          className="cursor-pointer flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors [&>*]:pointer-events-none"
+          className="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium min-h-[48px] touch-manipulation flex-1"
         >
           {isPlayingNormal ? (
-            <Volume2 className="w-5 h-5 mr-2" />
+            <Volume2 className="w-5 h-5 mr-2 pointer-events-none" />
           ) : (
-            <Play className="w-5 h-5 mr-2" />
+            <Play className="w-5 h-5 mr-2 pointer-events-none" />
           )}
-          Normal Speed
+          <span className="pointer-events-none text-sm sm:text-base">
+            Normal Speed
+          </span>
         </button>
 
         <button
           onClick={() => playAudio(audioUrlSlow || "", true)}
           disabled={isPlayingSlow || !audioUrlSlow}
-          className="cursor-pointer flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors [&>*]:pointer-events-none"
+          className="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium min-h-[48px] touch-manipulation flex-1"
         >
           {isPlayingSlow ? (
-            <Volume2 className="w-5 h-5 mr-2" />
+            <Volume2 className="w-5 h-5 mr-2 pointer-events-none" />
           ) : (
-            <Play className="w-5 h-5 mr-2" />
+            <Play className="w-5 h-5 mr-2 pointer-events-none" />
           )}
-          Slow Speed
+          <span className="pointer-events-none text-sm sm:text-base">
+            Slow Speed
+          </span>
         </button>
       </div>
 
       {/* Text Input */}
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-2xl px-4">
         <textarea
           value={userText}
           onChange={(e) => onTextChange(e.target.value)}
           placeholder="Type what you hear..."
-          className="w-full h-32 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-lg"
+          className="w-full h-32 sm:h-36 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base sm:text-lg touch-manipulation"
           disabled={isSubmitting}
         />
       </div>
 
       {/* Submit Button */}
-      <button
-        type="button"
-        onClick={onSubmit}
-        disabled={!userText.trim() || isSubmitting}
-        className="cursor-pointer px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium relative z-10"
-        style={{ pointerEvents: 'auto' }}
-      >
-        {isSubmitting ? "Checking..." : "Check Answer"}
-      </button>
+      <div className="w-full max-w-md px-4">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!userText.trim() || isSubmitting}
+          className="w-full flex items-center justify-center px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium min-h-[48px] touch-manipulation"
+        >
+          <span className="pointer-events-none">
+            {isSubmitting ? "Checking..." : "Check Answer"}
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
