@@ -10,6 +10,7 @@ import DictationInterface from "./DictationInterface";
 import DictationResults from "./DictationResults";
 import { DictationAttempt } from "@/types/pronunciation";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import ActivitySwitcher from "../shared/ActivitySwitcher";
 
 export default function LessonDictationView() {
   const params = useParams();
@@ -52,7 +53,14 @@ export default function LessonDictationView() {
       // Refetch to update cache
       refetchLastAttempt();
     }
-  }, [data, currentPhraseIndex, userText, lessonId, submitDictation, refetchLastAttempt]);
+  }, [
+    data,
+    currentPhraseIndex,
+    userText,
+    lessonId,
+    submitDictation,
+    refetchLastAttempt,
+  ]);
 
   const handleNext = () => {
     if (data && currentPhraseIndex < data.phrases.length - 1) {
@@ -131,19 +139,11 @@ export default function LessonDictationView() {
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Activity Switcher */}
-        <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-          <button className="flex items-center px-4 py-3 rounded-md text-sm font-medium transition-colors flex-1 justify-center bg-white text-blue-600 shadow-sm min-h-[44px] touch-manipulation">
-            <span className="pointer-events-none">Dictation</span>
-          </button>
-          <button
-            onClick={() =>
-              router.push(`/learn/${unitId}/lesson/${lessonId}/practice`)
-            }
-            className="flex items-center px-4 py-3 rounded-md text-sm font-medium transition-colors flex-1 justify-center text-gray-600 hover:text-gray-900 min-h-[44px] touch-manipulation"
-          >
-            <span className="pointer-events-none">Practice</span>
-          </button>
-        </div>
+        <ActivitySwitcher
+          unitId={unitId}
+          lessonId={lessonId}
+          currentActivity="dictation"
+        />
 
         {/* Phrase Stepper */}
         <PhraseStepper

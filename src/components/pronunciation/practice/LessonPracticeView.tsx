@@ -12,6 +12,7 @@ import { useSpeechRecognition } from "@/hooks/speech/useSpeechRecognition";
 import { useLastSpeechAttempt } from "@/hooks/speech/useLastSpeechAttempt";
 import { AssessmentResults } from "@/hooks/speech/useRecognitionState";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import ActivitySwitcher from "../shared/ActivitySwitcher";
 
 export default function LessonPracticeView() {
   const params = useParams();
@@ -186,19 +187,11 @@ export default function LessonPracticeView() {
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Activity Switcher */}
-        <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-          <button
-            onClick={() => router.push(`/learn/${unitId}/lesson/${lessonId}/dictation`)}
-            className="flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center text-gray-600 hover:text-gray-900"
-          >
-            Dictation
-          </button>
-          <button
-            className="flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center bg-white text-blue-600 shadow-sm"
-          >
-            Practice
-          </button>
-        </div>
+        <ActivitySwitcher
+          unitId={unitId}
+          lessonId={lessonId}
+          currentActivity="practice"
+        />
 
         {/* Phrase Stepper */}
         <PhraseStepper
