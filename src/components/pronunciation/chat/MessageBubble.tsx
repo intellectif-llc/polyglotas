@@ -22,18 +22,41 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     setAudioError(null);
 
     try {
-      // For now, we'll use a placeholder since Gemini 2.0 TTS is not fully implemented
-      // This would be replaced with actual TTS generation
-      console.log("Playing audio for message:", message.message_text);
+      // Generate and play TTS audio
+      const response = await fetch("/api/chat/tts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: message.message_text,
+        }),
+      });
 
-      // Simulate audio playback
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!response.ok) {
+        throw new Error(`TTS API error: ${response.status}`);
+      }
 
-      setAudioError("TTS not yet implemented - using placeholder");
+      // Get audio blob and play it
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setIsPlayingAudio(false);
+      };
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        setAudioError("Failed to play audio");
+        setIsPlayingAudio(false);
+      };
+
+      await audio.play();
     } catch (error) {
       console.error("Error playing audio:", error);
-      setAudioError("Failed to play audio");
-    } finally {
+      setAudioError("Failed to generate or play audio");
       setIsPlayingAudio(false);
     }
   };
