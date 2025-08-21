@@ -1,72 +1,64 @@
 import { NextResponse } from "next/server";
-import axios from "axios";
-import { getSpeechTokenService } from "@/services/azure/speechService";
+import { createClient } from "@/lib/supabase/server";
 
-/**
- * GET handler for Azure Speech token endpoint
- * Returns an authentication token for Azure Speech SDK
- */
 export async function GET() {
-  const speechKey = process.env.SPEECH_KEY;
-  const speechRegion = process.env.SPEECH_REGION;
-
-  if (!speechKey || !speechRegion) {
-    console.error(
-      "Error: SPEECH_KEY or SPEECH_REGION environment variables not set."
-    );
-    return new NextResponse(
-      JSON.stringify({
-        error: "Server configuration error: Speech credentials missing.",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-  }
-
   try {
-    const result = await getSpeechTokenService(speechKey, speechRegion);
-    return NextResponse.json({
-      authToken: result.token,
-      region: speechRegion,
-    });
-  } catch (error: unknown) {
-    console.error("Error fetching Azure Speech token:", error);
+    // Verify user is authenticated
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    let errorMessage = "Failed to retrieve Azure Speech token.";
-    let statusCode = 500;
-
-    if (axios.isAxiosError(error)) {
-      if (error.response) {
-        // Error from Azure (e.g., invalid key)
-        errorMessage = `Azure token service error: ${
-          error.response.statusText || "Unknown error"
-        }`;
-        statusCode =
-          error.response.status === 401 || error.response.status === 403
-            ? 401
-            : 500;
-      } else if (error.request) {
-        // Request made but no response (e.g., timeout, network issue)
-        errorMessage = "No response received from Azure token service.";
-        statusCode = 504; // Gateway Timeout
-      } else {
-        // Setup error
-        errorMessage = `Error setting up request to Azure token service: ${error.message}`;
-      }
-    } else {
-      errorMessage = error instanceof Error ? error.message : "Unknown error";
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    return new NextResponse(
-      JSON.stringify({
-        error: errorMessage,
-      }),
+    const speechKey = process.env.SPEECH_KEY;
+    const speechRegion = process.env.SPEECH_REGION;
+
+    if (!speechKey || !speechRegion) {
+      console.error("Azure Speech credentials not configured");
+      return NextResponse.json(
+        { error: "Speech service not configured" },
+        { status: 500 }
+      );
+    }
+
+    // Get Azure Speech token
+    const tokenResponse = await fetch(
+      `https://${speechRegion}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
       {
-        status: statusCode,
-        headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: {
+          "Ocp-Apim-Subscription-Key": speechKey,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       }
+    );
+
+    if (!tokenResponse.ok) {
+      console.error(
+        "Failed to get Azure Speech token:",
+        tokenResponse.statusText
+      );
+      return NextResponse.json(
+        { error: "Failed to get speech token" },
+        { status: 500 }
+      );
+    }
+
+    const authToken = await tokenResponse.text();
+
+    return NextResponse.json({
+      authToken,
+      region: speechRegion,
+    });
+  } catch (error) {
+    console.error("Error in speech token endpoint:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
     );
   }
 }

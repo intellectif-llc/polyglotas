@@ -83,8 +83,8 @@ export async function generateInitialGreeting(
     const greetingPrompt = `
 ${systemPrompt}
 
-Please provide a warm, encouraging greeting to start our conversation practice session. 
-Keep it brief (1-2 sentences) and mention the lesson topic if relevant. 
+Please provide a warm, encouraging greeting (1-2 sentences) to start our conversation practice. 
+After the greeting, you MUST end your message by asking the user ONE of the "Conversation starters" provided in the context above to get the conversation going.
 Use simple, clear language appropriate for a ${lessonContext.level} level learner.
 `;
 

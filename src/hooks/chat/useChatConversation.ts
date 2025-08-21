@@ -103,13 +103,51 @@ export function useChatConversation(lessonId: string) {
           data.ai_message,
         ]
       );
+
+      // Auto-play the AI response
+      if (data.ai_message?.message_text) {
+        setTimeout(() => {
+          playAIMessage(data.ai_message.message_text);
+        }, 300); // Small delay to ensure UI is updated
+      }
     },
     onError: (error) => {
       console.error("Failed to send message:", error);
     },
   });
 
-  // Initialize messages with initial AI message if present
+  // Function to auto-play AI messages
+  const playAIMessage = async (text: string) => {
+    try {
+      const response = await fetch("/api/chat/stream-audio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (response.ok) {
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+        };
+
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+        };
+
+        await audio.play();
+      }
+    } catch (error) {
+      console.error("Failed to auto-play AI message:", error);
+    }
+  };
+
+  // Initialize messages with initial AI message if present and auto-play
   useEffect(() => {
     if (conversation?.initial_ai_message && conversationId) {
       queryClient.setQueryData<ChatMessage[]>(
@@ -121,7 +159,12 @@ export function useChatConversation(lessonId: string) {
               msg.message_id === conversation.initial_ai_message?.message_id
           );
 
-          if (!hasInitialMessage) {
+          if (!hasInitialMessage && conversation.initial_ai_message) {
+            // Auto-play the initial AI message
+            setTimeout(() => {
+              playAIMessage(conversation.initial_ai_message!.message_text);
+            }, 500); // Small delay to ensure UI is ready
+
             return [conversation.initial_ai_message, ...oldMessages];
           }
 

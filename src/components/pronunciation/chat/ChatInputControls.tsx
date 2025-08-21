@@ -28,6 +28,7 @@ export default function ChatInputControls({
     transcript,
     error: speechError,
     isSupported: speechSupported,
+    isProcessing,
     startListening,
     stopListening,
   } = useSpeechRecognition({
@@ -45,7 +46,13 @@ export default function ChatInputControls({
 
   // Auto-send when speech recognition ends with final result
   useEffect(() => {
-    if (!isListening && transcript && isVoiceMode && transcript.trim()) {
+    if (
+      !isListening &&
+      !isProcessing &&
+      transcript &&
+      isVoiceMode &&
+      transcript.trim()
+    ) {
       // Small delay to ensure transcript is complete
       const timer = setTimeout(() => {
         onSend();
@@ -54,7 +61,7 @@ export default function ChatInputControls({
 
       return () => clearTimeout(timer);
     }
-  }, [isListening, transcript, isVoiceMode, onSend]);
+  }, [isListening, isProcessing, transcript, isVoiceMode, onSend]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +77,7 @@ export default function ChatInputControls({
       return;
     }
 
-    if (isListening) {
+    if (isListening || isProcessing) {
       stopListening();
       setIsVoiceMode(false);
     } else {

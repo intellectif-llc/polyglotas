@@ -22,8 +22,8 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     setAudioError(null);
 
     try {
-      // Generate and play TTS audio
-      const response = await fetch("/api/chat/tts", {
+      // Generate and play TTS audio using streaming endpoint
+      const response = await fetch("/api/chat/stream-audio", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
