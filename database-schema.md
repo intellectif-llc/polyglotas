@@ -811,31 +811,31 @@ NEW.raw_user_meta_data->>'last_name'
 ## process_user_activity
 
 CREATE OR REPLACE FUNCTION public.process_user_activity(
-profile_id_param UUID,
-lesson_id_param INT,
-phrase_id_param INT,
-language_code_param VARCHAR,
-activity_type_param activity_type_enum,
-reference_text_param TEXT,
--- Pronunciation-specific parameters
-recognized_text_param TEXT DEFAULT NULL,
-accuracy_score_param NUMERIC DEFAULT NULL,
-fluency_score_param NUMERIC DEFAULT NULL,
-completeness_score_param NUMERIC DEFAULT NULL,
-pronunciation_score_param NUMERIC DEFAULT NULL,
-prosody_score_param NUMERIC DEFAULT NULL,
-phonetic_data_param JSONB DEFAULT NULL,
--- Dictation-specific parameters
-written_text_param TEXT DEFAULT NULL,
-overall_similarity_score_param NUMERIC DEFAULT NULL,
-word_level_feedback_param JSONB DEFAULT NULL
+    profile_id_param UUID,
+    lesson_id_param INT,
+    phrase_id_param INT,
+    language_code_param VARCHAR,
+    activity_type_param activity_type_enum,
+    reference_text_param TEXT,
+    -- Pronunciation-specific parameters
+    recognized_text_param TEXT DEFAULT NULL,
+    accuracy_score_param NUMERIC DEFAULT NULL,
+    fluency_score_param NUMERIC DEFAULT NULL,
+    completeness_score_param NUMERIC DEFAULT NULL,
+    pronunciation_score_param NUMERIC DEFAULT NULL,
+    prosody_score_param NUMERIC DEFAULT NULL,
+    phonetic_data_param JSONB DEFAULT NULL,
+    -- Dictation-specific parameters
+    written_text_param TEXT DEFAULT NULL,
+    overall_similarity_score_param NUMERIC DEFAULT NULL,
+    word_level_feedback_param JSONB DEFAULT NULL
 )
 RETURNS TABLE(points_awarded_total INT) AS $$
 DECLARE
--- IDs and Metadata
-v_lesson_progress_id INT;
-v_activity_progress_id INT;
-v_unit_id INT;
+    -- IDs and Metadata
+    v_lesson_progress_id INT;
+    v_activity_progress_id INT;
+    v_unit_id INT;
 
     -- Attempt & Progress Tracking
     next_attempt_number INT;
@@ -854,7 +854,7 @@ v_unit_id INT;
     v_word_text TEXT;
     v_accuracy_score NUMERIC;
     word_needs_practice BOOLEAN;
-
+    
     -- Streak variables
     current_streak INT;
     last_streak DATE;
@@ -864,11 +864,11 @@ v_unit_id INT;
     yesterday DATE := current_date - 1;
 
 BEGIN
--- Step 1: Insert the specific attempt record
-IF activity_type_param = 'pronunciation' THEN
-SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number
-FROM public.speech_attempts
-WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+    -- Step 1: Insert the specific attempt record
+    IF activity_type_param = 'pronunciation' THEN
+        SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number
+        FROM public.speech_attempts
+        WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
 
         INSERT INTO public.speech_attempts (
             profile_id, lesson_id, phrase_id, language_code, attempt_number,
@@ -938,7 +938,7 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
             VALUES (profile_id_param, 1, 'PHRASE_ACCURACY_BONUS', lesson_id_param, phrase_id_param, activity_type_param);
         END IF;
     END IF;
-
+    
     INSERT INTO public.user_phrase_progress (profile_id, lesson_id, phrase_id, language_code)
     VALUES (profile_id_param, lesson_id_param, phrase_id_param, language_code_param)
     ON CONFLICT (profile_id, lesson_id, phrase_id, language_code) DO NOTHING;
@@ -970,15 +970,15 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
     RETURNING progress_id INTO v_lesson_progress_id;
 
     IF v_lesson_progress_id IS NULL THEN
-      SELECT progress_id INTO v_lesson_progress_id FROM public.user_lesson_progress
+      SELECT progress_id INTO v_lesson_progress_id FROM public.user_lesson_progress 
       WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param;
     END IF;
 
-    SELECT activity_progress_id, (status = 'completed')
+    SELECT activity_progress_id, (status = 'completed') 
     INTO v_activity_progress_id, was_activity_already_completed
     FROM public.user_lesson_activity_progress
     WHERE user_lesson_progress_id = v_lesson_progress_id AND activity_type = activity_type_param;
-
+    
     IF v_activity_progress_id IS NULL THEN
         INSERT INTO public.user_lesson_activity_progress (user_lesson_progress_id, activity_type, status, started_at)
         VALUES (v_lesson_progress_id, activity_type_param, 'in_progress', NOW())
@@ -988,7 +988,7 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
 
     IF NOT COALESCE(was_activity_already_completed, false) THEN
         SELECT l.total_phrases INTO total_phrases_in_lesson FROM public.lessons l WHERE l.lesson_id = lesson_id_param;
-
+        
         IF activity_type_param = 'pronunciation' THEN
             SELECT COUNT(*) INTO phrases_completed_for_activity FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND pronunciation_completed = TRUE;
         ELSIF activity_type_param = 'dictation' THEN
@@ -1039,8 +1039,73 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
     END IF;
 
     points_awarded_total := total_points_for_this_attempt;
-
+    
     RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql;
+
+$$
+LANGUAGE plpgsql;
+
+## process_chat_completion
+
+CREATE OR REPLACE FUNCTION public.process_chat_completion(
+    profile_id_param UUID,
+    lesson_id_param INT,
+    language_code_param VARCHAR
+)
+RETURNS TABLE(points_awarded_total INT) AS
+$$
+
+DECLARE
+v_lesson_progress_id INT;
+v_unit_id INT;
+was_already_completed BOOLEAN;
+total_points_awarded INT := 0;
+BEGIN
+-- Check if chat was already completed for this lesson
+SELECT all_prompts_addressed_at IS NOT NULL
+INTO was_already_completed
+FROM public.lesson_chat_conversations
+WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param;
+
+    -- If already completed, return 0 points
+    IF COALESCE(was_already_completed, FALSE) THEN
+        RETURN QUERY SELECT 0;
+        RETURN;
+    END IF;
+
+    -- Ensure user_lesson_progress exists
+    INSERT INTO public.user_lesson_progress (profile_id, lesson_id, last_progress_at)
+    VALUES (profile_id_param, lesson_id_param, NOW())
+    ON CONFLICT (profile_id, lesson_id) DO UPDATE SET last_progress_at = NOW();
+
+    SELECT progress_id INTO v_lesson_progress_id
+    FROM public.user_lesson_progress
+    WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param;
+
+    -- Mark chat activity as completed
+    INSERT INTO public.user_lesson_activity_progress (user_lesson_progress_id, activity_type, status, completed_at)
+    VALUES (v_lesson_progress_id, 'chat', 'completed', NOW())
+    ON CONFLICT (user_lesson_progress_id, activity_type)
+    DO UPDATE SET status = 'completed', completed_at = NOW();
+
+    -- Award 5 points for chat completion
+    total_points_awarded := 5;
+
+    INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, activity_type)
+    VALUES (profile_id_param, 5, 'CHAT_COMPLETION', lesson_id_param, 'chat');
+
+    -- Update user's total points
+    UPDATE public.student_profiles
+    SET points = points + 5
+    WHERE profile_id = profile_id_param;
+
+    -- Check for unit completion bonus
+    SELECT unit_id INTO v_unit_id FROM public.lessons WHERE lesson_id = lesson_id_param;
+    PERFORM public.check_and_award_unit_completion_bonus(profile_id_param, v_unit_id, lesson_id_param);
+
+    RETURN QUERY SELECT total_points_awarded;
 
 END;
 

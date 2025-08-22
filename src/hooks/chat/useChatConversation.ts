@@ -16,6 +16,12 @@ export interface ChatPrompt {
   starter_text: string;
 }
 
+export interface PromptStatus {
+  prompt_id: number;
+  addressed_at: string;
+  first_addressed_message_id: string;
+}
+
 interface ConversationData {
   conversation_id: string;
   initial_ai_message?: ChatMessage;
@@ -26,12 +32,14 @@ interface SendMessageResponse {
   ai_message: ChatMessage;
   conversation_status: {
     all_prompts_addressed: boolean;
+    addressed_prompt_ids: number[];
   };
 }
 
 export function useChatConversation(lessonId: string) {
   const queryClient = useQueryClient();
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [addressedPromptIds, setAddressedPromptIds] = useState<number[]>([]);
 
   // Fetch conversation prompts
   const { data: prompts, isLoading: isLoadingPrompts } = useQuery<ChatPrompt[]>(
@@ -82,6 +90,31 @@ export function useChatConversation(lessonId: string) {
     enabled: !!conversationId,
   });
 
+  // Fetch addressed prompts status
+  const { data: promptStatuses = [] } = useQuery<PromptStatus[]>({
+    queryKey: ["promptStatuses", conversationId],
+    queryFn: async () => {
+      if (!conversationId) return [];
+      const response = await axios.get(
+        `/api/chat/conversations/${conversationId}/prompt-status`
+      );
+      return response.data;
+    },
+    enabled: !!conversationId,
+  });
+
+  // Update addressed prompt IDs when prompt statuses change
+  useEffect(() => {
+    const ids = promptStatuses.map(status => status.prompt_id);
+    setAddressedPromptIds(prev => {
+      // Only update if the arrays are different
+      if (prev.length !== ids.length || !prev.every(id => ids.includes(id))) {
+        return ids;
+      }
+      return prev;
+    });
+  }, [promptStatuses]);
+
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (messageText: string) => {
@@ -103,6 +136,13 @@ export function useChatConversation(lessonId: string) {
           data.ai_message,
         ]
       );
+
+      // Update addressed prompt IDs
+      if (data.conversation_status.addressed_prompt_ids) {
+        setAddressedPromptIds(data.conversation_status.addressed_prompt_ids);
+        // Invalidate prompt statuses to refetch
+        queryClient.invalidateQueries({ queryKey: ["promptStatuses", conversationId] });
+      }
 
       // Auto-play the AI response
       if (data.ai_message?.message_text) {
@@ -179,6 +219,7 @@ export function useChatConversation(lessonId: string) {
     conversationId,
     messages,
     prompts,
+    addressedPromptIds,
     isLoading: isLoadingConversation || isLoadingMessages || isLoadingPrompts,
     error: null, // Could be enhanced with proper error handling
     sendMessage: sendMessageMutation.mutateAsync,

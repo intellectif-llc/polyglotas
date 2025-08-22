@@ -7,6 +7,8 @@ import {
 import {
   generateAIResponse,
   checkPromptsCompletion,
+  detectAddressedPromptsWithAI,
+  getAddressedPrompts,
 } from "@/lib/gemini/conversation";
 import type {
   LessonContext,
@@ -32,6 +34,7 @@ interface SendMessageResponse {
   ai_message: ChatMessage;
   conversation_status: {
     all_prompts_addressed: boolean;
+    addressed_prompt_ids: number[];
   };
 }
 
@@ -323,20 +326,50 @@ export async function POST(
         );
       }
 
-      // Check if all prompts have been addressed
+      // Get previously addressed prompts
+      const { data: existingStatuses } = await supabase
+        .from("conversation_prompt_status")
+        .select("prompt_id")
+        .eq("conversation_id", conversationId);
+      
+      const previouslyAddressedIds = (existingStatuses || []).map(s => s.prompt_id);
+
+      // Check for newly addressed prompts
       const allConversationHistory = [
         ...conversationHistory,
         { role: "user" as const, parts: text_message.trim() },
         { role: "model" as const, parts: aiResponseText },
       ];
 
-      const allPromptsAddressed = checkPromptsCompletion(
-        allConversationHistory,
-        conversationPrompts
+      const newlyAddressedIds = await detectAddressedPromptsWithAI(
+        text_message.trim(),
+        conversationPrompts,
+        previouslyAddressedIds
       );
 
-      // Update conversation status if all prompts addressed
-      if (allPromptsAddressed) {
+      // Record newly addressed prompts
+      if (newlyAddressedIds.length > 0) {
+        const promptStatusInserts = newlyAddressedIds.map(promptId => ({
+          conversation_id: conversationId,
+          prompt_id: promptId,
+          first_addressed_message_id: userMessage.message_id,
+          addressed_at: new Date().toISOString(),
+        }));
+
+        await supabase
+          .from("conversation_prompt_status")
+          .insert(promptStatusInserts);
+      }
+
+      // Check if all prompts are now addressed using database records
+      const currentAddressedIds = [...previouslyAddressedIds, ...newlyAddressedIds];
+      const allPromptsAddressed = currentAddressedIds.length === conversationPrompts.length;
+
+      // Award points and update conversation status if all prompts addressed for first time
+      const wasAlreadyCompleted = previouslyAddressedIds.length === conversationPrompts.length;
+      
+      if (allPromptsAddressed && !wasAlreadyCompleted) {
+        // FIRST: Update conversation status to mark completion
         await supabase
           .from("lesson_chat_conversations")
           .update({
@@ -344,6 +377,13 @@ export async function POST(
             last_message_at: new Date().toISOString(),
           })
           .eq("conversation_id", conversationId);
+
+        // THEN: Award points using dedicated chat completion function
+        await supabase.rpc('process_chat_completion', {
+          profile_id_param: subscriptionResult.userId,
+          lesson_id_param: conversation.lesson_id,
+          language_code_param: conversation.language_code
+        });
       } else {
         await supabase
           .from("lesson_chat_conversations")
@@ -368,6 +408,7 @@ export async function POST(
         },
         conversation_status: {
           all_prompts_addressed: allPromptsAddressed,
+          addressed_prompt_ids: currentAddressedIds,
         },
       };
 

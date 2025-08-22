@@ -152,19 +152,96 @@ export function checkPromptsCompletion(
 ): boolean {
   if (conversationPrompts.length === 0) return true;
 
+  const addressedPrompts = getAddressedPrompts(conversationHistory, conversationPrompts);
+  return addressedPrompts.length === conversationPrompts.length;
+}
+
+/**
+ * Gets the list of prompts that have been addressed in the conversation
+ */
+export function getAddressedPrompts(
+  conversationHistory: ConversationMessage[],
+  conversationPrompts: ConversationPrompt[]
+): ConversationPrompt[] {
+  if (conversationPrompts.length === 0) return [];
+
   const conversationText = conversationHistory
     .map((msg) => msg.parts.toLowerCase())
     .join(" ");
 
-  // Simple check: if most prompts have related keywords in the conversation
-  const addressedPrompts = conversationPrompts.filter((prompt) => {
-    const keywords = prompt.starter_text
+  return conversationPrompts.filter((prompt) => {
+    // Extract key concepts from the prompt
+    const promptWords = prompt.starter_text
       .toLowerCase()
+      .replace(/[?!.,]/g, "")
       .split(" ")
-      .filter((word) => word.length > 3);
-    return keywords.some((keyword) => conversationText.includes(keyword));
+      .filter((word) => word.length > 2);
+    
+    // Look for semantic matches, not just keyword matches
+    const keyWords = promptWords.filter(word => 
+      !['what', 'how', 'when', 'where', 'why', 'who', 'do', 'does', 'did', 
+       'can', 'could', 'would', 'should', 'will', 'are', 'is', 'was', 'were',
+       'the', 'and', 'or', 'but', 'for', 'with', 'about', 'your', 'you', 'like',
+       'have', 'has', 'had', 'this', 'that', 'these', 'those', 'some', 'any'].includes(word)
+    );
+    
+    if (keyWords.length === 0) return false;
+    
+    // Check if at least 30% of key words appear in conversation (lowered threshold)
+    const matchedWords = keyWords.filter(word => conversationText.includes(word));
+    const matchRatio = matchedWords.length / keyWords.length;
+    
+    return matchRatio >= 0.3;
   });
+}
 
-  // Consider prompts addressed if at least 70% have been touched upon
-  return addressedPrompts.length >= Math.ceil(conversationPrompts.length * 0.7);
+/**
+ * Uses AI to detect if user addressed any conversation starters
+ */
+export async function detectAddressedPromptsWithAI(
+  userMessage: string,
+  conversationPrompts: ConversationPrompt[],
+  previouslyAddressedIds: number[]
+): Promise<number[]> {
+  try {
+    const model = getTextGenerationModel();
+    
+    const unaddressedPrompts = conversationPrompts.filter(p => !previouslyAddressedIds.includes(p.id));
+    if (unaddressedPrompts.length === 0) return [];
+
+    const analysisPrompt = `Analyze if this user message addresses any of the conversation starters below.
+
+User message: "${userMessage}"
+
+Conversation starters:
+${unaddressedPrompts.map(p => `${p.id}: ${p.starter_text}`).join('\n')}
+
+Return ONLY a JSON array of IDs that were addressed by the user's message. If none were addressed, return [].
+Example: [1, 3] or []`;
+
+    const result = await model.generateContent(analysisPrompt);
+    const response = await result.response;
+    const text = response.text().trim();
+    
+    const addressedIds = JSON.parse(text);
+    return Array.isArray(addressedIds) ? addressedIds.filter(id => typeof id === 'number') : [];
+  } catch (error) {
+    console.error('AI prompt detection failed:', error);
+    return [];
+  }
+}
+
+/**
+ * Detects newly addressed prompts from the latest user message (fallback)
+ */
+export function detectNewlyAddressedPrompts(
+  latestUserMessage: string,
+  conversationHistory: ConversationMessage[],
+  conversationPrompts: ConversationPrompt[],
+  previouslyAddressedIds: number[]
+): number[] {
+  const userMessages = conversationHistory.filter(msg => msg.role === 'user');
+  const currentlyAddressed = getAddressedPrompts(userMessages, conversationPrompts);
+  const currentlyAddressedIds = currentlyAddressed.map(p => p.id);
+  return currentlyAddressedIds.filter(id => !previouslyAddressedIds.includes(id));
 }

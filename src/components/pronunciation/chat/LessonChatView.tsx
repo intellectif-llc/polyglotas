@@ -35,6 +35,7 @@ export default function LessonChatView({
     conversation,
     messages,
     prompts,
+    addressedPromptIds,
     isLoading: isLoadingChat,
     error: chatError,
     sendMessage,
@@ -154,9 +155,7 @@ export default function LessonChatView({
           {prompts && prompts.length > 0 && (
             <ConversationStarters
               prompts={prompts}
-              onPromptClick={(promptText) => {
-                setInputText(promptText);
-              }}
+              addressedPromptIds={addressedPromptIds}
             />
           )}
 
@@ -174,8 +173,8 @@ export default function LessonChatView({
                 </p>
               </div>
             ) : (
-              messages.map((message) => (
-                <MessageBubble key={message.message_id} message={message} />
+              messages.map((message, index) => (
+                <MessageBubble key={`${message.message_id}-${index}`} message={message} />
               ))
             )}
 

@@ -29,7 +29,9 @@ export async function getTokenOrRefresh(): Promise<TokenResponse> {
     const response = await fetch("/api/speech/token");
 
     if (!response.ok) {
-      throw new Error(`Token request failed: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Speech token API error:', response.status, errorText);
+      throw new Error(`Token request failed: ${response.status} ${response.statusText}`);
     }
 
     const data: TokenResponse = await response.json();
@@ -46,8 +48,11 @@ export async function getTokenOrRefresh(): Promise<TokenResponse> {
     return data;
   } catch (error) {
     console.error("Error fetching Azure Speech token:", error);
+    // Clear cache on error
+    cachedToken = null;
+    tokenExpiry = 0;
     throw new Error(
-      `Failed to get speech token: ${
+      `Token request failed: ${
         error instanceof Error ? error.message : "Unknown error"
       }`
     );
