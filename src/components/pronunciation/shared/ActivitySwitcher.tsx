@@ -69,7 +69,7 @@ export default function ActivitySwitcher({
             disabled={!canAccess}
             className={`
               flex items-center justify-center px-4 py-3 rounded-md text-sm font-medium 
-              transition-colors flex-1 min-h-[44px] touch-manipulation
+              transition-colors flex-1 min-h-[44px] touch-manipulation cursor-pointer
               ${
                 isActive
                   ? "bg-white text-blue-600 shadow-sm"

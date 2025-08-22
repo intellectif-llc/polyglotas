@@ -83,9 +83,13 @@ export async function generateInitialGreeting(
     const greetingPrompt = `
 ${systemPrompt}
 
-Please provide a warm, encouraging greeting (1-2 sentences) to start our conversation practice. 
-After the greeting, you MUST end your message by asking the user ONE of the "Conversation starters" provided in the context above to get the conversation going.
-Use simple, clear language appropriate for a ${lessonContext.level} level learner.
+Your task is to generate a warm, encouraging greeting (1-2 sentences) to begin a conversation practice session.
+
+Instructions:
+1.  Start with a friendly greeting.
+2.  After the greeting, you MUST select ONE of the "Conversation starters" from the context above.
+3.  Your message must END with the selected conversation starter question. Do not add any text after the question.
+4.  Use simple, clear language appropriate for a ${lessonContext.level} level learner.
 `;
 
     const result = await model.generateContent(greetingPrompt);

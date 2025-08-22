@@ -149,7 +149,7 @@ export default function ChatInputControls({
             disabled={disabled}
             className={`
               p-2 rounded-lg transition-colors min-w-[40px] h-[40px]
-              flex items-center justify-center
+              flex items-center justify-center cursor-pointer
               ${
                 isListening
                   ? "bg-red-600 text-white hover:bg-red-700"
