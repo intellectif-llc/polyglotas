@@ -1,63 +1,29 @@
 "use client";
 
 import React, { useState } from "react";
-import { Volume2, VolumeX } from "lucide-react";
+import { Volume2, VolumeX, Bot } from "lucide-react";
+import Lottie from "lottie-react";
 import { ChatMessage } from "@/hooks/chat/useChatConversation";
+import animationData from "../../../../public/animations/Talking_Man.json";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  playingMessageId: string | null;
+  onPlayAudio: (messageId: string, text: string) => void;
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
-
+export default function MessageBubble({
+  message,
+  playingMessageId,
+  onPlayAudio,
+}: MessageBubbleProps) {
   const isUser = message.sender_type === "user";
   const isAI = message.sender_type === "ai";
+  const isPlayingAudio = playingMessageId === message.message_id;
 
-  const handlePlayAudio = async () => {
-    if (!isAI || isPlayingAudio) return;
-
-    setIsPlayingAudio(true);
-    setAudioError(null);
-
-    try {
-      // Generate and play TTS audio using streaming endpoint
-      const response = await fetch("/api/chat/stream-audio", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: message.message_text,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`TTS API error: ${response.status}`);
-      }
-
-      // Get audio blob and play it
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        setIsPlayingAudio(false);
-      };
-
-      audio.onerror = () => {
-        URL.revokeObjectURL(audioUrl);
-        setAudioError("Failed to play audio");
-        setIsPlayingAudio(false);
-      };
-
-      await audio.play();
-    } catch (error) {
-      console.error("Error playing audio:", error);
-      setAudioError("Failed to generate or play audio");
-      setIsPlayingAudio(false);
+  const handlePlayAudio = () => {
+    if (isAI) {
+      onPlayAudio(message.message_id, message.message_text);
     }
   };
 
@@ -67,7 +33,24 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
   };
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex items-end gap-2 ${
+        isUser ? "justify-end" : "justify-start"
+      }`}
+    >
+      {isAI && (
+        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+          {isPlayingAudio ? (
+            <Lottie
+              animationData={animationData}
+              loop={true}
+              style={{ width: "100%", height: "100%", transform: "scale(1.5)" }}
+            />
+          ) : (
+            <Bot size={28} className="text-gray-500" />
+          )}
+        </div>
+      )}
       <div
         className={`
           max-w-xs lg:max-w-md px-4 py-2 rounded-lg
@@ -92,7 +75,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           {isAI && (
             <button
               onClick={handlePlayAudio}
-              disabled={isPlayingAudio}
+              disabled={!!playingMessageId}
               className={`
                 ml-2 p-1 rounded hover:bg-opacity-20 hover:bg-gray-600 
                 transition-colors disabled:opacity-50
@@ -104,11 +87,6 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
             </button>
           )}
         </div>
-
-        {/* Audio error display */}
-        {audioError && (
-          <div className="mt-1 text-xs text-red-300">{audioError}</div>
-        )}
       </div>
     </div>
   );

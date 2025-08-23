@@ -40,6 +40,16 @@ export function useChatConversation(lessonId: string) {
   const queryClient = useQueryClient();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [addressedPromptIds, setAddressedPromptIds] = useState<number[]>([]);
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+
+  // Stop playing audio when component unmounts
+  useEffect(() => {
+    return () => {
+      // This is a simple way to stop audio. A more robust solution
+      // might involve managing the Audio object in a ref.
+      setPlayingMessageId(null);
+    };
+  }, []);
 
   // Fetch conversation prompts
   const { data: prompts, isLoading: isLoadingPrompts } = useQuery<ChatPrompt[]>(
@@ -105,10 +115,10 @@ export function useChatConversation(lessonId: string) {
 
   // Update addressed prompt IDs when prompt statuses change
   useEffect(() => {
-    const ids = promptStatuses.map(status => status.prompt_id);
-    setAddressedPromptIds(prev => {
+    const ids = promptStatuses.map((status) => status.prompt_id);
+    setAddressedPromptIds((prev) => {
       // Only update if the arrays are different
-      if (prev.length !== ids.length || !prev.every(id => ids.includes(id))) {
+      if (prev.length !== ids.length || !prev.every((id) => ids.includes(id))) {
         return ids;
       }
       return prev;
@@ -141,13 +151,18 @@ export function useChatConversation(lessonId: string) {
       if (data.conversation_status.addressed_prompt_ids) {
         setAddressedPromptIds(data.conversation_status.addressed_prompt_ids);
         // Invalidate prompt statuses to refetch
-        queryClient.invalidateQueries({ queryKey: ["promptStatuses", conversationId] });
+        queryClient.invalidateQueries({
+          queryKey: ["promptStatuses", conversationId],
+        });
       }
 
       // Auto-play the AI response
       if (data.ai_message?.message_text) {
         setTimeout(() => {
-          playAIMessage(data.ai_message.message_text);
+          playAudioForMessage(
+            data.ai_message.message_id,
+            data.ai_message.message_text
+          );
         }, 300); // Small delay to ensure UI is updated
       }
     },
@@ -156,8 +171,16 @@ export function useChatConversation(lessonId: string) {
     },
   });
 
-  // Function to auto-play AI messages
-  const playAIMessage = async (text: string) => {
+  // Function to play audio for a specific message
+  const playAudioForMessage = async (messageId: string, text: string) => {
+    if (playingMessageId === messageId) {
+      // Logic to stop audio if it's already playing could go here
+      // For now, we just prevent re-playing
+      return;
+    }
+
+    setPlayingMessageId(messageId);
+
     try {
       const response = await fetch("/api/chat/stream-audio", {
         method: "POST",
@@ -174,16 +197,21 @@ export function useChatConversation(lessonId: string) {
 
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl);
+          setPlayingMessageId(null);
         };
 
         audio.onerror = () => {
           URL.revokeObjectURL(audioUrl);
+          setPlayingMessageId(null);
         };
 
         await audio.play();
+      } else {
+        setPlayingMessageId(null); // Clear on error
       }
     } catch (error) {
-      console.error("Failed to auto-play AI message:", error);
+      console.error("Failed to play AI message:", error);
+      setPlayingMessageId(null); // Clear on error
     }
   };
 
@@ -202,7 +230,10 @@ export function useChatConversation(lessonId: string) {
           if (!hasInitialMessage && conversation.initial_ai_message) {
             // Auto-play the initial AI message
             setTimeout(() => {
-              playAIMessage(conversation.initial_ai_message!.message_text);
+              playAudioForMessage(
+                conversation.initial_ai_message!.message_id,
+                conversation.initial_ai_message!.message_text
+              );
             }, 500); // Small delay to ensure UI is ready
 
             return [conversation.initial_ai_message, ...oldMessages];
@@ -224,5 +255,7 @@ export function useChatConversation(lessonId: string) {
     error: null, // Could be enhanced with proper error handling
     sendMessage: sendMessageMutation.mutateAsync,
     isSendingMessage: sendMessageMutation.isPending,
+    playingMessageId,
+    playAudioForMessage,
   };
 }

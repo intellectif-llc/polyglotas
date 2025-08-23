@@ -40,6 +40,8 @@ export default function LessonChatView({
     error: chatError,
     sendMessage,
     isSendingMessage,
+    playingMessageId,
+    playAudioForMessage,
   } = useChatConversation(lessonId);
 
   const [inputText, setInputText] = useState("");
@@ -122,7 +124,7 @@ export default function LessonChatView({
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <button
             onClick={() => router.push(`/learn/${unitId}`)}
             className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-3 min-h-[44px] touch-manipulation"
@@ -141,7 +143,10 @@ export default function LessonChatView({
       </div>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-6 flex-1 flex flex-col">
+      <div
+        className="max-w-6xl mx-auto px-4 py-6 flex-1 flex flex-col"
+        style={{ width: "100%", maxWidth: "1152px" }}
+      >
         {/* Activity Switcher */}
         <ActivitySwitcher
           unitId={unitId}
@@ -174,7 +179,12 @@ export default function LessonChatView({
               </div>
             ) : (
               messages.map((message, index) => (
-                <MessageBubble key={`${message.message_id}-${index}`} message={message} />
+                <MessageBubble
+                  key={`${message.message_id}-${index}`}
+                  message={message}
+                  playingMessageId={playingMessageId}
+                  onPlayAudio={playAudioForMessage}
+                />
               ))
             )}
 
