@@ -202,14 +202,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use the centralized process_user_activity function
+    // Use the centralized process_user_activity function with correct parameter order
     const { data: activityResult, error: activityError } = await supabase
       .rpc("process_user_activity", {
         profile_id_param: user.id,
         lesson_id_param: lesson_id,
-        phrase_id_param: phrase_id,
         language_code_param: language_code,
         activity_type_param: "dictation",
+        phrase_id_param: phrase_id,
         reference_text_param: reference_text,
         written_text_param: written_text,
         overall_similarity_score_param: overall_similarity_score,

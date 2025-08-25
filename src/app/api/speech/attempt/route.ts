@@ -89,14 +89,14 @@ export async function POST(request: NextRequest) {
     const targetLanguage =
       languageCode || profile?.current_target_language_code || "en";
 
-    // 4. Call the database function
+    // 4. Call the database function with correct parameter order
     const { data: rpcData, error: rpcError } = await supabase
       .rpc("process_user_activity", {
         profile_id_param: profile_id,
         lesson_id_param: lesson_id,
-        phrase_id_param: phrase_id,
         language_code_param: targetLanguage,
         activity_type_param: 'pronunciation',
+        phrase_id_param: phrase_id,
         reference_text_param: referenceText,
         recognized_text_param:
           assessmentResults.recognizedText || "Recognition failed",

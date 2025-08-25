@@ -15,7 +15,9 @@ import {
 import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
 import { useUserStats } from "@/hooks/useUserProfile";
 import { useNavigationState } from "@/hooks/useNavigationState";
+import { useRealtimeUserStats } from "@/hooks/useRealtimeUserStats";
 import NavigationSkeleton from "./NavigationSkeleton";
+import { AnimatedStats } from "./AnimatedStats";
 
 interface NavigationSectionProps {
   isCollapsed: boolean;
@@ -46,6 +48,9 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
   const { pendingHref, handleNavigation } = useNavigationState(onNavigate);
   const { data: units, isLoading: unitsLoading } = usePronunciationUnits();
   const { data: userStats } = useUserStats();
+  
+  // Set up real-time stats updates
+  useRealtimeUserStats();
 
   const iconSize = isCollapsed && !isMobile ? 24 : 20;
   const textHidden = isCollapsed && !isMobile;
@@ -195,18 +200,10 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
             Quick Stats
           </h4>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Streak</span>
-              <span className="font-medium text-orange-600 dark:text-orange-400">
-                {userStats.currentStreak} days
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Points</span>
-              <span className="font-medium text-blue-600 dark:text-blue-400">
-                {userStats.totalPoints.toLocaleString()}
-              </span>
-            </div>
+            <AnimatedStats
+              streak={userStats.currentStreak}
+              points={userStats.totalPoints}
+            />
           </div>
         </div>
       )}

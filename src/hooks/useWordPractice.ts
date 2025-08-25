@@ -29,6 +29,9 @@ export const useWordsNeedingPractice = () => {
   });
 };
 
+/**
+ * @deprecated Use useWordPracticeAttempt from '../useWordPracticeAttempt' for real-time updates
+ */
 export const useWordPracticeAttempt = () => {
   const queryClient = useQueryClient();
 
@@ -50,8 +53,10 @@ export const useWordPracticeAttempt = () => {
       return response.json();
     },
     onSuccess: () => {
-      // Refresh the words needing practice list
+      // Refresh the words needing practice list and user stats
       queryClient.invalidateQueries({ queryKey: ["wordsNeedingPractice"] });
+      queryClient.invalidateQueries({ queryKey: ["userStats"] });
+      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
     },
   });
 };

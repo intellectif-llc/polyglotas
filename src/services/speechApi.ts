@@ -8,6 +8,7 @@ const apiClient = axios.create({
 
 /**
  * Submit a speech attempt to the backend
+ * @deprecated Use useSpeechAttempt hook instead for real-time updates
  */
 export const submitSpeechAttempt = async (
   lessonId: string | number,

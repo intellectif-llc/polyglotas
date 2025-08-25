@@ -1,0 +1,43 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+
+interface DictationAttemptRequest {
+  lesson_id: number;
+  phrase_id: number;
+  written_text: string;
+  language_code: string;
+}
+
+interface DictationAttemptResponse {
+  overall_similarity_score: number;
+  word_level_feedback: Array<{
+    reference_word: string;
+    written_word: string;
+    similarity_score: number;
+    position_in_phrase: number;
+  }>;
+  is_correct: boolean;
+  points_awarded: number;
+}
+
+export const useDictationAttempt = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<DictationAttemptResponse, Error, DictationAttemptRequest>({
+    mutationFn: async (data) => {
+      const response = await axios.post('/api/dictation/attempt', data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // Invalidate user stats queries to trigger real-time updates
+      queryClient.invalidateQueries({ queryKey: ['userStats'] });
+      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+      
+      // The real-time subscription will handle the UI updates
+      console.log(`🎉 Dictation attempt completed! Points awarded: ${data.points_awarded}`);
+    },
+    onError: (error) => {
+      console.error('Dictation attempt failed:', error);
+    },
+  });
+};

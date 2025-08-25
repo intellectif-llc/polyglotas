@@ -43,7 +43,7 @@ export const useUserProfile = () => {
       if (error) throw error;
       return data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds
   });
 };
 
@@ -136,7 +136,7 @@ export const useUserStats = () => {
         totalPoints: profile?.points || 0,
       };
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds
   });
 };
 
