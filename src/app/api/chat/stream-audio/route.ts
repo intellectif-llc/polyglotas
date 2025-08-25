@@ -56,33 +56,12 @@ export async function POST(request: NextRequest) {
         similarity_boost,
       });
 
-      // Convert stream to buffer for Lambda response
-      const reader = audioStream.getReader();
-      const chunks: Uint8Array[] = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-
-      // Combine all chunks into a single buffer
-      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const audioBuffer = new Uint8Array(totalLength);
-      let offset = 0;
-
-      for (const chunk of chunks) {
-        audioBuffer.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      // Return audio as response
-      return new NextResponse(audioBuffer, {
+      // Return the stream directly
+      return new NextResponse(audioStream, {
         status: 200,
         headers: {
           "Content-Type": "audio/mpeg",
-          "Content-Length": audioBuffer.byteLength.toString(),
-          "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+          "Cache-Control": "public, max-age=3600",
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Credentials": "true",
         },

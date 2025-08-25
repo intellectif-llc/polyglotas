@@ -9,14 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.12.2",
     "@google/generative-ai": "^0.24.1",
     "@heroicons/react": "^2.2.0",
+    "@stripe/stripe-js": "^7.9.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.8",
     "@tailwindcss/forms": "^0.5.10",
     "@tanstack/react-query": "^5.84.1",
     "axios": "^1.11.0",
-    "elevenlabs": "^1.59.0",
     "fastest-levenshtein": "^1.0.16",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.511.0",
@@ -25,7 +26,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
-    "recharts": "^3.1.0"
+    "recharts": "^3.1.0",
+    "stripe": "^18.4.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -1,4 +1,4 @@
-import axios from "axios";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
 export interface TTSOptions {
   language?: string;
@@ -6,6 +6,16 @@ export interface TTSOptions {
   speed?: number; // 0.5 to 2.0
   stability?: number; // 0.0 to 1.0
   similarity_boost?: number; // 0.0 to 1.0
+}
+
+// Initialize ElevenLabs client
+function getElevenLabsClient(): ElevenLabsClient {
+  if (!process.env.ELEVENLABS_API_KEY) {
+    throw new Error("ElevenLabs API key not configured");
+  }
+  return new ElevenLabsClient({
+    apiKey: process.env.ELEVENLABS_API_KEY,
+  });
 }
 
 /**
@@ -16,38 +26,48 @@ export async function generateSpeech(
   options: TTSOptions = {}
 ): Promise<ArrayBuffer> {
   try {
-    if (!process.env.ELEVENLABS_API_KEY) {
-      throw new Error("ElevenLabs API key not configured");
-    }
-
+    const client = getElevenLabsClient();
+    
     const voiceId =
       options.voice ||
       process.env.ELEVENLABS_VOICE_ID ||
       "pNInz6obpgDQGcFmaJgB";
 
-    const response = await axios.post(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      {
-        text: text,
-        model_id: process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5",
-        voice_settings: {
-          stability: options.stability || 0.5,
-          similarity_boost: options.similarity_boost || 0.8,
-          style: 0.0,
-          use_speaker_boost: true,
-        },
+    const audioStream = await client.textToSpeech.convert(voiceId, {
+      text: text,
+      modelId: process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5",
+      voiceSettings: {
+        stability: options.stability || 0.5,
+        similarityBoost: options.similarity_boost || 0.8,
+        style: 0.0,
+        useSpeakerBoost: true,
       },
-      {
-        headers: {
-          Accept: "audio/mpeg",
-          "Content-Type": "application/json",
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
-        },
-        responseType: "arraybuffer",
-      }
-    );
+    });
 
-    return response.data;
+    // Convert stream to ArrayBuffer
+    const chunks: Uint8Array[] = [];
+    const reader = audioStream.getReader();
+    
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // Combine chunks into single ArrayBuffer
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return result.buffer;
   } catch (error) {
     console.error("Error generating speech with ElevenLabs:", error);
     throw new Error("Failed to generate speech audio");
@@ -86,42 +106,25 @@ export async function generateSpeechStream(
   options: TTSOptions = {}
 ): Promise<ReadableStream> {
   try {
-    if (!process.env.ELEVENLABS_API_KEY) {
-      throw new Error("ElevenLabs API key not configured");
-    }
-
+    const client = getElevenLabsClient();
+    
     const voiceId =
       options.voice ||
       process.env.ELEVENLABS_STREAMING_VOICE_ID ||
       "pNInz6obpgDQGcFmaJgB";
 
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
-      {
-        method: "POST",
-        headers: {
-          Accept: "audio/mpeg",
-          "Content-Type": "application/json",
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5",
-          voice_settings: {
-            stability: options.stability || 0.5,
-            similarity_boost: options.similarity_boost || 0.8,
-            style: 0.0,
-            use_speaker_boost: true,
-          },
-        }),
-      }
-    );
+    const audioStream = await client.textToSpeech.convert(voiceId, {
+      text: text,
+      modelId: process.env.ELEVENLABS_MODEL_ID || "eleven_turbo_v2_5",
+      voiceSettings: {
+        stability: options.stability || 0.5,
+        similarityBoost: options.similarity_boost || 0.8,
+        style: 0.0,
+        useSpeakerBoost: true,
+      },
+    });
 
-    if (!response.ok) {
-      throw new Error(`ElevenLabs API error: ${response.status}`);
-    }
-
-    return response.body!;
+    return audioStream;
   } catch (error) {
     console.error("Error generating speech stream:", error);
     throw new Error("Failed to generate speech stream");
@@ -156,17 +159,15 @@ interface Voice {
 
 export async function getAvailableVoices(): Promise<Voice[]> {
   try {
-    if (!process.env.ELEVENLABS_API_KEY) {
-      return [];
-    }
-
-    const response = await axios.get("https://api.elevenlabs.io/v1/voices", {
-      headers: {
-        "xi-api-key": process.env.ELEVENLABS_API_KEY,
-      },
-    });
-
-    return response.data.voices || [];
+    const client = getElevenLabsClient();
+    const response = await client.voices.getAll();
+    
+    return response.voices?.map(voice => ({
+      voice_id: voice.voiceId || '',
+      name: voice.name || '',
+      category: voice.category || '',
+      description: voice.description,
+    })) || [];
   } catch (error) {
     console.error("Error fetching voices:", error);
     return [];
