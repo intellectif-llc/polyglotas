@@ -14,7 +14,12 @@ interface SuggestedAnswerButtonProps {
   messageId: string;
 }
 
-function SuggestedAnswerButton({ suggestion, onPlayAudio, playingMessageId, messageId }: SuggestedAnswerButtonProps) {
+function SuggestedAnswerButton({
+  suggestion,
+  onPlayAudio,
+  playingMessageId,
+  messageId,
+}: SuggestedAnswerButtonProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [tooltipConfig, setTooltipConfig] = useState({
     visible: false,
@@ -26,7 +31,11 @@ function SuggestedAnswerButton({ suggestion, onPlayAudio, playingMessageId, mess
   const isPlaying = playingMessageId === messageId;
 
   const closeTooltip = useCallback(() => {
-    setTooltipConfig({ visible: false, selectedText: "", triggerElement: null });
+    setTooltipConfig({
+      visible: false,
+      selectedText: "",
+      triggerElement: null,
+    });
   }, []);
 
   const handlePlayAudio = (e: React.MouseEvent) => {
@@ -38,12 +47,15 @@ function SuggestedAnswerButton({ suggestion, onPlayAudio, playingMessageId, mess
   useEffect(() => {
     if (!isExpanded) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setIsExpanded(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isExpanded]);
 
   // Handle text selection for translation - only close translation tooltip on outside clicks
@@ -51,18 +63,21 @@ function SuggestedAnswerButton({ suggestion, onPlayAudio, playingMessageId, mess
     const handleMouseUp = () => {
       const selection = window.getSelection();
       const selectedText = selection?.toString().trim();
-      
-      if (selectedText && suggestionRef.current?.contains(selection?.anchorNode || null)) {
+
+      if (
+        selectedText &&
+        suggestionRef.current?.contains(selection?.anchorNode || null)
+      ) {
         const range = selection?.getRangeAt(0);
         if (range) {
           const rect = range.getBoundingClientRect();
-          const triggerElement = document.createElement('div');
-          triggerElement.style.position = 'absolute';
+          const triggerElement = document.createElement("div");
+          triggerElement.style.position = "absolute";
           triggerElement.style.left = `${rect.left + window.scrollX}px`;
           triggerElement.style.top = `${rect.top + window.scrollY}px`;
           triggerElement.style.width = `${rect.width}px`;
           triggerElement.style.height = `${rect.height}px`;
-          
+
           setTooltipConfig({
             visible: true,
             selectedText,
@@ -71,12 +86,12 @@ function SuggestedAnswerButton({ suggestion, onPlayAudio, playingMessageId, mess
         }
       }
     };
-    
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => document.removeEventListener('mouseup', handleMouseUp);
+
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => document.removeEventListener("mouseup", handleMouseUp);
   }, []);
 
-  if (!suggestion || typeof suggestion !== 'string') return null;
+  if (!suggestion || typeof suggestion !== "string") return null;
 
   return (
     <div ref={containerRef} className="relative">
@@ -86,14 +101,16 @@ function SuggestedAnswerButton({ suggestion, onPlayAudio, playingMessageId, mess
           e.stopPropagation();
           setIsExpanded(!isExpanded);
         }}
-        className={`absolute -bottom-4 -right-4 w-8 h-8 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 z-10 ${
-          isExpanded ? 'bg-yellow-500 scale-110' : 'bg-yellow-400 hover:bg-yellow-500 hover:scale-105'
+        className={`absolute -bottom-4 -right-4 w-8 h-8 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 z-10 cursor-pointer ${
+          isExpanded
+            ? "bg-yellow-500 scale-110"
+            : "bg-yellow-400 hover:bg-yellow-500 hover:scale-105"
         }`}
         title="Get suggestion"
       >
         <Lightbulb size={16} className="text-yellow-800" />
       </button>
-      
+
       {/* Persistent suggestion panel */}
       {isExpanded && (
         <div className="absolute bottom-6 right-0 w-72 bg-white border border-gray-200 rounded-lg shadow-xl z-20 animate-in slide-in-from-bottom-2 duration-200">
@@ -110,39 +127,43 @@ function SuggestedAnswerButton({ suggestion, onPlayAudio, playingMessageId, mess
               ✕
             </button>
           </div>
-          
+
           {/* Suggestion text */}
           <div className="p-3">
-            <div 
+            <div
               ref={suggestionRef}
               className="text-sm text-gray-800 p-3 bg-blue-50 rounded border-l-4 border-blue-400 italic selectable-ai-text cursor-text mb-3"
             >
               &ldquo;{suggestion}&rdquo;
             </div>
-            
+
             {/* Audio button */}
             <button
               onClick={handlePlayAudio}
               disabled={!!playingMessageId && !isPlaying}
               className={`w-full flex items-center justify-center gap-2 text-sm bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors font-medium disabled:opacity-50 ${
-                isPlaying ? 'animate-pulse bg-green-700' : ''
+                isPlaying ? "animate-pulse bg-green-700" : ""
               }`}
             >
               {isPlaying ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              {isPlaying ? 'Playing pronunciation...' : 'Listen to pronunciation'}
+              {isPlaying
+                ? "Playing pronunciation..."
+                : "Listen to pronunciation"}
             </button>
           </div>
         </div>
       )}
-      
+
       {/* Translation tooltip */}
-      {tooltipConfig.visible && tooltipConfig.selectedText && tooltipConfig.triggerElement && (
-        <WordTooltip
-          selectedText={tooltipConfig.selectedText}
-          onClose={closeTooltip}
-          triggerElement={tooltipConfig.triggerElement}
-        />
-      )}
+      {tooltipConfig.visible &&
+        tooltipConfig.selectedText &&
+        tooltipConfig.triggerElement && (
+          <WordTooltip
+            selectedText={tooltipConfig.selectedText}
+            onClose={closeTooltip}
+            triggerElement={tooltipConfig.triggerElement}
+          />
+        )}
     </div>
   );
 }
@@ -161,16 +182,20 @@ export default function MessageBubble({
   const isUser = message.sender_type === "user";
   const isAI = message.sender_type === "ai";
   const isPlayingAudio = playingMessageId === message.message_id;
-  
+
   const [tooltipConfig, setTooltipConfig] = useState({
     visible: false,
     selectedText: "",
     triggerElement: null as HTMLElement | null,
   });
   const messageContentRef = useRef<HTMLDivElement>(null);
-  
+
   const closeTooltip = useCallback(() => {
-    setTooltipConfig({ visible: false, selectedText: "", triggerElement: null });
+    setTooltipConfig({
+      visible: false,
+      selectedText: "",
+      triggerElement: null,
+    });
   }, []);
 
   const handlePlayAudio = () => {
@@ -183,25 +208,28 @@ export default function MessageBubble({
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
-  
+
   useEffect(() => {
     const handleMouseUp = () => {
       if (!isAI || isUser) return;
-      
+
       const selection = window.getSelection();
       const selectedText = selection?.toString().trim();
-      
-      if (selectedText && messageContentRef.current?.contains(selection?.anchorNode || null)) {
+
+      if (
+        selectedText &&
+        messageContentRef.current?.contains(selection?.anchorNode || null)
+      ) {
         const range = selection?.getRangeAt(0);
         if (range) {
           const rect = range.getBoundingClientRect();
-          const triggerElement = document.createElement('div');
-          triggerElement.style.position = 'absolute';
+          const triggerElement = document.createElement("div");
+          triggerElement.style.position = "absolute";
           triggerElement.style.left = `${rect.left + window.scrollX}px`;
           triggerElement.style.top = `${rect.top + window.scrollY}px`;
           triggerElement.style.width = `${rect.width}px`;
           triggerElement.style.height = `${rect.height}px`;
-          
+
           setTooltipConfig({
             visible: true,
             selectedText,
@@ -212,9 +240,9 @@ export default function MessageBubble({
         closeTooltip();
       }
     };
-    
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => document.removeEventListener('mouseup', handleMouseUp);
+
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => document.removeEventListener("mouseup", handleMouseUp);
   }, [isAI, isUser, closeTooltip]);
 
   return (
@@ -239,7 +267,7 @@ export default function MessageBubble({
       <div className="relative">
         <div
           className={`
-            max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative
+            max-w-xs lg:max-w-md px-4 pr-6 py-2 rounded-lg relative
             ${isUser ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"}
           `}
         >
@@ -255,14 +283,20 @@ export default function MessageBubble({
               `}
               title={isPlayingAudio ? "Playing..." : "Play audio"}
             >
-              {isPlayingAudio ? <VolumeX size={14} className="text-gray-600" /> : <Volume2 size={14} className="text-gray-600" />}
+              {isPlayingAudio ? (
+                <VolumeX size={14} className="text-gray-600" />
+              ) : (
+                <Volume2 size={14} className="text-gray-600" />
+              )}
             </button>
           )}
 
           {/* Message text */}
-          <div 
+          <div
             ref={messageContentRef}
-            className={`whitespace-pre-wrap break-words ${isAI ? 'selectable-ai-text' : ''}`}
+            className={`whitespace-pre-wrap break-words ${
+              isAI ? "selectable-ai-text" : ""
+            }`}
           >
             {message.message_text}
           </div>
@@ -277,25 +311,31 @@ export default function MessageBubble({
             <span>{formatTimestamp(message.created_at)}</span>
           </div>
         </div>
-        
+
         {/* Suggested answer button - positioned at bottom right corner */}
         {isAI && message.suggested_answer && (
           <SuggestedAnswerButton
-            suggestion={typeof message.suggested_answer === 'string' ? message.suggested_answer : (message.suggested_answer || '')}
+            suggestion={
+              typeof message.suggested_answer === "string"
+                ? message.suggested_answer
+                : message.suggested_answer || ""
+            }
             onPlayAudio={onPlayAudio}
             playingMessageId={playingMessageId}
             messageId={`${message.message_id}-suggestion`}
           />
         )}
       </div>
-      
-      {tooltipConfig.visible && tooltipConfig.selectedText && tooltipConfig.triggerElement && (
-        <WordTooltip
-          selectedText={tooltipConfig.selectedText}
-          onClose={closeTooltip}
-          triggerElement={tooltipConfig.triggerElement}
-        />
-      )}
+
+      {tooltipConfig.visible &&
+        tooltipConfig.selectedText &&
+        tooltipConfig.triggerElement && (
+          <WordTooltip
+            selectedText={tooltipConfig.selectedText}
+            onClose={closeTooltip}
+            triggerElement={tooltipConfig.triggerElement}
+          />
+        )}
     </div>
   );
 }

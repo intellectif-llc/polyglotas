@@ -372,6 +372,18 @@ export async function POST(
         await supabase
           .from("conversation_prompt_status")
           .insert(promptStatusInserts);
+
+        // Handle streak for first prompt engagement of the day
+        const { error: streakError } = await supabase.rpc('process_user_activity', {
+          profile_id_param: subscriptionResult.userId,
+          lesson_id_param: conversation.lesson_id,
+          language_code_param: conversation.language_code,
+          activity_type_param: 'chat'
+        });
+        
+        if (streakError) {
+          console.error('Error processing chat streak:', streakError);
+        }
       }
 
       // Check if all prompts are now addressed using database records
@@ -382,7 +394,18 @@ export async function POST(
       const wasAlreadyCompleted = previouslyAddressedIds.length === conversationPrompts.length;
       
       if (allPromptsAddressed && !wasAlreadyCompleted) {
-        // FIRST: Update conversation status to mark completion
+        // Award points for chat completion
+        const { error: completionError } = await supabase.rpc('process_chat_completion', {
+          profile_id_param: subscriptionResult.userId,
+          lesson_id_param: conversation.lesson_id,
+          language_code_param: conversation.language_code
+        });
+        
+        if (completionError) {
+          console.error('Error processing chat completion:', completionError);
+        }
+
+        // Update conversation status to mark completion
         await supabase
           .from("lesson_chat_conversations")
           .update({
@@ -390,13 +413,6 @@ export async function POST(
             last_message_at: new Date().toISOString(),
           })
           .eq("conversation_id", conversationId);
-
-        // THEN: Award points using dedicated chat completion function
-        await supabase.rpc('process_chat_completion', {
-          profile_id_param: subscriptionResult.userId,
-          lesson_id_param: conversation.lesson_id,
-          language_code_param: conversation.language_code
-        });
       } else {
         await supabase
           .from("lesson_chat_conversations")
