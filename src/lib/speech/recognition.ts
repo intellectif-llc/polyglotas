@@ -2,6 +2,60 @@ import React from "react";
 import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk";
 import { getTokenOrRefresh } from "./auth";
 
+// Web Speech API type declarations
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): WebSpeechRecognitionResult;
+  [index: number]: WebSpeechRecognitionResult;
+}
+
+interface WebSpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognitionInstance;
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onstart: ((event: Event) => void) | null;
+  onend: ((event: Event) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 /**
  * Speech recognition utilities for chat voice input
  * Uses Azure Speech SDK for reliable speech recognition
@@ -28,7 +82,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions = {}) {
   const [isListening, setIsListening] = React.useState(false);
   const [transcript, setTranscript] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
-  const [isSupported, setIsSupported] = React.useState(true); // Azure SDK is always supported
+  const [isSupported] = React.useState(true); // Azure SDK is always supported
   const [isProcessing, setIsProcessing] = React.useState(false);
 
   const recognizerRef = React.useRef<SpeechSDK.SpeechRecognizer | null>(null);
@@ -89,14 +143,14 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions = {}) {
       recognizerRef.current = recognizer;
 
       // Setup event handlers
-      recognizer.recognizing = (s, e) => {
+      recognizer.recognizing = (_, e) => {
         if (e.result.reason === SpeechSDK.ResultReason.RecognizingSpeech) {
           const interimText = finalTranscriptRef.current + e.result.text;
           setTranscript(interimText);
         }
       };
 
-      recognizer.recognized = (s, e) => {
+      recognizer.recognized = (_, e) => {
         console.log("Azure Speech recognized:", e.result.reason, e.result.text);
         if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
           if (e.result.text) {
@@ -108,7 +162,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions = {}) {
         }
       };
 
-      recognizer.canceled = (s, e) => {
+      recognizer.canceled = (_, e) => {
         console.log(
           `Azure Speech canceled: ${SpeechSDK.CancellationReason[e.reason]}`
         );
@@ -126,13 +180,13 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions = {}) {
         setIsProcessing(false);
       };
 
-      recognizer.sessionStarted = (s, e) => {
+      recognizer.sessionStarted = () => {
         console.log("Azure Speech session started");
         setIsListening(true);
         setIsProcessing(false);
       };
 
-      recognizer.sessionStopped = (s, e) => {
+      recognizer.sessionStopped = () => {
         console.log("Azure Speech session stopped");
         setIsListening(false);
         setIsProcessing(false);
@@ -220,7 +274,7 @@ export function useSpeechRecognition(options: SpeechRecognitionOptions = {}) {
 }
 
 export class ChatSpeechRecognition {
-  private recognition: any;
+  private recognition: SpeechRecognitionInstance;
   private isListening = false;
   private onResult?: (result: SpeechRecognitionResult) => void;
   private onError?: (error: string) => void;
@@ -230,8 +284,8 @@ export class ChatSpeechRecognition {
   constructor(options: SpeechRecognitionOptions = {}) {
     // Check if browser supports speech recognition
     const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      window.SpeechRecognition ||
+      window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       throw new Error("Speech recognition not supported in this browser");
@@ -257,12 +311,12 @@ export class ChatSpeechRecognition {
       this.onEnd?.();
     };
 
-    this.recognition.onerror = (event: any) => {
+    this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       this.isListening = false;
       this.onError?.(event.error);
     };
 
-    this.recognition.onresult = (event: any) => {
+    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       const results = event.results;
       const lastResult = results[results.length - 1];
 
@@ -343,8 +397,8 @@ export class ChatSpeechRecognition {
 
   public static isSupported(): boolean {
     return !!(
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition
+      window.SpeechRecognition ||
+      window.webkitSpeechRecognition
     );
   }
 }

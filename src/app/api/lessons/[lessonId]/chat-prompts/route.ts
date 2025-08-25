@@ -68,7 +68,7 @@ export async function GET(
     }
 
     // Transform the data to match the expected format
-    const prompts: ChatPrompt[] = (starters || []).map((starter: any) => ({
+    const prompts: ChatPrompt[] = (starters || []).map((starter: { id: number; conversation_starter_translations: { starter_text: string }[] }) => ({
       id: starter.id,
       starter_text:
         starter.conversation_starter_translations[0]?.starter_text || "",

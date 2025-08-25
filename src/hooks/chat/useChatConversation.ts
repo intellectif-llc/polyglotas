@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 
@@ -9,6 +9,7 @@ export interface ChatMessage {
   message_order: number;
   created_at: string;
   related_prompt_id?: number;
+  suggested_answer?: string | null;
 }
 
 export interface ChatPrompt {
@@ -143,7 +144,10 @@ export function useChatConversation(lessonId: string) {
         (oldMessages = []) => [
           ...oldMessages,
           data.user_message,
-          data.ai_message,
+          {
+            ...data.ai_message,
+            suggested_answer: data.ai_message.suggested_answer || null,
+          },
         ]
       );
 
@@ -172,7 +176,7 @@ export function useChatConversation(lessonId: string) {
   });
 
   // Function to play audio for a specific message
-  const playAudioForMessage = async (messageId: string, text: string) => {
+  const playAudioForMessage = useCallback(async (messageId: string, text: string) => {
     if (playingMessageId === messageId) {
       // Logic to stop audio if it's already playing could go here
       // For now, we just prevent re-playing
@@ -213,7 +217,7 @@ export function useChatConversation(lessonId: string) {
       console.error("Failed to play AI message:", error);
       setPlayingMessageId(null); // Clear on error
     }
-  };
+  }, [playingMessageId]);
 
   // Initialize messages with initial AI message if present and auto-play
   useEffect(() => {
@@ -243,7 +247,7 @@ export function useChatConversation(lessonId: string) {
         }
       );
     }
-  }, [conversation, conversationId, queryClient]);
+  }, [conversation, conversationId, queryClient, playAudioForMessage]);
 
   return {
     conversation,

@@ -33,7 +33,7 @@ export default function ConversationStarters({
     setSelectedPrompt(selectedPrompt === promptId ? null : promptId);
   };
 
-  const getPromptById = (id: number) => prompts.find(p => p.id === id);
+
 
   return (
     <div className="border-b border-gray-200 p-4">

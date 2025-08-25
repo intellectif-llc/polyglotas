@@ -147,7 +147,14 @@ export function validateTTSOptions(options: TTSOptions): TTSOptions {
 /**
  * Gets available voices from ElevenLabs
  */
-export async function getAvailableVoices(): Promise<any[]> {
+interface Voice {
+  voice_id: string;
+  name: string;
+  category: string;
+  description?: string;
+}
+
+export async function getAvailableVoices(): Promise<Voice[]> {
   try {
     if (!process.env.ELEVENLABS_API_KEY) {
       return [];

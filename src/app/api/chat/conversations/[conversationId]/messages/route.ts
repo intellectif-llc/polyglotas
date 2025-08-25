@@ -6,9 +6,7 @@ import {
 } from "@/lib/subscription/validation";
 import {
   generateAIResponse,
-  checkPromptsCompletion,
   detectAddressedPromptsWithAI,
-  getAddressedPrompts,
 } from "@/lib/gemini/conversation";
 import type {
   LessonContext,
@@ -23,6 +21,7 @@ export interface ChatMessage {
   message_order: number;
   created_at: string;
   related_prompt_id?: number;
+  suggested_answer?: string | null;
 }
 
 interface SendMessageRequest {
@@ -93,7 +92,8 @@ export async function GET(
         sender_type,
         message_order,
         created_at,
-        related_prompt_id
+        related_prompt_id,
+        suggested_answer
       `
       )
       .eq("conversation_id", conversationId)
@@ -116,6 +116,7 @@ export async function GET(
       message_order: msg.message_order,
       created_at: msg.created_at,
       related_prompt_id: msg.related_prompt_id || undefined,
+      suggested_answer: msg.suggested_answer || undefined,
     }));
 
     return NextResponse.json(chatMessages);
@@ -154,7 +155,7 @@ export async function POST(
     let requestBody: SendMessageRequest;
     try {
       requestBody = await request.json();
-    } catch (error) {
+    } catch {
       return new NextResponse(
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -266,7 +267,7 @@ export async function POST(
         );
 
       const conversationPrompts: ConversationPrompt[] = (prompts || []).map(
-        (prompt: any) => ({
+        (prompt: { id: number; conversation_starter_translations: { starter_text: string }[] }) => ({
           id: prompt.id,
           starter_text:
             prompt.conversation_starter_translations[0]?.starter_text || "",
@@ -282,28 +283,46 @@ export async function POST(
       }));
 
       // Build lesson context
-      const lesson = conversation.lessons;
+      const lesson = conversation.lessons[0]; // lessons is an array, get first item
       const lessonContext: LessonContext = {
         lessonTitle:
-          lesson.lesson_translations[0]?.lesson_title ||
-          `Lesson ${lesson.lesson_id}`,
+          lesson?.lesson_translations?.[0]?.lesson_title ||
+          `Lesson ${lesson?.lesson_id}`,
         unitTitle:
-          lesson.units.unit_translations[0]?.unit_title ||
-          `Unit ${lesson.unit_id}`,
-        level: lesson.units.level || "A1",
+          lesson?.units?.[0]?.unit_translations?.[0]?.unit_title ||
+          `Unit ${lesson?.unit_id}`,
+        level: lesson?.units?.[0]?.level || "A1",
         targetLanguage: conversation.language_code,
         nativeLanguage: profile?.native_language_code || "en",
       };
 
-      // Generate AI response
-      const aiResponseText = await generateAIResponse(
+      // Generate AI response with suggested answer
+      const aiResponseRaw = await generateAIResponse(
         text_message.trim(),
         conversationHistory,
         lessonContext,
         conversationPrompts
       );
+      
+      // Parse JSON response or fallback to plain text
+      let aiResponseText: string;
+      let suggestedAnswer: string | null = null;
+      
+      try {
+        // Extract JSON from response (handle cases where AI adds extra text)
+        const jsonMatch = aiResponseRaw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          aiResponseText = parsed.response || aiResponseRaw;
+          suggestedAnswer = parsed.suggested_answer || null;
+        } else {
+          aiResponseText = aiResponseRaw;
+        }
+      } catch {
+        aiResponseText = aiResponseRaw;
+      }
 
-      // Store AI message
+      // Store AI message with suggested answer
       const { data: aiMessage, error: aiMessageError } = await supabase
         .from("conversation_messages")
         .insert({
@@ -312,9 +331,10 @@ export async function POST(
           message_order: nextMessageOrder + 1,
           message_text: aiResponseText,
           message_language_code: conversation.language_code,
+          suggested_answer: suggestedAnswer,
         })
         .select(
-          "message_id, message_text, sender_type, message_order, created_at"
+          "message_id, message_text, sender_type, message_order, created_at, suggested_answer"
         )
         .single();
 
@@ -333,13 +353,6 @@ export async function POST(
         .eq("conversation_id", conversationId);
       
       const previouslyAddressedIds = (existingStatuses || []).map(s => s.prompt_id);
-
-      // Check for newly addressed prompts
-      const allConversationHistory = [
-        ...conversationHistory,
-        { role: "user" as const, parts: text_message.trim() },
-        { role: "model" as const, parts: aiResponseText },
-      ];
 
       const newlyAddressedIds = await detectAddressedPromptsWithAI(
         text_message.trim(),
@@ -405,6 +418,7 @@ export async function POST(
           sender_type: "ai",
           message_order: aiMessage.message_order,
           created_at: aiMessage.created_at,
+          suggested_answer: aiMessage.suggested_answer,
         },
         conversation_status: {
           all_prompts_addressed: allPromptsAddressed,

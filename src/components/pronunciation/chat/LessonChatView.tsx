@@ -32,7 +32,6 @@ export default function LessonChatView({
     useSubscriptionTier();
 
   const {
-    conversation,
     messages,
     prompts,
     addressedPromptIds,

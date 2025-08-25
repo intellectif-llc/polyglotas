@@ -58,14 +58,28 @@ export async function generateAIResponse(
       ],
     });
 
-    // Send the user message and get response
-    const result = await chat.sendMessage(userMessage);
+    // Send the user message and get response with structured format
+    const structuredPrompt = `${userMessage}
+
+Respond with ONLY a JSON object in this exact format:
+{
+  "response": "your conversational response here",
+  "suggested_answer": "a complete natural sentence the student could say"
+}
+
+For suggested_answer: Create a natural, complete sentence that directly answers your question. Use simple ${lessonContext.level} level vocabulary. Example: if you ask "What's your favorite food?", suggest "My favorite food is pizza" not just "pizza".`;
+
+    const result = await chat.sendMessage(structuredPrompt);
     const response = await result.response;
 
     return response.text();
   } catch (error) {
     console.error("Error generating AI response:", error);
-    throw new Error("Failed to generate AI response");
+    // Fallback to simple text response
+    return JSON.stringify({
+      response: "I'm here to help you practice. What would you like to talk about?",
+      suggested_answer: "I'd like to practice conversation"
+    });
   }
 }
 

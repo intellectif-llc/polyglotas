@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     let requestBody: TTSRequest;
     try {
       requestBody = await request.json();
-    } catch (error) {
+    } catch {
       return new NextResponse(
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { status: 400, headers: { "Content-Type": "application/json" } }

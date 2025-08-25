@@ -132,7 +132,7 @@ export async function POST(
       .eq("conversation_starter_translations.language_code", targetLanguage);
 
     const conversationPrompts: ConversationPrompt[] = (prompts || []).map(
-      (prompt: any) => ({
+      (prompt: { id: number; conversation_starter_translations: { starter_text: string }[] }) => ({
         id: prompt.id,
         starter_text:
           prompt.conversation_starter_translations[0]?.starter_text || "",
@@ -144,9 +144,9 @@ export async function POST(
       lessonTitle:
         lesson.lesson_translations[0]?.lesson_title || `Lesson ${lessonId}`,
       unitTitle:
-        lesson.units.unit_translations[0]?.unit_title ||
+        lesson.units[0]?.unit_translations[0]?.unit_title ||
         `Unit ${lesson.unit_id}`,
-      level: lesson.units.level || "A1",
+      level: lesson.units[0]?.level || "A1",
       targetLanguage: targetLanguage,
       nativeLanguage: profile.native_language_code || "en",
     };
