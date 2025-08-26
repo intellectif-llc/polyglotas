@@ -191,7 +191,7 @@ export async function GET() {
               current_period_end: sub.current_period_end,
               cancel_at_period_end: sub.cancel_at_period_end,
               items: [{
-                price: sub.prices.stripe_price_id,
+                price: (sub.prices as any).stripe_price_id,
                 quantity: sub.quantity || 1,
               }],
             };

@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import LevelSelector from "@/components/pronunciation/dashboard/LevelSelector";
 import UnitsCarousel from "@/components/pronunciation/dashboard/UnitsCarousel";
 import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
+import { useUserName } from "@/hooks/useUserName";
 import { Unit } from "@/types/pronunciation";
 
 const PronunciationDashboard = () => {
   const [selectedLevel, setSelectedLevel] = useState("A1");
   const { data: allUnits, isLoading, error } = usePronunciationUnits();
+  const { data: firstName } = useUserName();
   const router = useRouter();
 
   const unitsForLevel = useMemo(() => {
@@ -28,7 +30,7 @@ const PronunciationDashboard = () => {
   return (
     <div className="font-sans bg-gray-100 min-h-screen">
       <div className="bg-white p-5 text-center relative shadow-sm">
-        <h2 className="text-xl font-semibold mt-6">Welcome back, User</h2>
+        <h2 className="text-xl font-semibold mt-6">Welcome back, {firstName || "User"}</h2>
       </div>
       <div className="bg-white p-4 sm:p-5 mb-5 shadow-sm">
         <LevelSelector
