@@ -61,6 +61,8 @@ export default function BillingDashboard() {
   const currentSubscription = billingInfo?.subscriptions?.[0];
   const currentTier = billingInfo?.profile?.subscription_tier || "free";
 
+
+
   if (isLoading) {
     return (
       <div className="max-w-6xl mx-auto p-6">

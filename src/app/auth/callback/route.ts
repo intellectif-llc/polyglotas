@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
   const error = requestUrl.searchParams.get("error");
   const errorDescription = requestUrl.searchParams.get("error_description");
-  const origin = requestUrl.origin;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin;
 
   console.log(
     "[AUTH_DEBUG] [auth/callback/route.ts] Received callback with code:",
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     );
     // Redirect to an error page or show an error message
     return NextResponse.redirect(
-      `${origin}/auth/signin?error=OAuth+authentication+failed&error_description=${encodeURIComponent(
+      `${siteUrl}/auth/signin?error=OAuth+authentication+failed&error_description=${encodeURIComponent(
         errorDescription || error
       )}`
     );
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         // Log more details if available
         if (exchangeError.cause) console.error("Cause:", exchangeError.cause);
         return NextResponse.redirect(
-          `${origin}/auth/auth-code-error?message=${encodeURIComponent(
+          `${siteUrl}/auth/auth-code-error?message=${encodeURIComponent(
             exchangeError.message
           )}&status=${exchangeError.status || "unknown"}`
         );
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         errorMessage
       );
       return NextResponse.redirect(
-        `${origin}/auth/auth-code-error?message=Internal Server Error during code exchange: ${encodeURIComponent(
+        `${siteUrl}/auth/auth-code-error?message=Internal Server Error during code exchange: ${encodeURIComponent(
           errorMessage
         )}`
       );
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       "[AUTH_DEBUG] [/auth/callback/route.ts] Redirecting to /learn. Session User ID should be set:",
       sessionData?.user?.id
     );
-    return NextResponse.redirect(`${origin}/learn`);
+    return NextResponse.redirect(`${siteUrl}/learn`);
   }
 
   // Fallback redirect if no code or error
@@ -88,6 +88,6 @@ export async function GET(request: NextRequest) {
     "[AUTH_DEBUG] [/auth/callback/route.ts] No code found in callback URL. Redirecting to signin with error."
   );
   return NextResponse.redirect(
-    `${origin}/auth/auth-code-error?message=Authorization code not found.`
+    `${siteUrl}/auth/auth-code-error?message=Authorization code not found.`
   );
 }

@@ -10,6 +10,8 @@ export default function PricingPlans() {
   const { data: plans, isLoading } = useAvailablePlans();
   const { createCheckout, isLoading: isCreatingCheckout } = useCreateCheckout();
 
+
+
   const handleSelectPlan = async (priceId: string) => {
     if (isCreatingCheckout) return;
 

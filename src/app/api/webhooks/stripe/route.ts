@@ -182,10 +182,10 @@ async function handleSubscriptionCreated(
 
     // Use the new database function to handle subscription creation
     const { error } = await supabase.rpc("upsert_stripe_subscription", {
-      stripe_subscription_id: subscriptionData.id as string,
-      stripe_customer_id: subscriptionData.customer as string,
-      stripe_price_id: stripePriceId,
-      subscription_data: subscriptionData,
+      p_stripe_subscription_id: subscriptionData.id as string,
+      p_stripe_customer_id: subscriptionData.customer as string,
+      p_stripe_price_id: stripePriceId,
+      p_subscription_data: subscriptionData,
     });
 
     if (error) {
@@ -216,10 +216,10 @@ async function handleSubscriptionUpdated(
 
     // Use the same database function to handle subscription updates
     const { error } = await supabase.rpc("upsert_stripe_subscription", {
-      stripe_subscription_id: subscriptionData.id as string,
-      stripe_customer_id: subscriptionData.customer as string,
-      stripe_price_id: stripePriceId,
-      subscription_data: subscriptionData,
+      p_stripe_subscription_id: subscriptionData.id as string,
+      p_stripe_customer_id: subscriptionData.customer as string,
+      p_stripe_price_id: stripePriceId,
+      p_subscription_data: subscriptionData,
     });
 
     if (error) {
@@ -292,10 +292,10 @@ async function handleInvoicePaymentSucceeded(
   try {
     // Use the new database function to handle invoice upsert
     const { error } = await supabase.rpc("upsert_stripe_invoice", {
-      stripe_invoice_id: invoiceData.id as string,
-      stripe_customer_id: invoiceData.customer as string,
-      stripe_subscription_id: (invoiceData.subscription as string) || null,
-      invoice_data: {
+      p_stripe_invoice_id: invoiceData.id as string,
+      p_stripe_customer_id: invoiceData.customer as string,
+      p_stripe_subscription_id: (invoiceData.subscription as string) || null,
+      p_invoice_data: {
         ...invoiceData,
         status: "paid", // Override status for successful payment
       },
@@ -317,10 +317,10 @@ async function handleInvoicePaymentFailed(
   try {
     // Use the new database function to handle invoice upsert
     const { error } = await supabase.rpc("upsert_stripe_invoice", {
-      stripe_invoice_id: invoiceData.id as string,
-      stripe_customer_id: invoiceData.customer as string,
-      stripe_subscription_id: (invoiceData.subscription as string) || null,
-      invoice_data: {
+      p_stripe_invoice_id: invoiceData.id as string,
+      p_stripe_customer_id: invoiceData.customer as string,
+      p_stripe_subscription_id: (invoiceData.subscription as string) || null,
+      p_invoice_data: {
         ...invoiceData,
         status: "past_due", // Override status for failed payment
       },

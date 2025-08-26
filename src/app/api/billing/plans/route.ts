@@ -53,8 +53,8 @@ export async function GET() {
         currency: plan.currency,
         billing_interval: plan.billing_interval,
         interval_count: plan.interval_count,
-        product_name: Array.isArray(plan.products) ? plan.products[0]?.name : undefined,
-        tier_key: Array.isArray(plan.products) ? plan.products[0]?.tier_key : undefined,
+        product_name: plan.products?.name,
+        tier_key: plan.products?.tier_key,
       })) || [];
 
     return NextResponse.json(formattedPlans);

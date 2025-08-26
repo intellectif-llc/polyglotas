@@ -15,8 +15,8 @@ import {
 interface Subscription {
   id: string;
   status: string;
-  current_period_start: number;
-  current_period_end: number;
+  current_period_start: number | string;
+  current_period_end: number | string;
   cancel_at_period_end: boolean;
   items: Array<{
     price: string;
@@ -37,8 +37,29 @@ export default function SubscriptionCard({
   onManage,
   isManaging,
 }: SubscriptionCardProps) {
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString("en-US", {
+
+  const formatDate = (timestamp: number | string | null | undefined) => {
+    if (!timestamp) return "N/A";
+    
+    let date: Date;
+    
+    // Handle different timestamp formats
+    if (typeof timestamp === 'string') {
+      date = new Date(timestamp);
+    } else if (typeof timestamp === 'number') {
+      // If timestamp is in seconds (Unix timestamp), convert to milliseconds
+      // If timestamp is already in milliseconds, use as is
+      date = new Date(timestamp > 1000000000000 ? timestamp : timestamp * 1000);
+    } else {
+      return "N/A";
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return "N/A";
+    }
+    
+    return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",

@@ -165,30 +165,38 @@ export async function GET() {
             created: customer.created,
           };
 
-          // Get active subscriptions
-          const stripeSubscriptions = await stripe.subscriptions.list({
-            customer: profile.stripe_customer_id,
-            status: "active",
-            limit: 10,
-          });
+          // Get active subscriptions from our database instead of Stripe
+          const { data: dbSubscriptions } = await supabase
+            .from('student_subscriptions')
+            .select(`
+              stripe_subscription_id,
+              status,
+              current_period_start,
+              current_period_end,
+              cancel_at_period_end,
+              quantity,
+              prices!inner(
+                stripe_price_id
+              )
+            `)
+            .eq('profile_id', user.id)
+            .in('status', ['active', 'trialing'])
+            .order('created_at', { ascending: false });
 
-          subscriptions = stripeSubscriptions.data.map((sub) => {
-            const subscription = sub as Stripe.Subscription & {
-              current_period_start: number;
-              current_period_end: number;
-              cancel_at_period_end: boolean;
+          subscriptions = (dbSubscriptions || []).map((sub) => {
+            const mappedSub = {
+              id: sub.stripe_subscription_id,
+              status: sub.status,
+              current_period_start: sub.current_period_start,
+              current_period_end: sub.current_period_end,
+              cancel_at_period_end: sub.cancel_at_period_end,
+              items: [{
+                price: sub.prices.stripe_price_id,
+                quantity: sub.quantity || 1,
+              }],
             };
-            return {
-              id: subscription.id,
-              status: subscription.status as string,
-              current_period_start: subscription.current_period_start,
-              current_period_end: subscription.current_period_end,
-              cancel_at_period_end: subscription.cancel_at_period_end,
-              items: subscription.items.data.map((item) => ({
-                price: item.price.id,
-                quantity: item.quantity || 1,
-              })),
-            };
+
+            return mappedSub;
           });
         }
       } catch (stripeError) {
@@ -197,14 +205,16 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({
+    const responseData = {
       profile: {
         subscription_tier: profile.subscription_tier,
         stripe_customer_id: profile.stripe_customer_id,
       },
       customer: customerInfo,
       subscriptions,
-    });
+    };
+    
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("Error fetching customer info:", error);
     return NextResponse.json(

@@ -693,34 +693,91 @@ CONSTRAINT users_pkey PRIMARY KEY (id)
 
 # Sql functions
 
-## check_and_award_unit_completion_bonus
+## admin_fix_user_tier
+### Description
+An administrative function to recalculate and correct a user's subscription tier based on their active subscriptions. It returns the tier before and after the fix, along with a list of their active subscriptions.
 
 ### Parameters
+user_profile_id (uuid): The unique identifier for the user's profile.
 
-profile_id_param (uuid)
-unit_id_param (integer)
-triggering_lesson_id_param (integer)
+### Returns
+A table with the following columns:
 
-### Function Definition
+old_tier (text): The user's subscription tier before the function was executed.
 
-CREATE OR REPLACE FUNCTION public.check_and_award_unit_completion_bonus(profile_id_param uuid, unit_id_param integer, triggering_lesson_id_param integer)
-RETURNS void
-LANGUAGE plpgsql
+new_tier (text): The user's subscription tier after recalculation.
+
+active_subscriptions (text[]): An array of strings describing the user's active subscriptions.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.admin_fix_user_tier(user_profile_id uuid)
+ RETURNS TABLE(old_tier text, new_tier text, active_subscriptions text[])
+ LANGUAGE plpgsql
+ SECURITY DEFINER
 AS $function$
 DECLARE
-v_level_code TEXT;
-is_unit_now_completed BOOLEAN;
-is_level_now_completed BOOLEAN;
+  old_tier_val TEXT;
+  new_tier_val TEXT;
+  active_subs TEXT[];
 BEGIN
--- Check if a UNIT_COMPLETION bonus was already given for any lesson within this unit.
-IF EXISTS (
-SELECT 1 FROM public.user_points_log
-WHERE profile_id = profile_id_param
-AND reason_code = 'UNIT_COMPLETION'
-AND related_lesson_id IN (SELECT lesson_id FROM public.lessons WHERE unit_id = unit_id_param)
-) THEN
-RETURN;
-END IF;
+  -- Get current tier
+  SELECT sp.subscription_tier::TEXT INTO old_tier_val
+  FROM public.student_profiles sp
+  WHERE sp.profile_id = user_profile_id;
+
+  -- Get active subscriptions
+  SELECT ARRAY_AGG(prod.tier_key || ' (' || ss.stripe_subscription_id || ')')
+  INTO active_subs
+  FROM public.student_subscriptions ss
+  JOIN public.prices pr ON ss.price_id = pr.id
+  JOIN public.products prod ON pr.product_id = prod.id
+  WHERE ss.profile_id = user_profile_id
+  AND ss.status IN ('active', 'trialing')
+  AND (ss.ended_at IS NULL OR ss.ended_at > NOW());
+
+  -- Update tier
+  new_tier_val := public.update_user_subscription_tier(user_profile_id);
+
+  RETURN QUERY SELECT old_tier_val, new_tier_val, COALESCE(active_subs, ARRAY[]::TEXT[]);
+END;
+$function$
+
+
+## check_and_award_unit_completion_bonus
+### Description
+Checks if a user has completed all required lessons in a unit. If the unit is newly completed, it awards points for UNIT_COMPLETION. It then proceeds to check if this unit completion also leads to a level completion, awarding LEVEL_COMPLETION points if applicable.
+
+### Parameters
+profile_id_param (uuid): The unique identifier for the user's profile.
+
+unit_id_param (integer): The ID of the unit being checked.
+
+triggering_lesson_id_param (integer): The ID of the lesson that triggered this check.
+
+### Returns
+void - This function does not return a value.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.check_and_award_unit_completion_bonus(profile_id_param uuid, unit_id_param integer, triggering_lesson_id_param integer)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_level_code TEXT;
+    is_unit_now_completed BOOLEAN;
+    is_level_now_completed BOOLEAN;
+BEGIN
+    -- Check if a UNIT_COMPLETION bonus was already given for any lesson within this unit.
+    IF EXISTS (
+        SELECT 1 FROM public.user_points_log 
+        WHERE profile_id = profile_id_param 
+          AND reason_code = 'UNIT_COMPLETION' 
+          AND related_lesson_id IN (SELECT lesson_id FROM public.lessons WHERE unit_id = unit_id_param)
+    ) THEN
+        RETURN;
+    END IF;
 
     -- This assumes you have a function to check unit completion based on the user's tier.
     -- You will need to create is_unit_complete(profile_id, unit_id)
@@ -730,7 +787,7 @@ END IF;
         -- Award unit completion points, logging the lesson ID that triggered it.
         INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id)
         VALUES (profile_id_param, 25, 'UNIT_COMPLETION', triggering_lesson_id_param);
-
+        
         UPDATE public.student_profiles SET points = points + 25 WHERE profile_id = profile_id_param;
 
         -- Now, check for level completion.
@@ -761,70 +818,510 @@ END IF;
             END IF;
         END IF;
     END IF;
+END;
+$function$
+
+## cleanup_user_subscriptions
+### Description
+A maintenance function that marks expired subscriptions as 'canceled' and then recalculates the user's overall subscription tier to ensure it's accurate.
+
+### Parameters
+user_profile_id (uuid): The unique identifier for the user whose subscriptions need cleanup.
+
+### Returns
+text - The new, recalculated subscription tier for the user.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.cleanup_user_subscriptions(user_profile_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  new_tier TEXT;
+BEGIN
+  -- Mark expired subscriptions as ended if they're not already
+  UPDATE public.student_subscriptions
+  SET
+    status = 'canceled',
+    ended_at = COALESCE(ended_at, NOW()),
+    updated_at = NOW()
+  WHERE profile_id = user_profile_id
+  AND status IN ('active', 'trialing')
+  AND current_period_end < NOW();
+
+  -- Update user's subscription tier based on remaining active subscriptions
+  new_tier := public.update_user_subscription_tier(user_profile_id);
+
+  RETURN new_tier;
+END;
+$function$
+
+
+## get_user_billing_summary
+### Description
+Retrieves a summary of a user's billing information, including their current subscription tier, the number of active subscriptions, the next billing date, the total monthly cost, and whether they have a payment method on file.
+
+### Parameters
+user_profile_id (uuid): The unique identifier for the user's profile.
+
+### Returns
+A table with the following columns:
+
+current_tier (text): The user's current subscription tier.
+
+active_subscriptions_count (integer): The number of active or trialing subscriptions.
+
+next_billing_date (timestamp with time zone): The earliest upcoming billing date for active subscriptions.
+
+monthly_amount (integer): The sum of monthly subscription costs.
+
+has_payment_method (boolean): true if the user has a default payment method stored.
+
+### Definition
+
+
+CREATE OR REPLACE FUNCTION public.get_user_billing_summary(user_profile_id uuid)
+ RETURNS TABLE(current_tier text, active_subscriptions_count integer, next_billing_date timestamp with time zone, monthly_amount integer, has_payment_method boolean)
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    sp.subscription_tier::TEXT as current_tier,
+    (
+      SELECT COUNT(*)::INTEGER
+      FROM public.student_subscriptions ss
+      WHERE ss.profile_id = user_profile_id
+      AND ss.status IN ('active', 'trialing')
+      AND (ss.ended_at IS NULL OR ss.ended_at > NOW())
+    ) as active_subscriptions_count,
+    (
+      SELECT MIN(ss.current_period_end)
+      FROM public.student_subscriptions ss
+      WHERE ss.profile_id = user_profile_id
+      AND ss.status IN ('active', 'trialing')
+      AND (ss.ended_at IS NULL OR ss.ended_at > NOW())
+    ) as next_billing_date,
+    (
+      SELECT SUM(pr.unit_amount)::INTEGER
+      FROM public.student_subscriptions ss
+      JOIN public.prices pr ON ss.price_id = pr.id
+      WHERE ss.profile_id = user_profile_id
+      AND ss.status IN ('active', 'trialing')
+      AND (ss.ended_at IS NULL OR ss.ended_at > NOW())
+      AND pr.billing_interval = 'month'
+    ) as monthly_amount,
+    (sp.default_payment_method_details IS NOT NULL) as has_payment_method
+  FROM public.student_profiles sp
+  WHERE sp.profile_id = user_profile_id;
+END;
+$function$
+
+
+## get_user_highest_tier
+### Description
+Determines the highest subscription tier ('pro', 'starter', or 'free') a user is entitled to based on their currently active subscriptions.
+
+### Parameters
+user_profile_id (uuid): The unique identifier for the user's profile.
+
+### Returns
+text - The highest active subscription tier ('pro', 'starter', or 'free'). Defaults to 'free' if no active subscriptions are found.
+
+### Definition
+
+
+CREATE OR REPLACE FUNCTION public.get_user_highest_tier(user_profile_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  highest_tier TEXT := 'free';
+  tier_record RECORD;
+BEGIN
+  -- Check for active subscriptions and find the highest tier
+  FOR tier_record IN
+    SELECT p.tier_key
+    FROM public.student_subscriptions ss
+    JOIN public.prices pr ON ss.price_id = pr.id
+    JOIN public.products p ON pr.product_id = p.id
+    WHERE ss.profile_id = user_profile_id
+    AND ss.status IN ('active', 'trialing')
+    AND (ss.ended_at IS NULL OR ss.ended_at > NOW())
+    ORDER BY
+      CASE p.tier_key
+        WHEN 'pro' THEN 3
+        WHEN 'starter' THEN 2
+        WHEN 'free' THEN 1
+        ELSE 0
+      END DESC
+    LIMIT 1
+  LOOP
+    highest_tier := tier_record.tier_key;
+    EXIT;
+  END LOOP;
+
+  RETURN highest_tier;
+END;
+$function$
+
+
+## handle_new_user_profile
+### Description
+A trigger function that automatically runs when a new user signs up (a new row is added to auth.users). It populates the public.profiles and public.student_profiles tables with the new user's information, setting their initial subscription tier to 'free'.
+
+### Parameters
+None. This is a trigger function that operates on the NEW record.
+
+### Returns
+trigger - Returns the NEW record to be inserted into the auth.users table.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.handle_new_user_profile()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  -- Create entry in public.profiles with proper name extraction
+  INSERT INTO public.profiles (id, first_name, last_name)
+  VALUES (
+    NEW.id,
+    COALESCE(
+      NEW.raw_user_meta_data->>'first_name',
+      NEW.raw_user_meta_data->>'given_name',
+      SPLIT_PART(NEW.raw_user_meta_data->>'full_name', ' ', 1),
+      SPLIT_PART(NEW.raw_user_meta_data->>'name', ' ', 1)
+    ),
+    COALESCE(
+      NEW.raw_user_meta_data->>'last_name',
+      NEW.raw_user_meta_data->>'family_name',
+      CASE
+        WHEN NEW.raw_user_meta_data->>'full_name' IS NOT NULL
+        THEN TRIM(SUBSTRING(NEW.raw_user_meta_data->>'full_name' FROM POSITION(' ' IN NEW.raw_user_meta_data->>'full_name') + 1))
+        WHEN NEW.raw_user_meta_data->>'name' IS NOT NULL
+        THEN TRIM(SUBSTRING(NEW.raw_user_meta_data->>'name' FROM POSITION(' ' IN NEW.raw_user_meta_data->>'name') + 1))
+        ELSE NULL
+      END
+    )
+  );
+
+  -- Create corresponding entry in public.student_profiles with free tier
+  INSERT INTO public.student_profiles (
+    profile_id,
+    status,
+    subscription_tier
+  )
+  VALUES (
+    NEW.id,
+    'active'::public.account_status_enum,
+    'free'::public.subscription_tier_enum
+  );
+
+  RETURN NEW;
+END;
+$function$
+
+
+## handle_subscription_tier_conflict
+### Description
+Manages subscription conflicts. Specifically, if a user upgrades to the 'pro' tier, this function automatically cancels any existing 'starter' subscriptions to prevent redundant billing.
+
+### Parameters
+user_profile_id (uuid): The unique identifier for the user's profile.
+
+new_tier (subscription_tier_enum): The new subscription tier the user is acquiring.
+
+### Returns
+void - This function does not return a value.
+
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.handle_subscription_tier_conflict(user_profile_id uuid, new_tier subscription_tier_enum)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  existing_sub RECORD;
+BEGIN
+  -- If upgrading to pro, cancel any active starter subscriptions
+  IF new_tier = 'pro' THEN
+    FOR existing_sub IN
+      SELECT ss.stripe_subscription_id
+      FROM public.student_subscriptions ss
+      JOIN public.prices pr ON ss.price_id = pr.id
+      JOIN public.products p ON pr.product_id = p.id
+      WHERE ss.profile_id = user_profile_id
+      AND p.tier_key = 'starter'
+      AND ss.status IN ('active', 'trialing')
+      AND (ss.ended_at IS NULL OR ss.ended_at > NOW())
+    LOOP
+      -- Mark the subscription as canceled
+      UPDATE public.student_subscriptions
+      SET
+        status = 'canceled',
+        cancel_at_period_end = true,
+        canceled_at = NOW(),
+        updated_at = NOW()
+      WHERE stripe_subscription_id = existing_sub.stripe_subscription_id;
+
+      -- Log that this subscription was auto-canceled due to upgrade
+      INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, notes)
+      VALUES (user_profile_id, 0, 'SUBSCRIPTION_UPGRADE_CANCELLATION',
+              'Starter subscription auto-canceled due to Pro upgrade: ' || existing_sub.stripe_subscription_id);
+    END LOOP;
+  END IF;
+END;
+$function$
+
+
+## handle_user_word_pronunciation_update
+### Description
+A core function for tracking a user's pronunciation progress on a per-word basis. It upserts a record in user_word_pronunciation with detailed statistics from a user's attempt, including accuracy scores and error types, and determines if the word needs_practice.
+
+### Parameters
+profile_id_param (uuid): The unique identifier for the user's profile.
+
+language_code_param (character varying): The language code for the word (e.g., 'en-US').
+
+word_data (jsonb): A JSON object containing details of the pronunciation attempt, including word, accuracyScore, and errorType.
+
+### Returns
+void - This function does not return a value.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.handle_user_word_pronunciation_update(profile_id_param uuid, language_code_param character varying, word_data jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_word_text TEXT := lower(word_data->>'word');
+    v_accuracy_score NUMERIC := (word_data->>'accuracyScore')::NUMERIC;
+    v_error_type TEXT := word_data->>'errorType';
+    v_error_increment INT;
+BEGIN
+    -- Exit if essential data is missing
+    IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
+        RETURN;
+    END IF;
+
+    -- Determine if the attempt had an error
+    v_error_increment := CASE WHEN v_error_type IS NOT NULL AND v_error_type <> 'None' THEN 1 ELSE 0 END;
+
+    -- Upsert the word pronunciation record, setting `needs_practice` based on the CURRENT attempt's score.
+    INSERT INTO public.user_word_pronunciation (
+        profile_id, word_text, language_code, total_attempts, error_count,
+        sum_accuracy_score, average_accuracy_score, last_accuracy_score,
+        last_error_type, last_attempt_at, updated_at, needs_practice
+    )
+    VALUES (
+        profile_id_param, v_word_text, language_code_param, 1, v_error_increment,
+        v_accuracy_score, v_accuracy_score, v_accuracy_score, v_error_type,
+        NOW(), NOW(), (v_accuracy_score < 70) -- Correct logic on insert
+    )
+    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
+    SET
+        total_attempts = user_word_pronunciation.total_attempts + 1,
+        error_count = user_word_pronunciation.error_count + v_error_increment,
+        sum_accuracy_score = user_word_pronunciation.sum_accuracy_score + v_accuracy_score,
+        average_accuracy_score = (user_word_pronunciation.sum_accuracy_score + v_accuracy_score) / (user_word_pronunciation.total_attempts + 1),
+        last_accuracy_score = v_accuracy_score,
+        last_error_type = v_error_type,
+        last_attempt_at = NOW(),
+        updated_at = NOW(),
+        needs_practice = (v_accuracy_score < 70); -- Correct logic on update
 
 END;
 $function$
 
-## handle_new_user_profile
+## is_unit_complete
+### Description
+A boolean function that determines if a user has completed all the required activities (chat, pronunciation, dictation) for every lesson within a specific unit.
 
 ### Parameters
+p_profile_id (uuid): The unique identifier for the user's profile.
 
-None
+p_unit_id (integer): The ID of the unit to check for completion.
 
-### Function Definition
+### Returns
+boolean - true if all lessons and their activities within the unit are complete, otherwise false.
 
-CREATE OR REPLACE FUNCTION public.handle_new_user_profile()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
+### Definition
+
+CREATE OR REPLACE FUNCTION public.is_unit_complete(p_profile_id uuid, p_unit_id integer)
+ RETURNS boolean
+ LANGUAGE plpgsql
 AS $function$
+DECLARE
+    total_lessons_in_unit integer;
+    completed_lessons_by_user integer;
 BEGIN
--- Create entry in public.profiles
-INSERT INTO public.profiles (id, first_name, last_name)
-VALUES (
-NEW.id,
-NEW.raw_user_meta_data->>'first_name',
-NEW.raw_user_meta_data->>'last_name'
-); -- Relies on DB default for created_at, updated_at
+    -- Get the total number of lessons in the unit
+    SELECT COUNT(*)
+    INTO total_lessons_in_unit
+    FROM public.lessons
+    WHERE unit_id = p_unit_id;
 
-      -- Create corresponding entry in public.student_profiles
-      INSERT INTO public.student_profiles (
-        profile_id,
-        status
-        -- native_language_code, current_target_language_code, etc., will be NULL or use DB defaults
-      )
-      VALUES (
-        NEW.id,
-        'active'::public.account_status_enum -- Or 'pending_verification' if more appropriate
-      ); -- Relies on DB defaults for subscription_tier, points, current_streak_days
-      RETURN NEW;
-    END;
-    $function$
+    -- If there are no lessons, the unit is not "completable"
+    IF total_lessons_in_unit = 0 THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Get the number of completed lessons by checking activity progress
+    WITH completed_lessons AS (
+        SELECT l.lesson_id
+        FROM public.lessons l
+        JOIN public.user_lesson_progress ulp ON l.lesson_id = ulp.lesson_id
+        JOIN public.user_lesson_activity_progress ulap ON ulap.user_lesson_progress_id = ulp.progress_id
+        WHERE l.unit_id = p_unit_id 
+          AND ulp.profile_id = p_profile_id
+        GROUP BY l.lesson_id
+        HAVING COUNT(CASE WHEN ulap.status = 'completed' THEN 1 END) =
+               (
+                   CASE WHEN l.has_chat THEN 1 ELSE 0 END +
+                   CASE WHEN l.has_pronunciation THEN 1 ELSE 0 END +
+                   CASE WHEN l.has_dictation THEN 1 ELSE 0 END
+               )
+    )
+    SELECT COUNT(*)
+    INTO completed_lessons_by_user
+    FROM completed_lessons;
+
+    -- Return true if the counts match
+    RETURN total_lessons_in_unit = completed_lessons_by_user;
+END;
+$function$
+
+
+## process_chat_completion
+### Description
+Marks the chat activity for a given lesson as complete. It awards points for this completion (if not already awarded) and then triggers a check to see if this completes the entire unit or level, potentially awarding further bonuses.
+
+### Parameters
+profile_id_param (uuid): The unique identifier for the user's profile.
+
+lesson_id_param (integer): The ID of the lesson containing the chat activity.
+
+language_code_param (character varying): The language code for the lesson.
+
+### Returns
+A table with the following column:
+
+points_awarded_total (integer): The total number of points awarded for this action.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.process_chat_completion(profile_id_param uuid, lesson_id_param integer, language_code_param character varying)
+ RETURNS TABLE(points_awarded_total integer)
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+v_lesson_progress_id INT;
+v_unit_id INT;
+was_already_completed BOOLEAN;
+total_points_awarded INT := 0;
+BEGIN
+-- Check if chat completion points were already awarded for this lesson
+SELECT EXISTS(
+    SELECT 1 FROM public.user_points_log
+    WHERE profile_id = profile_id_param 
+    AND related_lesson_id = lesson_id_param
+    AND reason_code = 'CHAT_COMPLETION'
+) INTO was_already_completed;
+
+    -- If already completed, return 0 points
+    IF was_already_completed THEN
+        RETURN QUERY SELECT 0;
+        RETURN;
+    END IF;
+
+    -- Ensure user_lesson_progress exists
+    INSERT INTO public.user_lesson_progress (profile_id, lesson_id, last_progress_at)
+    VALUES (profile_id_param, lesson_id_param, NOW())
+    ON CONFLICT (profile_id, lesson_id) DO UPDATE SET last_progress_at = NOW();
+
+    SELECT progress_id INTO v_lesson_progress_id
+    FROM public.user_lesson_progress
+    WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param;
+
+    -- Mark chat activity as completed
+    INSERT INTO public.user_lesson_activity_progress (user_lesson_progress_id, activity_type, status, completed_at)
+    VALUES (v_lesson_progress_id, 'chat', 'completed', NOW())
+    ON CONFLICT (user_lesson_progress_id, activity_type)
+    DO UPDATE SET status = 'completed', completed_at = NOW();
+
+    -- Award 5 points for chat completion
+    total_points_awarded := 5;
+
+    INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, activity_type)
+    VALUES (profile_id_param, 5, 'CHAT_COMPLETION', lesson_id_param, 'chat');
+
+    -- Update user's total points
+    UPDATE public.student_profiles
+    SET points = points + 5
+    WHERE profile_id = profile_id_param;
+
+    -- Check for unit completion bonus
+    SELECT unit_id INTO v_unit_id FROM public.lessons WHERE lesson_id = lesson_id_param;
+    PERFORM public.check_and_award_unit_completion_bonus(profile_id_param, v_unit_id, lesson_id_param);
+
+    RETURN QUERY SELECT total_points_awarded;
+
+END;
+$function$
 
 ## process_user_activity
+### Description
+A comprehensive function that acts as the main entry point for processing user activity within a lesson. It handles different activity types (pronunciation, dictation, chat), records attempts, calculates and awards various points bonuses (streaks, first-try, accuracy, comeback), updates user progress at the word, phrase, and activity level, and triggers checks for unit and level completion.
 
-CREATE OR REPLACE FUNCTION public.process_user_activity(
-    -- Required Parameters First
-    profile_id_param UUID,
-    lesson_id_param INT,
-    language_code_param VARCHAR,
-    activity_type_param activity_type_enum,
+### Parameters
+profile_id_param (uuid): The user's profile ID.
 
-    -- Optional Parameters Last
-    phrase_id_param INT DEFAULT NULL,
-    reference_text_param TEXT DEFAULT NULL,
-    recognized_text_param TEXT DEFAULT NULL,
-    accuracy_score_param NUMERIC DEFAULT NULL,
-    fluency_score_param NUMERIC DEFAULT NULL,
-    completeness_score_param NUMERIC DEFAULT NULL,
-    pronunciation_score_param NUMERIC DEFAULT NULL,
-    prosody_score_param NUMERIC DEFAULT NULL,
-    phonetic_data_param JSONB DEFAULT NULL,
-    written_text_param TEXT DEFAULT NULL,
-    overall_similarity_score_param NUMERIC DEFAULT NULL,
-    word_level_feedback_param JSONB DEFAULT NULL
-)
-RETURNS TABLE(points_awarded_total INT) AS $$
+lesson_id_param (integer): The lesson ID.
+
+language_code_param (character varying): The language code.
+
+activity_type_param (activity_type_enum): The type of activity ('pronunciation', 'dictation', 'chat').
+
+phrase_id_param (integer, optional): The phrase ID (required for pronunciation/dictation).
+
+reference_text_param (text, optional): The correct text of the phrase.
+
+recognized_text_param (text, optional): The text recognized by speech-to-text.
+
+accuracy_score_param (numeric, optional): Accuracy score from speech analysis.
+
+fluency_score_param (numeric, optional): Fluency score from speech analysis.
+
+completeness_score_param (numeric, optional): Completeness score from speech analysis.
+
+pronunciation_score_param (numeric, optional): Overall pronunciation score from speech analysis.
+
+prosody_score_param (numeric, optional): Prosody score from speech analysis.
+
+phonetic_data_param (jsonb, optional): Detailed word-level feedback from speech analysis.
+
+written_text_param (text, optional): The text submitted by the user for dictation.
+
+overall_similarity_score_param (numeric, optional): Similarity score for dictation.
+
+word_level_feedback_param (jsonb, optional): Word-level feedback for dictation.
+
+### Returns
+A table with the following column:
+
+points_awarded_total (integer): The total number of points awarded for the activity.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.process_user_activity(profile_id_param uuid, lesson_id_param integer, language_code_param character varying, activity_type_param activity_type_enum, phrase_id_param integer DEFAULT NULL::integer, reference_text_param text DEFAULT NULL::text, recognized_text_param text DEFAULT NULL::text, accuracy_score_param numeric DEFAULT NULL::numeric, fluency_score_param numeric DEFAULT NULL::numeric, completeness_score_param numeric DEFAULT NULL::numeric, pronunciation_score_param numeric DEFAULT NULL::numeric, prosody_score_param numeric DEFAULT NULL::numeric, phonetic_data_param jsonb DEFAULT NULL::jsonb, written_text_param text DEFAULT NULL::text, overall_similarity_score_param numeric DEFAULT NULL::numeric, word_level_feedback_param jsonb DEFAULT NULL::jsonb)
+ RETURNS TABLE(points_awarded_total integer)
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
 -- IDs and Metadata
 v_lesson_progress_id INT;
@@ -1079,105 +1576,58 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
     RETURN QUERY SELECT total_points_for_this_attempt;
 
 END;
-$$ LANGUAGE plpgsql;
+$function$
 
-## process_chat_completion
-
-CREATE OR REPLACE FUNCTION public.process_chat_completion(
-profile_id_param UUID,
-lesson_id_param INT,
-language_code_param VARCHAR
-)
-RETURNS TABLE(points_awarded_total INT) AS
-$$
-
-DECLARE
-v_lesson_progress_id INT;
-v_unit_id INT;
-was_already_completed BOOLEAN;
-total_points_awarded INT := 0;
-BEGIN
--- Check if chat completion points were already awarded for this lesson
-SELECT EXISTS(
-SELECT 1 FROM public.user_points_log
-WHERE profile_id = profile_id_param
-AND related_lesson_id = lesson_id_param
-AND reason_code = 'CHAT_COMPLETION'
-) INTO was_already_completed;
-
-    -- If already completed, return 0 points
-    IF was_already_completed THEN
-        RETURN QUERY SELECT 0;
-        RETURN;
-    END IF;
-
-    -- Ensure user_lesson_progress exists
-    INSERT INTO public.user_lesson_progress (profile_id, lesson_id, last_progress_at)
-    VALUES (profile_id_param, lesson_id_param, NOW())
-    ON CONFLICT (profile_id, lesson_id) DO UPDATE SET last_progress_at = NOW();
-
-    SELECT progress_id INTO v_lesson_progress_id
-    FROM public.user_lesson_progress
-    WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param;
-
-    -- Mark chat activity as completed
-    INSERT INTO public.user_lesson_activity_progress (user_lesson_progress_id, activity_type, status, completed_at)
-    VALUES (v_lesson_progress_id, 'chat', 'completed', NOW())
-    ON CONFLICT (user_lesson_progress_id, activity_type)
-    DO UPDATE SET status = 'completed', completed_at = NOW();
-
-    -- Award 5 points for chat completion
-    total_points_awarded := 5;
-
-    INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, activity_type)
-    VALUES (profile_id_param, 5, 'CHAT_COMPLETION', lesson_id_param, 'chat');
-
-    -- Update user's total points
-    UPDATE public.student_profiles
-    SET points = points + 5
-    WHERE profile_id = profile_id_param;
-
-    -- Check for unit completion bonus
-    SELECT unit_id INTO v_unit_id FROM public.lessons WHERE lesson_id = lesson_id_param;
-    PERFORM public.check_and_award_unit_completion_bonus(profile_id_param, v_unit_id, lesson_id_param);
-
-    RETURN QUERY SELECT total_points_awarded;
-
-END;
-
-$$
-LANGUAGE plpgsql;
 
 ## process_word_practice_attempt
+### Description
+Processes a user's attempt in a targeted word practice session. It updates the word's pronunciation statistics, awards a "Comeback Bonus" if a difficult word is successfully pronounced, and returns detailed feedback on the attempt's success and the user's updated progress with that word.
 
 ### Parameters
+profile_id_param (uuid): The user's profile ID.
 
-profile_id_param (uuid)
-word_text_param (character varying)
-language_code_param (character varying)
-accuracy_score_param (numeric)
+word_text_param (character varying): The word being practiced.
 
-### Function Definition
+language_code_param (character varying): The language of the word.
+
+accuracy_score_param (numeric): The accuracy score of the pronunciation attempt.
+
+### Returns
+A table with the following columns:
+
+success (boolean): Always true, indicates the function executed.
+
+word_completed (boolean): true if the word's average score is now >= 70.
+
+new_average_score (numeric): The new average accuracy score for the word.
+
+total_attempts (integer): The total number of attempts for the word.
+
+points_awarded (integer): The number of points awarded for this specific attempt.
+
+needs_practice (boolean): The updated status indicating if the word still needs practice.
+
+### Definition
 
 CREATE OR REPLACE FUNCTION public.process_word_practice_attempt(profile_id_param uuid, word_text_param character varying, language_code_param character varying, accuracy_score_param numeric)
-RETURNS TABLE(success boolean, word_completed boolean, new_average_score numeric, total_attempts integer, points_awarded integer, needs_practice boolean)
-LANGUAGE plpgsql
+ RETURNS TABLE(success boolean, word_completed boolean, new_average_score numeric, total_attempts integer, points_awarded integer, needs_practice boolean)
+ LANGUAGE plpgsql
 AS $function$
 DECLARE
-word_jsonb jsonb;
-points_for_this_attempt integer := 0;
-was_needing_practice boolean;
-is_now_completed boolean;
-v_new_average_score numeric;
-v_total_attempts integer;
-v_needs_practice boolean;
+    word_jsonb jsonb;
+    points_for_this_attempt integer := 0;
+    was_needing_practice boolean;
+    is_now_completed boolean;
+    v_new_average_score numeric;
+    v_total_attempts integer;
+    v_needs_practice boolean;
 BEGIN
--- Check if the word was previously needing practice for a potential bonus
-SELECT uwp.needs_practice INTO was_needing_practice
-FROM public.user_word_pronunciation uwp
-WHERE uwp.profile_id = profile_id_param
-AND uwp.word_text = word_text_param
-AND uwp.language_code = language_code_param;
+    -- Check if the word was previously needing practice for a potential bonus
+    SELECT uwp.needs_practice INTO was_needing_practice
+    FROM public.user_word_pronunciation uwp
+    WHERE uwp.profile_id = profile_id_param
+      AND uwp.word_text = word_text_param
+      AND uwp.language_code = language_code_param;
 
     -- Construct the JSONB object that handle_user_word_pronunciation_update expects
     word_jsonb := jsonb_build_object(
@@ -1221,125 +1671,265 @@ AND uwp.language_code = language_code_param;
         v_total_attempts as total_attempts,
         points_for_this_attempt as points_awarded,
         v_needs_practice as needs_practice;
-
 END;
 $function$
 
-## is_unit_complete
+
+## update_user_subscription_tier
+### Description
+A utility function that synchronizes a user's subscription tier. It determines the correct highest tier based on active subscriptions and updates the student_profiles table accordingly.
 
 ### Parameters
+user_profile_id (uuid): The unique identifier for the user's profile to update.
 
-p_profile_id (uuid)
-p_unit_id (integer)
+### Returns
+text - The new, updated subscription tier for the user.
 
-### Function Definition
+### Definition
 
-CREATE OR REPLACE FUNCTION public.is_unit_complete(
-    p_profile_id UUID,
-    p_unit_id INT
-)
-RETURNS BOOLEAN AS
-$$
-
-DECLARE
-total_lessons_in_unit integer;
-completed_lessons_by_user integer;
-BEGIN
--- Get the total number of lessons in the unit
-SELECT COUNT(\*)
-INTO total_lessons_in_unit
-FROM public.lessons
-WHERE unit_id = p_unit_id;
-
-    -- If there are no lessons, the unit is not "completable"
-    IF total_lessons_in_unit = 0 THEN
-        RETURN FALSE;
-    END IF;
-
-    -- Get the number of completed lessons by checking activity progress
-    WITH completed_lessons AS (
-        SELECT l.lesson_id
-        FROM public.lessons l
-        JOIN public.user_lesson_progress ulp ON l.lesson_id = ulp.lesson_id
-        JOIN public.user_lesson_activity_progress ulap ON ulap.user_lesson_progress_id = ulp.progress_id
-        WHERE l.unit_id = p_unit_id
-          AND ulp.profile_id = p_profile_id
-        GROUP BY l.lesson_id
-        HAVING COUNT(CASE WHEN ulap.status = 'completed' THEN 1 END) =
-               (
-                   CASE WHEN l.has_chat THEN 1 ELSE 0 END +
-                   CASE WHEN l.has_pronunciation THEN 1 ELSE 0 END +
-                   CASE WHEN l.has_dictation THEN 1 ELSE 0 END
-               )
-    )
-    SELECT COUNT(*)
-    INTO completed_lessons_by_user
-    FROM completed_lessons;
-
-    -- Return true if the counts match
-    RETURN total_lessons_in_unit = completed_lessons_by_user;
-
-END;
-
-$$
-LANGUAGE plpgsql;
-
-## handle_user_word_pronunciation_update
-
-### Parameters
-
-profile_id_param (uuid)
-language_code_param (character varying)
-word_data (jsonb)
-
-### Function Definition
-
-CREATE OR REPLACE FUNCTION public.handle_user_word_pronunciation_update(profile_id_param uuid, language_code_param character varying, word_data jsonb)
-RETURNS void
-LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.update_user_subscription_tier(user_profile_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
 AS $function$
 DECLARE
-v_word_text TEXT := lower(word_data->>'word');
-v_accuracy_score NUMERIC := (word_data->>'accuracyScore')::NUMERIC;
-v_error_type TEXT := word_data->>'errorType';
-v_error_increment INT;
+  new_tier TEXT;
 BEGIN
--- Exit if essential data is missing
-IF v_word_text IS NULL OR v_accuracy_score IS NULL THEN
-RETURN;
-END IF;
+  -- Get the highest tier the user should have
+  new_tier := public.get_user_highest_tier(user_profile_id);
 
-    -- Determine if the attempt had an error
-    v_error_increment := CASE WHEN v_error_type IS NOT NULL AND v_error_type <> 'None' THEN 1 ELSE 0 END;
+  -- Update the user's subscription tier
+  UPDATE public.student_profiles
+  SET
+    subscription_tier = new_tier::public.subscription_tier_enum,
+    updated_at = NOW()
+  WHERE profile_id = user_profile_id;
 
-    -- Upsert the word pronunciation record, setting `needs_practice` based on the CURRENT attempt's score.
-    INSERT INTO public.user_word_pronunciation (
-        profile_id, word_text, language_code, total_attempts, error_count,
-        sum_accuracy_score, average_accuracy_score, last_accuracy_score,
-        last_error_type, last_attempt_at, updated_at, needs_practice
-    )
-    VALUES (
-        profile_id_param, v_word_text, language_code_param, 1, v_error_increment,
-        v_accuracy_score, v_accuracy_score, v_accuracy_score, v_error_type,
-        NOW(), NOW(), (v_accuracy_score < 70) -- Correct logic on insert
-    )
-    ON CONFLICT (profile_id, word_text, language_code) DO UPDATE
-    SET
-        total_attempts = user_word_pronunciation.total_attempts + 1,
-        error_count = user_word_pronunciation.error_count + v_error_increment,
-        sum_accuracy_score = user_word_pronunciation.sum_accuracy_score + v_accuracy_score,
-        average_accuracy_score = (user_word_pronunciation.sum_accuracy_score + v_accuracy_score) / (user_word_pronunciation.total_attempts + 1),
-        last_accuracy_score = v_accuracy_score,
-        last_error_type = v_error_type,
-        last_attempt_at = NOW(),
-        updated_at = NOW(),
-        needs_practice = (v_accuracy_score < 70); -- Correct logic on update
-
+  RETURN new_tier;
 END;
 $function$
 
 
-$$
+## upsert_stripe_invoice
+### Description
+Handles Stripe webhook events for invoices. It finds the associated user profile and creates or updates an invoice record in the local database with the data received from Stripe.
 
-$$
-$$
+### Parameters
+p_stripe_invoice_id (text): The Stripe ID for the invoice.
+
+p_stripe_customer_id (text): The Stripe ID for the customer.
+
+p_stripe_subscription_id (text): The Stripe ID for the subscription related to the invoice.
+
+p_invoice_data (jsonb): The full invoice object from the Stripe webhook event.
+
+### Returns
+boolean - true on successful upsert, false if the user profile could not be found.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.upsert_stripe_invoice(p_stripe_invoice_id text, p_stripe_customer_id text, p_stripe_subscription_id text, p_invoice_data jsonb)
+ RETURNS boolean
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  user_profile_id UUID;
+BEGIN
+  -- Get user profile
+  SELECT sp.profile_id INTO user_profile_id
+  FROM public.student_profiles sp
+  WHERE sp.stripe_customer_id = p_stripe_customer_id;
+
+  IF user_profile_id IS NULL THEN
+    RAISE WARNING 'Webhook Error: No user profile found for customer: %', p_stripe_customer_id;
+    RETURN FALSE;
+  END IF;
+
+  -- Upsert invoice record with proper NULL handling
+  INSERT INTO public.invoices (
+    profile_id, stripe_invoice_id, stripe_subscription_id, stripe_customer_id,
+    status, amount_due, amount_paid, amount_remaining, currency,
+    due_date, paid_at, invoice_pdf_url, hosted_invoice_url,
+    billing_reason, metadata, issued_at, updated_at
+  )
+  VALUES (
+    user_profile_id,
+    p_stripe_invoice_id,
+    NULLIF(p_stripe_subscription_id, ''),
+    p_stripe_customer_id,
+    (p_invoice_data->>'status')::public.invoice_status_enum,
+    COALESCE((p_invoice_data->>'amount_due')::INTEGER, 0),
+    COALESCE((p_invoice_data->>'amount_paid')::INTEGER, 0),
+    COALESCE((p_invoice_data->>'amount_remaining')::INTEGER, 0),
+    COALESCE(p_invoice_data->>'currency', 'usd'),
+    CASE WHEN p_invoice_data->>'due_date' IS NOT NULL AND p_invoice_data->>'due_date' != 'null'
+    THEN TO_TIMESTAMP((p_invoice_data->>'due_date')::BIGINT) 
+    ELSE NULL END,
+    CASE WHEN p_invoice_data->>'status' = 'paid' AND p_invoice_data->'status_transitions'->>'paid_at' IS NOT NULL
+    THEN TO_TIMESTAMP((p_invoice_data->'status_transitions'->>'paid_at')::BIGINT) 
+    ELSE NULL END,
+    p_invoice_data->>'invoice_pdf',
+    p_invoice_data->>'hosted_invoice_url',
+    p_invoice_data->>'billing_reason',
+    COALESCE(p_invoice_data->'metadata', '{}'::jsonb),
+    COALESCE(
+      CASE WHEN p_invoice_data->>'created' IS NOT NULL 
+      THEN TO_TIMESTAMP((p_invoice_data->>'created')::BIGINT)
+      ELSE NOW() END,
+      NOW()
+    ),
+    NOW()
+  )
+  ON CONFLICT (stripe_invoice_id)
+  DO UPDATE SET
+    stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+    status = EXCLUDED.status,
+    amount_due = EXCLUDED.amount_due,
+    amount_paid = EXCLUDED.amount_paid,
+    amount_remaining = EXCLUDED.amount_remaining,
+    due_date = EXCLUDED.due_date,
+    paid_at = EXCLUDED.paid_at,
+    invoice_pdf_url = EXCLUDED.invoice_pdf_url,
+    hosted_invoice_url = EXCLUDED.hosted_invoice_url,
+    billing_reason = EXCLUDED.billing_reason,
+    metadata = EXCLUDED.metadata,
+    updated_at = NOW();
+
+  RETURN TRUE;
+END;
+$function$
+
+
+## upsert_stripe_subscription
+### Description
+Handles Stripe webhook events for subscriptions. It creates or updates a subscription record in the local database, manages potential tier conflicts (e.g., upgrading from 'starter' to 'pro'), and then updates the user's overall subscription tier to reflect the change.
+
+### Parameters
+p_stripe_subscription_id (text): The Stripe ID for the subscription.
+
+p_stripe_customer_id (text): The Stripe ID for the customer.
+
+p_stripe_price_id (text): The Stripe ID for the price associated with the subscription.
+
+p_subscription_data (jsonb): The full subscription object from the Stripe webhook event.
+
+### Returns
+boolean - true on successful upsert, false if the user or price could not be found.
+
+### Definition
+
+CREATE OR REPLACE FUNCTION public.upsert_stripe_subscription(p_stripe_subscription_id text, p_stripe_customer_id text, p_stripe_price_id text, p_subscription_data jsonb)
+ RETURNS boolean
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  user_profile_id UUID;
+  price_record RECORD;
+  tier_before TEXT;
+  tier_after TEXT;
+BEGIN
+  -- Get user profile
+  SELECT sp.profile_id INTO user_profile_id
+  FROM public.student_profiles sp
+  WHERE sp.stripe_customer_id = p_stripe_customer_id;
+
+  IF user_profile_id IS NULL THEN
+    RAISE WARNING 'Webhook Error: No user profile found for customer: %', p_stripe_customer_id;
+    RETURN FALSE;
+  END IF;
+
+  -- Get price and product information
+  SELECT p.id, prod.tier_key
+  INTO price_record
+  FROM public.prices p
+  JOIN public.products prod ON p.product_id = prod.id
+  WHERE p.stripe_price_id = p_stripe_price_id;
+
+  IF price_record.id IS NULL THEN
+    RAISE WARNING 'Webhook Error: Price not found in database: %', p_stripe_price_id;
+    RETURN FALSE;
+  END IF;
+
+  -- Store current tier
+  SELECT sp.subscription_tier INTO tier_before
+  FROM public.student_profiles sp
+  WHERE sp.profile_id = user_profile_id;
+
+  -- Handle tier conflicts if this is a new active subscription
+  IF p_subscription_data->>'status' IN ('active', 'trialing') THEN
+    PERFORM public.handle_subscription_tier_conflict(user_profile_id, price_record.tier_key);
+  END IF;
+
+  -- Upsert subscription record with proper NULL handling
+  INSERT INTO public.student_subscriptions (
+    profile_id, price_id, stripe_subscription_id, status, quantity,
+    current_period_start, current_period_end, cancel_at_period_end,
+    canceled_at, ended_at, trial_start_at, trial_end_at, metadata,
+    stripe_created_at, updated_at
+  )
+  VALUES (
+    user_profile_id, 
+    price_record.id, 
+    p_stripe_subscription_id,
+    (p_subscription_data->>'status')::public.subscription_status_enum,
+    COALESCE((p_subscription_data->>'quantity')::INTEGER, 1),
+    COALESCE(
+      CASE WHEN p_subscription_data->>'current_period_start' IS NOT NULL 
+      THEN TO_TIMESTAMP((p_subscription_data->>'current_period_start')::BIGINT)
+      ELSE NOW() END,
+      NOW()
+    ),
+    COALESCE(
+      CASE WHEN p_subscription_data->>'current_period_end' IS NOT NULL 
+      THEN TO_TIMESTAMP((p_subscription_data->>'current_period_end')::BIGINT)
+      ELSE NOW() + INTERVAL '1 month' END,
+      NOW() + INTERVAL '1 month'
+    ),
+    COALESCE((p_subscription_data->>'cancel_at_period_end')::BOOLEAN, false),
+    CASE WHEN p_subscription_data->>'canceled_at' IS NOT NULL 
+    THEN TO_TIMESTAMP((p_subscription_data->>'canceled_at')::BIGINT) 
+    ELSE NULL END,
+    CASE WHEN p_subscription_data->>'ended_at' IS NOT NULL 
+    THEN TO_TIMESTAMP((p_subscription_data->>'ended_at')::BIGINT) 
+    ELSE NULL END,
+    CASE WHEN p_subscription_data->>'trial_start' IS NOT NULL 
+    THEN TO_TIMESTAMP((p_subscription_data->>'trial_start')::BIGINT) 
+    ELSE NULL END,
+    CASE WHEN p_subscription_data->>'trial_end' IS NOT NULL 
+    THEN TO_TIMESTAMP((p_subscription_data->>'trial_end')::BIGINT) 
+    ELSE NULL END,
+    COALESCE(p_subscription_data->'metadata', '{}'::jsonb),
+    COALESCE(
+      CASE WHEN p_subscription_data->>'created' IS NOT NULL 
+      THEN TO_TIMESTAMP((p_subscription_data->>'created')::BIGINT)
+      ELSE NOW() END,
+      NOW()
+    ),
+    NOW()
+  )
+  ON CONFLICT (stripe_subscription_id)
+  DO UPDATE SET
+    status = EXCLUDED.status,
+    quantity = EXCLUDED.quantity,
+    current_period_start = EXCLUDED.current_period_start,
+    current_period_end = EXCLUDED.current_period_end,
+    cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+    canceled_at = EXCLUDED.canceled_at,
+    ended_at = EXCLUDED.ended_at,
+    trial_start_at = EXCLUDED.trial_start_at,
+    trial_end_at = EXCLUDED.trial_end_at,
+    metadata = EXCLUDED.metadata,
+    updated_at = NOW();
+
+  -- Update user's subscription tier based on all active subscriptions
+  tier_after := public.update_user_subscription_tier(user_profile_id);
+
+  -- Log tier change if it occurred
+  IF tier_before::TEXT != tier_after THEN
+    INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, notes)
+    VALUES (user_profile_id, 0, 'TIER_CHANGE',
+            'Subscription tier changed from ' || tier_before::TEXT || ' to ' || tier_after);
+  END IF;
+
+  RETURN TRUE;
+END;
+$function$
