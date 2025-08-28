@@ -97,14 +97,21 @@ export async function generateInitialGreeting(
     const greetingPrompt = `
 ${systemPrompt}
 
-Your task is to generate a warm, encouraging greeting (1-2 sentences) to begin a conversation practice session.
+Your task is to generate a warm, encouraging greeting to begin a conversation practice session.
 
 Instructions:
-1.  Start with a friendly greeting.
-2.  After the greeting, you MUST select ONE of the "Conversation starters" from the context above.
-3.  Your message must END with the selected conversation starter question. Do not add any text after the question.
-4.  Use simple, clear language appropriate for a ${lessonContext.level} level learner.
-`;
+1. Start with a friendly greeting.
+2. After the greeting, you MUST select ONE of the "Conversation starters" from the context above.
+3. Your message must END with the selected conversation starter question. Do not add any text after the question.
+4. Use simple, clear language appropriate for a ${lessonContext.level} level learner.
+
+Respond with ONLY a JSON object in this exact format:
+{
+  "response": "your greeting message ending with a conversation starter question",
+  "suggested_answer": "a complete natural sentence the student could say to answer your question"
+}
+
+For suggested_answer: Create a natural, complete sentence that directly answers your question. Use simple ${lessonContext.level} level vocabulary.`;
 
     const result = await model.generateContent(greetingPrompt);
     const response = await result.response;
@@ -112,8 +119,11 @@ Instructions:
     return response.text();
   } catch (error) {
     console.error("Error generating initial greeting:", error);
-    // Fallback greeting
-    return `Hello! Welcome to ${lessonContext.lessonTitle}. I'm here to help you practice your ${lessonContext.targetLanguage}. What would you like to talk about?`;
+    // Fallback greeting with structured format
+    return JSON.stringify({
+      response: `Hello! Welcome to ${lessonContext.lessonTitle}. I'm here to help you practice your ${lessonContext.targetLanguage}. What would you like to talk about?`,
+      suggested_answer: "I'd like to practice conversation"
+    });
   }
 }
 

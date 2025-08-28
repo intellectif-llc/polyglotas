@@ -17,6 +17,7 @@ interface StartConversationResponse {
     message_text: string;
     sender_type: "ai";
     created_at: string;
+    suggested_answer?: string | null;
   };
 }
 
@@ -153,10 +154,28 @@ export async function POST(
 
     try {
       // Generate initial AI greeting
-      const greetingText = await generateInitialGreeting(
+      const greetingRaw = await generateInitialGreeting(
         lessonContext,
         conversationPrompts
       );
+      
+      // Parse JSON response or fallback to plain text
+      let greetingText: string;
+      let suggestedAnswer: string | null = null;
+      
+      try {
+        // Extract JSON from response (handle cases where AI adds extra text)
+        const jsonMatch = greetingRaw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          greetingText = parsed.response || greetingRaw;
+          suggestedAnswer = parsed.suggested_answer || null;
+        } else {
+          greetingText = greetingRaw;
+        }
+      } catch {
+        greetingText = greetingRaw;
+      }
 
       // Store the initial AI message
       const { data: aiMessage, error: messageError } = await supabase
@@ -167,8 +186,9 @@ export async function POST(
           message_order: 1,
           message_text: greetingText,
           message_language_code: targetLanguage,
+          suggested_answer: suggestedAnswer,
         })
-        .select("message_id, message_text, sender_type, created_at")
+        .select("message_id, message_text, sender_type, created_at, suggested_answer")
         .single();
 
       if (messageError || !aiMessage) {
@@ -184,6 +204,7 @@ export async function POST(
               message_text: aiMessage.message_text,
               sender_type: "ai",
               created_at: aiMessage.created_at,
+              suggested_answer: aiMessage.suggested_answer,
             }
           : undefined,
       };

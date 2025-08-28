@@ -113,7 +113,7 @@ function SuggestedAnswerButton({
 
       {/* Persistent suggestion panel */}
       {isExpanded && (
-        <div className="absolute bottom-6 right-0 w-72 bg-white border border-gray-200 rounded-lg shadow-xl z-20 animate-in slide-in-from-bottom-2 duration-200">
+        <div className="fixed bottom-6 right-4 w-72 bg-white border border-gray-200 rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-2 duration-200">
           {/* Header with close button */}
           <div className="flex items-center justify-between p-3 border-b border-gray-100">
             <div className="text-sm text-gray-600 font-medium flex items-center gap-2">
