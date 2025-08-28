@@ -3,17 +3,19 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { useUserStats } from "@/hooks/useUserProfile";
+import { useLanguageLevels } from "@/hooks/useLanguageLevels";
 
 interface LevelSelectorProps {
   isCollapsed: boolean;
 }
 
-const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
+
 
 const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { data: userStats } = useUserStats();
+  const { data: levels = [] } = useLanguageLevels();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -70,29 +72,29 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
               <div className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 mb-1">
                 Available Levels
               </div>
-              {LEVELS.map((level) => (
+              {levels.map((level) => (
                 <button
-                  key={level}
+                  key={level.level_code}
                   onClick={() => {
                     // For now, just close the dropdown
                     // Level switching logic can be implemented when needed
                     setIsOpen(false);
                   }}
                   className={`w-full flex items-center space-x-3 px-2 py-2 rounded-md text-sm transition-colors ${
-                    level === currentLevel
+                    level.level_code === currentLevel
                       ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
                       : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    level === currentLevel
+                    level.level_code === currentLevel
                       ? "bg-blue-500 text-white"
                       : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
                   }`}>
-                    {level}
+                    {level.level_code}
                   </div>
-                  <span>Level {level}</span>
-                  {level === currentLevel && (
+                  <span>Level {level.level_code}</span>
+                  {level.level_code === currentLevel && (
                     <span className="ml-auto text-xs text-blue-500">Current</span>
                   )}
                 </button>
