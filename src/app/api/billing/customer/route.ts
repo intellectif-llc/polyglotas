@@ -183,21 +183,17 @@ export async function GET() {
             .in('status', ['active', 'trialing'])
             .order('created_at', { ascending: false });
 
-          subscriptions = (dbSubscriptions || []).map((sub) => {
-            const mappedSub = {
-              id: sub.stripe_subscription_id,
-              status: sub.status,
-              current_period_start: sub.current_period_start,
-              current_period_end: sub.current_period_end,
-              cancel_at_period_end: sub.cancel_at_period_end,
-              items: [{
-                price: (sub.prices as any).stripe_price_id,
-                quantity: sub.quantity || 1,
-              }],
-            };
-
-            return mappedSub;
-          });
+          subscriptions = (dbSubscriptions || []).map((sub) => ({
+            id: sub.stripe_subscription_id,
+            status: sub.status,
+            current_period_start: sub.current_period_start,
+            current_period_end: sub.current_period_end,
+            cancel_at_period_end: sub.cancel_at_period_end,
+            items: [{
+              price: sub.prices[0]?.stripe_price_id,
+              quantity: sub.quantity || 1,
+            }],
+          }));
         }
       } catch (stripeError) {
         console.error("Error fetching customer from Stripe:", stripeError);

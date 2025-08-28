@@ -53,8 +53,8 @@ export async function GET() {
         currency: plan.currency,
         billing_interval: plan.billing_interval,
         interval_count: plan.interval_count,
-        product_name: plan.products?.name,
-        tier_key: plan.products?.tier_key,
+        product_name: plan.products?.[0]?.name,
+        tier_key: plan.products?.[0]?.tier_key,
       })) || [];
 
     return NextResponse.json(formattedPlans);
