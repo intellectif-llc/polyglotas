@@ -8,6 +8,7 @@ export async function GET() {
     const { data: languages, error } = await supabase
       .from("languages")
       .select("language_code, language_name")
+      .eq("is_enabled", true)
       .order("language_name");
 
     if (error) {

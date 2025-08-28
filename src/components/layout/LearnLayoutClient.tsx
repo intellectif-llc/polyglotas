@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import OnboardingWrapper from "@/components/onboarding/OnboardingWrapper";
 
 interface LearnLayoutClientProps {
   user: User | null;
@@ -32,16 +33,18 @@ export default function LearnLayoutClient({
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-      <Sidebar
-        user={user}
-        isMobileOpen={isMobileSidebarOpen}
-        toggleMobileSidebar={toggleMobileSidebar}
-      />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header user={user} toggleMobileSidebar={toggleMobileSidebar} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+    <OnboardingWrapper>
+      <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+        <Sidebar
+          user={user}
+          isMobileOpen={isMobileSidebarOpen}
+          toggleMobileSidebar={toggleMobileSidebar}
+        />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header user={user} toggleMobileSidebar={toggleMobileSidebar} />
+          <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </OnboardingWrapper>
   );
 }

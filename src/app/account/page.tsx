@@ -2,13 +2,15 @@
 
 import React from "react";
 import { useUserProfile, useUserStats } from "@/hooks/useUserProfile";
+import { useProfileNames } from "@/hooks/useProfileNames";
 import { User, Trophy, Zap, Calendar } from "lucide-react";
 
 export default function AccountPage() {
   const { data: profile, isLoading: profileLoading } = useUserProfile();
   const { data: stats, isLoading: statsLoading } = useUserStats();
+  const { data: names, isLoading: namesLoading } = useProfileNames();
 
-  if (profileLoading || statsLoading) {
+  if (profileLoading || statsLoading || namesLoading) {
     return (
       <div className="container mx-auto px-4 py-6">
         <div className="bg-white rounded-lg shadow-xl p-6">
@@ -72,6 +74,22 @@ export default function AccountPage() {
           <div>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name
+                </label>
+                <p className="text-gray-900 bg-gray-50 p-2 rounded">
+                  {names?.firstName || "Not set"}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Last Name
+                </label>
+                <p className="text-gray-900 bg-gray-50 p-2 rounded">
+                  {names?.lastName || "Not set"}
+                </p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Target Language
