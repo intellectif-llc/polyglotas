@@ -274,6 +274,8 @@ export async function POST(request: NextRequest) {
       word_level_feedback,
       is_correct: isDictationCorrect,
       points_awarded: pointsAwarded,
+      written_text,
+      reference_text,
     });
 
   } catch (error) {

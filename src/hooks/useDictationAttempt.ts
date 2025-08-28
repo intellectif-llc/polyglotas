@@ -18,6 +18,8 @@ interface DictationAttemptResponse {
   }>;
   is_correct: boolean;
   points_awarded: number;
+  written_text?: string;
+  reference_text?: string;
 }
 
 export const useDictationAttempt = () => {

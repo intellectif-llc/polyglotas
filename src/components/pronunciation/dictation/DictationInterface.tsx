@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Play, Volume2 } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Volume2, Turtle } from "lucide-react";
 
 interface DictationInterfaceProps {
   audioUrlNormal?: string;
@@ -22,22 +22,67 @@ export default function DictationInterface({
 }: DictationInterfaceProps) {
   const [isPlayingNormal, setIsPlayingNormal] = useState(false);
   const [isPlayingSlow, setIsPlayingSlow] = useState(false);
+  const audioNormalRef = useRef<HTMLAudioElement>(null);
+  const audioSlowRef = useRef<HTMLAudioElement>(null);
 
-  const playAudio = (url: string, isSlow: boolean) => {
-    if (!url) return;
+  useEffect(() => {
+    const audioNormal = audioNormalRef.current;
+    const audioSlow = audioSlowRef.current;
+    
+    if (audioNormal) {
+      audioNormal.onended = () => setIsPlayingNormal(false);
+    }
+    if (audioSlow) {
+      audioSlow.onended = () => setIsPlayingSlow(false);
+    }
+    
+    return () => {
+      if (audioNormal) {
+        audioNormal.onended = null;
+      }
+      if (audioSlow) {
+        audioSlow.onended = null;
+      }
+    };
+  }, []);
 
-    const audio = new Audio(url);
+  const toggleNormalPlayback = useCallback(() => {
+    const audio = audioNormalRef.current;
+    const audioSlow = audioSlowRef.current;
+    if (!audio) return;
 
-    if (isSlow) {
-      setIsPlayingSlow(true);
-      audio.onended = () => setIsPlayingSlow(false);
-    } else {
-      setIsPlayingNormal(true);
-      audio.onended = () => setIsPlayingNormal(false);
+    if (isPlayingSlow && audioSlow) {
+      audioSlow.pause();
+      setIsPlayingSlow(false);
     }
 
-    audio.play().catch(console.error);
-  };
+    if (isPlayingNormal) {
+      audio.pause();
+      setIsPlayingNormal(false);
+    } else {
+      audio.play().catch((e) => console.error("Error playing normal audio:", e));
+      setIsPlayingNormal(true);
+    }
+  }, [isPlayingNormal, isPlayingSlow]);
+
+  const toggleSlowPlayback = useCallback(() => {
+    const audio = audioSlowRef.current;
+    const audioNormal = audioNormalRef.current;
+    if (!audio) return;
+
+    if (isPlayingNormal && audioNormal) {
+      audioNormal.pause();
+      setIsPlayingNormal(false);
+    }
+
+    if (isPlayingSlow) {
+      audio.pause();
+      setIsPlayingSlow(false);
+    } else {
+      audio.play().catch((e) => console.error("Error playing slow audio:", e));
+      setIsPlayingSlow(true);
+    }
+  }, [isPlayingSlow, isPlayingNormal]);
 
   return (
     <div className="flex flex-col items-center space-y-6">
@@ -52,36 +97,65 @@ export default function DictationInterface({
       </div>
 
       {/* Audio Controls */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full max-w-md">
-        <button
-          onClick={() => playAudio(audioUrlNormal || "", false)}
-          disabled={isPlayingNormal || !audioUrlNormal}
-          className="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium min-h-[48px] touch-manipulation flex-1"
-        >
-          {isPlayingNormal ? (
-            <Volume2 className="w-5 h-5 mr-2 pointer-events-none" />
-          ) : (
-            <Play className="w-5 h-5 mr-2 pointer-events-none" />
-          )}
-          <span className="pointer-events-none text-sm sm:text-base">
-            Normal Speed
-          </span>
-        </button>
-
-        <button
-          onClick={() => playAudio(audioUrlSlow || "", true)}
-          disabled={isPlayingSlow || !audioUrlSlow}
-          className="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium min-h-[48px] touch-manipulation flex-1"
-        >
-          {isPlayingSlow ? (
-            <Volume2 className="w-5 h-5 mr-2 pointer-events-none" />
-          ) : (
-            <Play className="w-5 h-5 mr-2 pointer-events-none" />
-          )}
-          <span className="pointer-events-none text-sm sm:text-base">
-            Slow Speed
-          </span>
-        </button>
+      <div className="flex items-center justify-center gap-3 my-3">
+        {audioUrlNormal && (
+          <>
+            <audio ref={audioNormalRef} src={audioUrlNormal} preload="auto" />
+            <button
+              onClick={toggleNormalPlayback}
+              className={`
+                cursor-pointer p-3 rounded-full 
+                ${isPlayingNormal 
+                  ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                  : 'bg-blue-50 text-blue-600 border-blue-200'
+                }
+                hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300
+                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
+                transition-all duration-200 ease-in-out
+                shadow-sm hover:shadow
+                inline-flex items-center justify-center
+                w-12 h-12
+              `}
+              aria-label={
+                isPlayingNormal ? "Pause normal speed audio" : "Play normal speed audio"
+              }
+              title="Listen at normal speed"
+            >
+              <Volume2 className="h-6 w-6" />
+            </button>
+          </>
+        )}
+        
+        {audioUrlSlow && (
+          <>
+            <audio ref={audioSlowRef} src={audioUrlSlow} preload="auto" />
+            <button
+              onClick={toggleSlowPlayback}
+              className={`
+                cursor-pointer p-3 rounded-full 
+                ${isPlayingSlow 
+                  ? 'bg-orange-100 text-orange-700 border-orange-300' 
+                  : 'bg-orange-50 text-orange-600 border-orange-200'
+                }
+                hover:bg-orange-100 hover:text-orange-700 hover:border-orange-300
+                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 
+                transition-all duration-200 ease-in-out
+                shadow-sm hover:shadow
+                inline-flex items-center justify-center
+                w-12 h-12 relative
+              `}
+              aria-label={
+                isPlayingSlow ? "Pause slow speed audio" : "Play slow speed audio"
+              }
+              title="Listen at slow speed"
+            >
+              <Turtle className="h-5 w-5" />
+              <span className="absolute -bottom-1 -right-1 text-xs font-bold bg-orange-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                S
+              </span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Text Input */}

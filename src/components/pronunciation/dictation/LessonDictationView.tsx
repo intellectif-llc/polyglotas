@@ -179,6 +179,8 @@ export default function LessonDictationView() {
                   userText={userText}
                   onTryAgain={handleTryAgain}
                   onContinue={handleContinueToPractice}
+                  audioUrlNormal={currentPhrase.audio_url_normal}
+                  audioUrlSlow={currentPhrase.audio_url_slow}
                 />
               )}
             </div>

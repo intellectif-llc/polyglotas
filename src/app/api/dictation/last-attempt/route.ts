@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     const { data: lastAttempt, error } = await supabase
       .from("dictation_attempts")
-      .select("overall_similarity_score, word_level_feedback, written_text")
+      .select("overall_similarity_score, word_level_feedback, written_text, reference_text")
       .eq("profile_id", user.id)
       .eq("lesson_id", parseInt(lessonId))
       .eq("phrase_id", parseInt(phraseId))
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         word_level_feedback: lastAttempt.word_level_feedback,
         is_correct: lastAttempt.overall_similarity_score >= 70,
         written_text: lastAttempt.written_text,
+        reference_text: lastAttempt.reference_text,
       },
     });
   } catch (error) {
