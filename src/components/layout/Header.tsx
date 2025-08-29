@@ -11,8 +11,10 @@ import {
   Settings,
   UserCircle,
   Menu,
+  Crown,
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { usePartnership } from "@/hooks/usePartnership";
 
 interface HeaderProps {
   user: SupabaseUser | null;
@@ -28,6 +30,7 @@ const Header: React.FC<HeaderProps> = ({
   const [user, setUser] = useState(initialUser);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { data: partnership } = usePartnership();
 
   useEffect(() => {
     setUser(initialUser);
@@ -87,9 +90,21 @@ const Header: React.FC<HeaderProps> = ({
         >
           <Menu size={24} />
         </button>
-        <h1 className="text-lg md:text-xl font-semibold text-gray-800 dark:text-white">
-          Dashboard
-        </h1>
+        {partnership ? (
+          <div className="flex items-center space-x-2">
+            <Crown size={20} className="text-amber-500" />
+            <h1 className="text-lg md:text-lg font-semibold text-gray-800 dark:text-white">
+              <span className="hidden sm:inline">{partnership.name} </span>
+              <span className="text-amber-600 dark:text-amber-400 font-medium">
+                Partner
+              </span>
+            </h1>
+          </div>
+        ) : (
+          <h1 className="text-lg md:text-lg font-semibold text-gray-800 dark:text-white">
+            Dashboard
+          </h1>
+        )}
       </div>
 
       <div className="flex items-center space-x-2 md:space-x-4">
