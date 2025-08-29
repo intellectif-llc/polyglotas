@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { useLanguages } from '@/hooks/useLanguages';
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useLanguages } from "@/hooks/useLanguages";
 
 interface OnboardingData {
   firstName: string;
@@ -18,12 +18,16 @@ interface OnboardingModalProps {
   onComplete: () => void;
 }
 
-export default function OnboardingModal({ isOpen, initialData, onComplete }: OnboardingModalProps) {
+export default function OnboardingModal({
+  isOpen,
+  initialData,
+  onComplete,
+}: OnboardingModalProps) {
   const [formData, setFormData] = useState<OnboardingData>({
-    firstName: initialData?.firstName || '',
-    lastName: initialData?.lastName || '',
-    nativeLanguage: initialData?.nativeLanguage || '',
-    targetLanguage: initialData?.targetLanguage || '',
+    firstName: initialData?.firstName || "",
+    lastName: initialData?.lastName || "",
+    nativeLanguage: initialData?.nativeLanguage || "",
+    targetLanguage: initialData?.targetLanguage || "",
   });
 
   const { data: languages = [] } = useLanguages();
@@ -32,35 +36,37 @@ export default function OnboardingModal({ isOpen, initialData, onComplete }: Onb
   const updateProfileMutation = useMutation({
     mutationFn: async (data: OnboardingData) => {
       const supabase = createSupabaseBrowserClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) throw new Error('Not authenticated');
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) throw new Error("Not authenticated");
 
       // Update profiles table
       const { error: profileError } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({
           first_name: data.firstName,
           last_name: data.lastName,
         })
-        .eq('id', session.user.id);
+        .eq("id", session.user.id);
 
       if (profileError) throw profileError;
 
       // Update student_profiles table
       const { error: studentProfileError } = await supabase
-        .from('student_profiles')
+        .from("student_profiles")
         .update({
           native_language_code: data.nativeLanguage,
           current_target_language_code: data.targetLanguage,
         })
-        .eq('profile_id', session.user.id);
+        .eq("profile_id", session.user.id);
 
       if (studentProfileError) throw studentProfileError;
 
       // Add target language to student_target_languages table
       const { error: targetLanguageError } = await supabase
-        .from('student_target_languages')
+        .from("student_target_languages")
         .upsert({
           profile_id: session.user.id,
           language_code: data.targetLanguage,
@@ -69,15 +75,20 @@ export default function OnboardingModal({ isOpen, initialData, onComplete }: Onb
       if (targetLanguageError) throw targetLanguageError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
-      queryClient.invalidateQueries({ queryKey: ['userName'] });
+      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+      queryClient.invalidateQueries({ queryKey: ["userName"] });
       onComplete();
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.firstName && formData.lastName && formData.nativeLanguage && formData.targetLanguage) {
+    if (
+      formData.firstName &&
+      formData.lastName &&
+      formData.nativeLanguage &&
+      formData.targetLanguage
+    ) {
       updateProfileMutation.mutate(formData);
     }
   };
@@ -91,35 +102,53 @@ export default function OnboardingModal({ isOpen, initialData, onComplete }: Onb
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl font-bold text-white">P</span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Polyglotas!</h2>
-          <p className="text-gray-600 text-sm leading-relaxed">Let&apos;s set up your profile to get started on your language learning journey.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Welcome to Polyglotas!
+          </h2>
+          <p className="text-gray-600 text-sm leading-relaxed">
+            Let&apos;s set up your profile to get started on your language
+            learning journey.
+          </p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="firstName" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="firstName"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 First Name
               </label>
               <input
                 type="text"
                 id="firstName"
                 value={formData.firstName}
-                onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    firstName: e.target.value,
+                  }))
+                }
                 className="w-full px-4 py-3 bg-gray-50/80 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white focus:border-blue-300/50 hover:bg-gray-100/60 hover:border-gray-300/60 transition-all duration-200 text-gray-900 placeholder-gray-500 cursor-text"
                 placeholder="John"
                 required
               />
             </div>
             <div>
-              <label htmlFor="lastName" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="lastName"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 Last Name
               </label>
               <input
                 type="text"
                 id="lastName"
                 value={formData.lastName}
-                onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, lastName: e.target.value }))
+                }
                 className="w-full px-4 py-3 bg-gray-50/80 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white focus:border-blue-300/50 hover:bg-gray-100/60 hover:border-gray-300/60 transition-all duration-200 text-gray-900 placeholder-gray-500 cursor-text"
                 placeholder="Doe"
                 required
@@ -128,13 +157,21 @@ export default function OnboardingModal({ isOpen, initialData, onComplete }: Onb
           </div>
 
           <div>
-            <label htmlFor="nativeLanguage" className="block text-sm font-semibold text-gray-800 mb-2">
+            <label
+              htmlFor="nativeLanguage"
+              className="block text-sm font-semibold text-gray-800 mb-2"
+            >
               🏠 Native Language
             </label>
             <select
               id="nativeLanguage"
               value={formData.nativeLanguage}
-              onChange={(e) => setFormData(prev => ({ ...prev, nativeLanguage: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  nativeLanguage: e.target.value,
+                }))
+              }
               className="w-full px-4 py-3 bg-gray-50/80 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white focus:border-blue-300/50 hover:bg-gray-100/60 hover:border-gray-300/60 transition-all duration-200 text-gray-900 appearance-none cursor-pointer"
               required
             >
@@ -148,13 +185,21 @@ export default function OnboardingModal({ isOpen, initialData, onComplete }: Onb
           </div>
 
           <div>
-            <label htmlFor="targetLanguage" className="block text-sm font-semibold text-gray-800 mb-2">
+            <label
+              htmlFor="targetLanguage"
+              className="block text-sm font-semibold text-gray-800 mb-2"
+            >
               🎯 Language to Learn
             </label>
             <select
               id="targetLanguage"
               value={formData.targetLanguage}
-              onChange={(e) => setFormData(prev => ({ ...prev, targetLanguage: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  targetLanguage: e.target.value,
+                }))
+              }
               className="w-full px-4 py-3 bg-gray-50/80 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white focus:border-blue-300/50 hover:bg-gray-100/60 hover:border-gray-300/60 transition-all duration-200 text-gray-900 appearance-none cursor-pointer"
               required
             >
@@ -170,7 +215,7 @@ export default function OnboardingModal({ isOpen, initialData, onComplete }: Onb
           <button
             type="submit"
             disabled={updateProfileMutation.isPending}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold text-base hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold text-base hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           >
             {updateProfileMutation.isPending ? (
               <div className="flex items-center justify-center space-x-2">
@@ -178,7 +223,7 @@ export default function OnboardingModal({ isOpen, initialData, onComplete }: Onb
                 <span>Setting up...</span>
               </div>
             ) : (
-              'Get Started 🚀'
+              "Get Started 🚀"
             )}
           </button>
         </form>

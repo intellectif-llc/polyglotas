@@ -3,14 +3,17 @@
 import React from "react";
 import { useUserProfile, useUserStats } from "@/hooks/useUserProfile";
 import { useProfileNames } from "@/hooks/useProfileNames";
-import { User, Trophy, Zap, Calendar } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
+import { User, Trophy, Zap, Calendar, Shield, Users } from "lucide-react";
+import Link from "next/link";
 
 export default function AccountPage() {
   const { data: profile, isLoading: profileLoading } = useUserProfile();
   const { data: stats, isLoading: statsLoading } = useUserStats();
   const { data: names, isLoading: namesLoading } = useProfileNames();
+  const { role, loading: roleLoading } = useUserRole();
 
-  if (profileLoading || statsLoading || namesLoading) {
+  if (profileLoading || statsLoading || namesLoading || roleLoading) {
     return (
       <div className="container mx-auto px-4 py-6">
         <div className="bg-white rounded-lg shadow-xl p-6">
@@ -71,6 +74,39 @@ export default function AccountPage() {
         </div>
 
         <div className="space-y-6">
+          {/* Management Links */}
+          {(role === 'partnership_manager' || role === 'admin') && (
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Management</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(role === 'partnership_manager' || role === 'admin') && (
+                  <Link
+                    href="/partnership"
+                    className="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                  >
+                    <Users className="text-blue-600 mr-3" size={24} />
+                    <div>
+                      <h3 className="font-medium text-gray-900">Partnership Manager</h3>
+                      <p className="text-sm text-gray-600">Manage invitations and partnerships</p>
+                    </div>
+                  </Link>
+                )}
+                {role === 'admin' && (
+                  <Link
+                    href="/admin"
+                    className="flex items-center p-4 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                  >
+                    <Shield className="text-red-600 mr-3" size={24} />
+                    <div>
+                      <h3 className="font-medium text-gray-900">Admin Panel</h3>
+                      <p className="text-sm text-gray-600">Manage users and partnerships</p>
+                    </div>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
           <div>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

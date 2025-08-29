@@ -16,10 +16,10 @@ feedback_text text,
 feedback_language_code character varying,
 suggested_answer jsonb,
 CONSTRAINT conversation_messages_pkey PRIMARY KEY (message_id),
-CONSTRAINT conversation_messages_related_prompt_id_fkey FOREIGN KEY (related_prompt_id) REFERENCES public.conversation_starters(id),
+CONSTRAINT fk_conversation_messages_msg_lang FOREIGN KEY (message_language_code) REFERENCES public.languages(language_code),
 CONSTRAINT conversation_messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id),
-CONSTRAINT fk_conversation_messages_fb_lang FOREIGN KEY (feedback_language_code) REFERENCES public.languages(language_code),
-CONSTRAINT fk_conversation_messages_msg_lang FOREIGN KEY (message_language_code) REFERENCES public.languages(language_code)
+CONSTRAINT conversation_messages_related_prompt_id_fkey FOREIGN KEY (related_prompt_id) REFERENCES public.conversation_starters(id),
+CONSTRAINT fk_conversation_messages_fb_lang FOREIGN KEY (feedback_language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.conversation_prompt_status (
 prompt_status_id bigint NOT NULL DEFAULT nextval('conversation_prompt_status_prompt_status_id_seq'::regclass),
@@ -28,9 +28,9 @@ prompt_id integer NOT NULL,
 first_addressed_message_id bigint,
 addressed_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT conversation_prompt_status_pkey PRIMARY KEY (prompt_status_id),
-CONSTRAINT conversation_prompt_status_first_addressed_message_id_fkey FOREIGN KEY (first_addressed_message_id) REFERENCES public.conversation_messages(message_id),
+CONSTRAINT conversation_prompt_status_prompt_id_fkey FOREIGN KEY (prompt_id) REFERENCES public.conversation_starters(id),
 CONSTRAINT conversation_prompt_status_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id),
-CONSTRAINT conversation_prompt_status_prompt_id_fkey FOREIGN KEY (prompt_id) REFERENCES public.conversation_starters(id)
+CONSTRAINT conversation_prompt_status_first_addressed_message_id_fkey FOREIGN KEY (first_addressed_message_id) REFERENCES public.conversation_messages(message_id)
 );
 CREATE TABLE public.conversation_starter_translations (
 starter_translation_id integer NOT NULL DEFAULT nextval('conversation_starter_translations_starter_translation_id_seq'::regclass),
@@ -40,8 +40,8 @@ starter_text text NOT NULL,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT conversation_starter_translations_pkey PRIMARY KEY (starter_translation_id),
-CONSTRAINT fk_conversation_starter_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-CONSTRAINT conversation_starter_translations_starter_id_fkey FOREIGN KEY (starter_id) REFERENCES public.conversation_starters(id)
+CONSTRAINT conversation_starter_translations_starter_id_fkey FOREIGN KEY (starter_id) REFERENCES public.conversation_starters(id),
+CONSTRAINT fk_conversation_starter_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.conversation_starters (
 id integer NOT NULL DEFAULT nextval('conversation_starters_id_seq'::regclass),
@@ -64,10 +64,10 @@ overall_similarity_score numeric CHECK (overall_similarity_score IS NULL OR over
 word_level_feedback jsonb,
 created_at timestamp with time zone DEFAULT now(),
 CONSTRAINT dictation_attempts_pkey PRIMARY KEY (attempt_id),
-CONSTRAINT dictation_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
 CONSTRAINT dictation_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-CONSTRAINT fk_dictation_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-CONSTRAINT dictation_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+CONSTRAINT dictation_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
+CONSTRAINT dictation_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT fk_dictation_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.invoices (
 id integer NOT NULL DEFAULT nextval('invoices_id_seq'::regclass),
@@ -90,8 +90,8 @@ issued_at timestamp with time zone,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT invoices_pkey PRIMARY KEY (id),
-CONSTRAINT invoices_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT invoices_stripe_subscription_id_fkey FOREIGN KEY (stripe_subscription_id) REFERENCES public.student_subscriptions(stripe_subscription_id)
+CONSTRAINT invoices_stripe_subscription_id_fkey FOREIGN KEY (stripe_subscription_id) REFERENCES public.student_subscriptions(stripe_subscription_id),
+CONSTRAINT invoices_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.language_levels (
 level_code USER-DEFINED NOT NULL,
@@ -135,9 +135,9 @@ created_at timestamp with time zone DEFAULT now(),
 all_prompts_addressed_at timestamp with time zone,
 last_message_at timestamp with time zone,
 CONSTRAINT lesson_chat_conversations_pkey PRIMARY KEY (conversation_id),
+CONSTRAINT lesson_chat_conversations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
 CONSTRAINT fk_lesson_chat_conversations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-CONSTRAINT lesson_chat_conversations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-CONSTRAINT lesson_chat_conversations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+CONSTRAINT lesson_chat_conversations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
 );
 CREATE TABLE public.lesson_translations (
 lesson_translation_id integer NOT NULL DEFAULT nextval('lesson_translations_lesson_translation_id_seq'::regclass),
@@ -167,12 +167,13 @@ CONSTRAINT lessons_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.units(un
 CREATE TABLE public.partnership_invitations (
 id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
 partnership_id bigint NOT NULL,
-code character varying NOT NULL UNIQUE,
-intended_for_email text,
+token uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+intended_for_email text NOT NULL,
 redeemed_by_profile_id uuid UNIQUE,
 redeemed_at timestamp with time zone,
-expires_at timestamp with time zone,
+expires_at timestamp with time zone NOT NULL,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
+status USER-DEFINED NOT NULL DEFAULT 'pending'::partnership_invitation_status,
 CONSTRAINT partnership_invitations_pkey PRIMARY KEY (id),
 CONSTRAINT partnership_invitations_redeemed_by_profile_id_fkey FOREIGN KEY (redeemed_by_profile_id) REFERENCES public.student_profiles(profile_id),
 CONSTRAINT partnership_invitations_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id)
@@ -238,7 +239,10 @@ first_name character varying,
 last_name character varying,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
+role USER-DEFINED NOT NULL DEFAULT 'student'::user_role_enum,
+partnership_id bigint,
 CONSTRAINT profiles_pkey PRIMARY KEY (id),
+CONSTRAINT profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
 CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.speech_attempts (
@@ -258,10 +262,10 @@ pronunciation_score numeric CHECK (pronunciation_score >= 0::numeric AND pronunc
 prosody_score numeric CHECK (prosody_score >= 0::numeric AND prosody_score <= 100::numeric),
 phonetic_data jsonb,
 CONSTRAINT speech_attempts_pkey PRIMARY KEY (attempt_id),
-CONSTRAINT speech_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
 CONSTRAINT fk_speech_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-CONSTRAINT speech_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
-CONSTRAINT speech_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+CONSTRAINT speech_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT speech_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT speech_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id)
 );
 CREATE TABLE public.student_profiles (
 profile_id uuid NOT NULL,
@@ -304,16 +308,16 @@ stripe_created_at timestamp with time zone,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT student_subscriptions_pkey PRIMARY KEY (id),
-CONSTRAINT student_subscriptions_price_id_fkey FOREIGN KEY (price_id) REFERENCES public.prices(id),
-CONSTRAINT student_subscriptions_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+CONSTRAINT student_subscriptions_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT student_subscriptions_price_id_fkey FOREIGN KEY (price_id) REFERENCES public.prices(id)
 );
 CREATE TABLE public.student_target_languages (
 profile_id uuid NOT NULL,
 language_code character varying NOT NULL,
 added_at timestamp with time zone DEFAULT now(),
 CONSTRAINT student_target_languages_pkey PRIMARY KEY (profile_id, language_code),
-CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.unit_translations (
 unit_translation_id integer NOT NULL DEFAULT nextval('unit_translations_unit_translation_id_seq'::regclass),
@@ -373,9 +377,9 @@ dictation_attempts integer DEFAULT 0,
 dictation_last_attempt_at timestamp with time zone,
 last_progress_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_phrase_progress_pkey PRIMARY KEY (phrase_progress_id),
-CONSTRAINT fk_user_phrase_progress_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-CONSTRAINT user_phrase_progress_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
 CONSTRAINT user_phrase_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT user_phrase_progress_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
+CONSTRAINT fk_user_phrase_progress_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
 CONSTRAINT user_phrase_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
 );
 CREATE TABLE public.user_points_log (
@@ -391,10 +395,10 @@ notes text,
 created_at timestamp with time zone DEFAULT now(),
 activity_type USER-DEFINED,
 CONSTRAINT user_points_log_pkey PRIMARY KEY (log_id),
-CONSTRAINT fk_user_points_log_related_word_lang FOREIGN KEY (related_word_language_code) REFERENCES public.languages(language_code),
-CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id),
 CONSTRAINT user_points_log_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id)
+CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id),
+CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT fk_user_points_log_related_word_lang FOREIGN KEY (related_word_language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.user_word_pronunciation (
 id integer NOT NULL DEFAULT nextval('user_word_pronunciation_id_seq'::regclass),
@@ -431,8 +435,8 @@ last_reviewed_at timestamp with time zone,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_word_spelling_pkey PRIMARY KEY (id),
-CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT fk_user_word_spelling_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+CONSTRAINT fk_user_word_spelling_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.vocabulary_phrases (
 id integer NOT NULL DEFAULT nextval('vocabulary_phrases_id_seq'::regclass),
@@ -656,50 +660,56 @@ CONSTRAINT users_pkey PRIMARY KEY (id)
 
 # Enums
 
-| enum_name                   | enum_value           | enumsortorder |
-| --------------------------- | -------------------- | ------------- |
-| account_status_enum         | pending_verification | 1             |
-| account_status_enum         | active               | 2             |
-| account_status_enum         | suspended            | 3             |
-| account_status_enum         | deactivated          | 4             |
-| invoice_status_enum         | draft                | 1             |
-| invoice_status_enum         | open                 | 2             |
-| invoice_status_enum         | paid                 | 3             |
-| invoice_status_enum         | void                 | 4             |
-| invoice_status_enum         | uncollectible        | 5             |
-| invoice_status_enum         | past_due             | 6             |
-| invoice_status_enum         | refunded             | 7             |
-| invoice_status_enum         | pending              | 8             |
-| level_enum                  | A1                   | 1             |
-| level_enum                  | A2                   | 2             |
-| level_enum                  | B1                   | 3             |
-| level_enum                  | B2                   | 4             |
-| level_enum                  | C1                   | 5             |
-| price_billing_interval_enum | day                  | 1             |
-| price_billing_interval_enum | week                 | 2             |
-| price_billing_interval_enum | month                | 3             |
-| price_billing_interval_enum | year                 | 4             |
-| price_type_enum             | recurring            | 1             |
-| price_type_enum             | one_time             | 2             |
-| sender_type_enum            | user                 | 1             |
-| sender_type_enum            | ai                   | 2             |
-| subscription_status_enum    | trialing             | 1             |
-| subscription_status_enum    | active               | 2             |
-| subscription_status_enum    | past_due             | 3             |
-| subscription_status_enum    | unpaid               | 4             |
-| subscription_status_enum    | canceled             | 5             |
-| subscription_status_enum    | incomplete           | 6             |
-| subscription_status_enum    | incomplete_expired   | 7             |
-| subscription_status_enum    | paused               | 8             |
-| subscription_tier_enum      | free                 | 1             |
-| subscription_tier_enum      | starter              | 2             |
-| subscription_tier_enum      | pro                  | 3             |
-| activity_status_enum        | not_started          | 1             |
-| activity_status_enum        | in_progress          | 2             |
-| activity_status_enum        | completed            | 3             |
-| activity_type_enum          | dictation            | 1             |
-| activity_type_enum          | pronunciation        | 2             |
-| activity_type_enum          | chat                 | 3             |
+| enum_name                     | enum_value           | enumsortorder |
+| ----------------------------- | -------------------- | ------------- |
+| account_status_enum           | pending_verification | 1             |
+| account_status_enum           | active               | 2             |
+| account_status_enum           | suspended            | 3             |
+| account_status_enum           | deactivated          | 4             |
+| invoice_status_enum           | draft                | 1             |
+| invoice_status_enum           | open                 | 2             |
+| invoice_status_enum           | paid                 | 3             |
+| invoice_status_enum           | void                 | 4             |
+| invoice_status_enum           | uncollectible        | 5             |
+| invoice_status_enum           | past_due             | 6             |
+| invoice_status_enum           | refunded             | 7             |
+| invoice_status_enum           | pending              | 8             |
+| level_enum                    | A1                   | 1             |
+| level_enum                    | A2                   | 2             |
+| level_enum                    | B1                   | 3             |
+| level_enum                    | B2                   | 4             |
+| level_enum                    | C1                   | 5             |
+| price_billing_interval_enum   | day                  | 1             |
+| price_billing_interval_enum   | week                 | 2             |
+| price_billing_interval_enum   | month                | 3             |
+| price_billing_interval_enum   | year                 | 4             |
+| price_type_enum               | recurring            | 1             |
+| price_type_enum               | one_time             | 2             |
+| sender_type_enum              | user                 | 1             |
+| sender_type_enum              | ai                   | 2             |
+| subscription_status_enum      | trialing             | 1             |
+| subscription_status_enum      | active               | 2             |
+| subscription_status_enum      | past_due             | 3             |
+| subscription_status_enum      | unpaid               | 4             |
+| subscription_status_enum      | canceled             | 5             |
+| subscription_status_enum      | incomplete           | 6             |
+| subscription_status_enum      | incomplete_expired   | 7             |
+| subscription_status_enum      | paused               | 8             |
+| subscription_tier_enum        | free                 | 1             |
+| subscription_tier_enum        | starter              | 2             |
+| subscription_tier_enum        | pro                  | 3             |
+| activity_status_enum          | not_started          | 1             |
+| activity_status_enum          | in_progress          | 2             |
+| activity_status_enum          | completed            | 3             |
+| activity_type_enum            | dictation            | 1             |
+| activity_type_enum            | pronunciation        | 2             |
+| activity_type_enum            | chat                 | 3             |
+| partnership_invitation_status | pending              | 1             |
+| partnership_invitation_status | redeemed             | 2             |
+| partnership_invitation_status | expired              | 3             |
+| user_role_enum                | student              | 1             |
+| user_role_enum                | partnership_manager  | 2             |
+| user_role_enum                | admin                | 3             |
 
 # Sql functions
 

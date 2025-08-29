@@ -12,6 +12,8 @@ import {
   CreditCard,
   Loader2,
   LucideIcon,
+  Shield,
+  Users,
 } from "lucide-react";
 import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
 import { useUserStats } from "@/hooks/useUserProfile";
@@ -19,6 +21,7 @@ import { useNavigationState } from "@/hooks/useNavigationState";
 import { useRealtimeUserStats } from "@/hooks/useRealtimeUserStats";
 import NavigationSkeleton from "./NavigationSkeleton";
 import { AnimatedStats } from "./AnimatedStats";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface NavigationSectionProps {
   isCollapsed: boolean;
@@ -49,6 +52,7 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
   const { pendingHref, handleNavigation } = useNavigationState(onNavigate);
   const { data: units, isLoading: unitsLoading } = usePronunciationUnits();
   const { data: userStats } = useUserStats();
+  const { role } = useUserRole();
 
   // Set up real-time stats updates
   useRealtimeUserStats();
@@ -80,6 +84,7 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
           })) || [],
       };
 
+  // Build navigation sections based on user role
   const navSections: NavSection[] = [
     {
       items: [
@@ -122,6 +127,30 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
       ],
     },
   ];
+
+  // Add management sections based on role
+  if (role === 'partnership_manager' || role === 'admin') {
+    navSections.push({
+      title: "Management",
+      items: [
+        {
+          href: "/partnership",
+          label: "Partnership",
+          icon: Users,
+          isActive: pathname.startsWith("/partnership"),
+        },
+      ],
+    });
+  }
+
+  if (role === 'admin') {
+    navSections[navSections.length - 1].items.push({
+      href: "/admin",
+      label: "Admin Panel",
+      icon: Shield,
+      isActive: pathname.startsWith("/admin"),
+    });
+  }
 
   const renderNavItem = (item: NavItem, index: number) => {
     const isNavigating = pendingHref === item.href;

@@ -102,10 +102,17 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
     console.log(
       `[AUTH_DEBUG] [home-client.tsx] handleSignIn: Attempting ${provider} sign in.`
     );
+    
+    // Check for invitation token
+    const invitationToken = localStorage.getItem('invitation_token');
+    const redirectUrl = invitationToken 
+      ? `${window.location.origin}/auth/callback?invitation_token=${invitationToken}`
+      : `${window.location.origin}/auth/callback`;
+    
     supabaseClient.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
   };

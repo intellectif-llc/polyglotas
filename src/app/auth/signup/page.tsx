@@ -12,10 +12,17 @@ export default function SignUpPage() {
   const handleSignUpWithGoogle = async () => {
     setError(null);
     setSuccessMessage(null);
+    
+    // Check for invitation token
+    const invitationToken = localStorage.getItem('invitation_token');
+    const redirectUrl = invitationToken 
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?invitation_token=${invitationToken}`
+      : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
+    
     const { error: signUpError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
     if (signUpError) {
@@ -26,10 +33,17 @@ export default function SignUpPage() {
   const handleSignUpWithGitHub = async () => {
     setError(null);
     setSuccessMessage(null);
+    
+    // Check for invitation token
+    const invitationToken = localStorage.getItem('invitation_token');
+    const redirectUrl = invitationToken 
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?invitation_token=${invitationToken}`
+      : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
+    
     const { error: signUpError } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
     if (signUpError) {
