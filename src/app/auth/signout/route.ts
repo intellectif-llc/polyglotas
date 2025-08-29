@@ -6,24 +6,15 @@ export async function POST() {
   noStore(); // Ensure dynamic execution
   const supabase = await createClient();
 
-  console.log("[AUTH_DEBUG] [auth/signout/route.ts] Attempting to sign out.");
-
   const { error } = await supabase.auth.signOut();
 
   if (error) {
-    console.error(
-      "[AUTH_DEBUG] [auth/signout/route.ts] Error during sign out:",
-      error.message
-    );
     return NextResponse.json(
       { error: "Failed to sign out", details: error.message },
       { status: 500 }
     );
   }
 
-  console.log(
-    "[AUTH_DEBUG] [auth/signout/route.ts] Sign out successful. Redirecting to home."
-  );
   // Redirect to home or login page after sign out
   const redirectUrl = new URL(
     "/",

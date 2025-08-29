@@ -1,9 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function createMiddlewareClient(
-  request: NextRequest
-) {
+export async function createMiddlewareClient(request: NextRequest) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -84,10 +82,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  console.log(
-    "[AUTH_DEBUG] [middleware/updateSession] User from getUser():",
-    user?.id || "No user"
-  );
 
   const { pathname } = request.nextUrl;
 
