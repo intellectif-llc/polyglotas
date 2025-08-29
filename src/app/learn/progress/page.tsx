@@ -4,12 +4,14 @@ import React from "react";
 import { BarChart3, TrendingUp, Calendar, Award } from "lucide-react";
 import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
 import { useUserStats } from "@/hooks/useUserProfile";
+import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 
 export default function ProgressPage() {
   const { data: units, isLoading: unitsLoading } = usePronunciationUnits();
   const { data: stats, isLoading: statsLoading } = useUserStats();
+  const { tier, isLoading: tierLoading } = useSubscriptionTier();
 
-  if (unitsLoading || statsLoading) {
+  if (unitsLoading || statsLoading || tierLoading) {
     return (
       <div className="container mx-auto px-4 py-6">
         <div className="bg-white rounded-lg shadow-xl p-6">
@@ -88,7 +90,12 @@ export default function ProgressPage() {
 
         {/* Unit Progress */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Unit Progress</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold text-gray-900">Unit Progress</h2>
+            <div className="text-sm text-gray-600">
+              Progress based on {tier} tier activities
+            </div>
+          </div>
           <div className="space-y-4">
             {units?.map((unit) => (
               <div key={unit.unit_id} className="bg-gray-50 p-4 rounded-lg">
@@ -109,6 +116,23 @@ export default function ProgressPage() {
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${unit.progress.percent}%` }}
                   ></div>
+                </div>
+                
+                {/* Show required activities based on tier */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Dictation
+                  </span>
+                  {(tier === 'starter' || tier === 'pro') && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Pronunciation
+                    </span>
+                  )}
+                  {tier === 'pro' && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      Chat
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

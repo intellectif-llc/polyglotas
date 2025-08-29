@@ -120,6 +120,19 @@ export async function POST(
       );
     }
 
+    // Initialize chat activity progress when conversation is created
+    const { error: activityError } = await supabase.rpc('process_user_activity', {
+      profile_id_param: subscriptionResult.userId,
+      lesson_id_param: lessonId,
+      language_code_param: targetLanguage,
+      activity_type_param: 'chat'
+    });
+    
+    if (activityError) {
+      console.error('Error initializing chat activity:', activityError);
+      // Don't fail the conversation creation, just log the error
+    }
+
     // Get conversation prompts for context
     const { data: prompts } = await supabase
       .from("conversation_starters")

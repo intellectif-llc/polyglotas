@@ -11,14 +11,13 @@ interface UnitFromDB {
 }
 
 interface ProgressFromDB {
-  user_lesson_progress_id: number;
   activity_type: string;
   status: string;
-  user_lesson_progress: Array<{
+  user_lesson_progress: {
     lesson_id: number;
     profile_id: string;
     lessons: { unit_id: number };
-  }>;
+  };
 }
 
 export async function GET() {
@@ -76,12 +75,35 @@ export async function GET() {
 
     const unitIds = units.map((u) => u.unit_id);
 
-    // 2. Fetch user progress for all lessons in these units
+    // 2. Get user's subscription tier to determine required activities
+    const { data: userProfile } = await supabase
+      .from("student_profiles")
+      .select("subscription_tier")
+      .eq("profile_id", user.id)
+      .single();
+
+    const subscriptionTier = userProfile?.subscription_tier || 'free';
+    
+    // Define required activities based on subscription tier
+    const getRequiredActivities = (tier: string): string[] => {
+      switch (tier) {
+        case 'free':
+          return ['dictation'];
+        case 'starter':
+          return ['dictation', 'pronunciation'];
+        case 'pro':
+          return ['dictation', 'pronunciation', 'chat'];
+        default:
+          return ['dictation'];
+      }
+    };
+    
+    const requiredActivities = getRequiredActivities(subscriptionTier);
+
+    // 3. Fetch user progress for all lessons in these units
     const { data: progressData, error: progressError } = await supabase
       .from("user_lesson_activity_progress")
-      .select(
-        `
-        user_lesson_progress_id,
+      .select(`
         activity_type,
         status,
         user_lesson_progress!inner(
@@ -89,10 +111,10 @@ export async function GET() {
           profile_id,
           lessons!inner(unit_id)
         )
-      `
-      )
+      `)
       .eq("user_lesson_progress.profile_id", user.id)
-      .in("user_lesson_progress.lessons.unit_id", unitIds);
+      .in("user_lesson_progress.lessons.unit_id", unitIds)
+      .in("activity_type", requiredActivities);
 
     if (progressError) {
       console.error(
@@ -102,7 +124,7 @@ export async function GET() {
       // Continue without progress data rather than failing
     }
 
-    // 3. Fetch total lesson counts for each unit
+    // 4. Fetch total lesson counts for each unit
     const { data: lessonCounts, error: countError } = await supabase
       .from("lessons")
       .select("unit_id")
@@ -116,19 +138,43 @@ export async function GET() {
       // Continue without count data rather than failing
     }
 
-    // 4. Create lookup maps for efficient processing
-    const progressMap = (
+    // 5. Create lookup maps for efficient processing
+    // Group progress by lesson and unit for tier-aware completion calculation
+    const lessonProgressMap = (
       (progressData as unknown as ProgressFromDB[]) || []
     ).reduce((acc, p) => {
-      const unitId = p.user_lesson_progress[0]?.lessons?.unit_id;
-      if (unitId) {
-        if (!acc[unitId]) {
-          acc[unitId] = { completed: 0 };
+      const lessonId = p.user_lesson_progress?.lesson_id;
+      const unitId = p.user_lesson_progress?.lessons?.unit_id;
+      
+      if (lessonId && unitId) {
+        if (!acc[lessonId]) {
+          acc[lessonId] = { unitId, completedActivities: new Set() };
         }
-        if (p.activity_type === 'pronunciation' && p.status === 'completed') {
-          acc[unitId].completed += 1;
+        
+        if (p.status === 'completed') {
+          acc[lessonId].completedActivities.add(p.activity_type);
         }
       }
+      return acc;
+    }, {} as Record<number, { unitId: number; completedActivities: Set<string> }>);
+    
+    // Calculate completed lessons per unit based on tier requirements
+    const progressMap = Object.values(lessonProgressMap).reduce((acc, lesson) => {
+      const { unitId, completedActivities } = lesson;
+      
+      if (!acc[unitId]) {
+        acc[unitId] = { completed: 0 };
+      }
+      
+      // Check if all required activities for the user's tier are completed
+      const allRequiredCompleted = requiredActivities.every(activity => 
+        completedActivities.has(activity)
+      );
+      
+      if (allRequiredCompleted) {
+        acc[unitId].completed += 1;
+      }
+      
       return acc;
     }, {} as Record<number, { completed: number }>);
 
@@ -141,7 +187,7 @@ export async function GET() {
       return acc;
     }, {} as Record<number, number>);
 
-    // 5. Combine units with their progress
+    // 6. Combine units with their progress
     const unitsWithProgress: Unit[] = (units as UnitFromDB[]).map((unit) => {
       const unitId = unit.unit_id;
       const completedLessons = progressMap[unitId]?.completed || 0;
@@ -165,7 +211,7 @@ export async function GET() {
         },
       };
     });
-
+    
     return NextResponse.json({ units: unitsWithProgress });
   } catch (err: unknown) {
     const errorMessage =
