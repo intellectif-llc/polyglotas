@@ -28,7 +28,7 @@ export default function ActivitySwitcher({
     },
     {
       key: "practice" as const,
-      label: "Practice",
+      label: "Pronunciation",
       path: `/learn/${unitId}/lesson/${lessonId}/practice`,
       canAccess: permissions.canAccessPractice,
     },

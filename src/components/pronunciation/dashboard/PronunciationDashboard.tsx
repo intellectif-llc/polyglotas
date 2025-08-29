@@ -29,8 +29,8 @@ const PronunciationDashboard = () => {
 
   return (
     <div className="font-sans bg-gray-100 min-h-screen">
-      <div className="bg-white p-5 text-center relative shadow-sm">
-        <h2 className="text-xl font-semibold mt-6">Welcome back, {firstName || "User"}</h2>
+      <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-5 text-center relative shadow-lg">
+        <h2 className="text-xl font-semibold mt-6 text-white">Welcome back, {firstName || "User"}</h2>
       </div>
       <div className="bg-white p-4 sm:p-5 mb-5 shadow-sm">
         <LevelSelector
@@ -42,7 +42,7 @@ const PronunciationDashboard = () => {
         className={`
           px-4 sm:px-5 py-6 sm:py-8
           transition-all duration-300
-          bg-[#01d4dd] mx-4 sm:mx-5 rounded-b-xl shadow
+          bg-gradient-to-br from-purple-500 via-indigo-500 to-pink-500 mx-4 sm:mx-5 rounded-b-xl shadow-lg
         `}
       >
         {isLoading && <div className="text-center text-white">Loading...</div>}

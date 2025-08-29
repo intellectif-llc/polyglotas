@@ -24,8 +24,8 @@ function LevelSelector({ currentLevel, onSelectLevel }: { currentLevel: string; 
               focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500
               ${
                 isSelected
-                  ? "bg-gray-800 text-white"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg"
+                  : "bg-white text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50 hover:text-purple-600 border border-gray-200"
               }
             `}
           >

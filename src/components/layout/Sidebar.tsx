@@ -28,7 +28,7 @@ const SidebarHeader: React.FC<{
     {!isDesktopCollapsed && !isMobile && (
       <Link
         href="/learn"
-        className="text-xl font-semibold text-gray-800 dark:text-white"
+        className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent hover:from-purple-600 hover:to-pink-600 transition-all duration-200"
       >
         Polyglotas
       </Link>
@@ -41,7 +41,7 @@ const SidebarHeader: React.FC<{
     {isMobile && (
       <Link
         href="/learn"
-        className="text-xl font-semibold text-gray-800 dark:text-white"
+        className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent"
       >
         Polyglotas
       </Link>
