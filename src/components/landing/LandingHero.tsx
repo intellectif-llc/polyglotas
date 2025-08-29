@@ -117,7 +117,7 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
                 onClick={() => onSignIn("google")}
-                className="group px-8 py-4 bg-brand-gradient hover:shadow-2xl hover:shadow-purple-500/25 rounded-xl text-white font-semibold transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 cursor-pointer"
+                className="group px-8 py-4 bg-brand-gradient hover:shadow-2xl hover:shadow-purple-500/25 rounded-xl text-white font-semibold transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 cursor-pointer border border-white/10 shadow-lg"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -142,7 +142,7 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
               </button>
               <button
                 onClick={() => onSignIn("github")}
-                className="px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 rounded-xl text-white font-semibold transition-all duration-300 flex items-center space-x-3 cursor-pointer"
+                className="px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 rounded-xl text-white font-semibold transition-all duration-300 flex items-center space-x-3 cursor-pointer shadow-lg"
               >
                 <svg
                   className="w-5 h-5"

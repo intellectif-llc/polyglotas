@@ -22,9 +22,8 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createClient();
 
-    let sessionData = null; // Declare sessionData here
     try {
-      const { data, error: exchangeError } =
+      const { error: exchangeError } =
         await supabase.auth.exchangeCodeForSession(code);
       if (exchangeError) {
         return NextResponse.redirect(
@@ -33,7 +32,6 @@ export async function GET(request: NextRequest) {
           )}&status=${exchangeError.status || "unknown"}`
         );
       }
-      sessionData = data.session; // Assign here
     } catch (catchError: unknown) {
       const errorMessage =
         catchError instanceof Error ? catchError.message : "Unknown error";

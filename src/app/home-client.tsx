@@ -14,7 +14,7 @@ interface HomeClientProps {
 export default function HomeClient({ initialUser }: HomeClientProps) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [loading, setLoading] = useState(true);
-  // const router = useRouter(); // Removed unused variable
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const supabaseClient = useMemo(() => createClient(), []);
 
   useEffect(() => {
@@ -25,23 +25,28 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
       try {
         const {
           data: { session: clientSession },
-          error: clientSessionError,
         } = await supabaseClient.auth.getSession();
         if (!initialUser && clientSession?.user) {
+          // Session exists but initialUser is null - let auth listener handle it
         }
-      } catch (e: unknown) {}
+      } catch {
+        // Ignore session check errors
+      }
     };
     checkInitialClientSession();
 
     const { data: authListener } = supabaseClient.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
         const newEventUser = session?.user ?? null;
-        setUser(newEventUser);
-
+        
         if (event === "SIGNED_OUT") {
-        } else if (event === "INITIAL_SESSION") {
+          setUser(null);
+          setIsSigningOut(false);
         } else if (event === "SIGNED_IN") {
+          setUser(newEventUser);
+          setIsSigningOut(false);
         } else {
+          setUser(newEventUser);
         }
 
         setLoading(false);
@@ -53,7 +58,7 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
         authListener.subscription.unsubscribe();
       }
     };
-  }, [initialUser?.id, initialUser, user?.id, supabaseClient]);
+  }, [initialUser, supabaseClient]);
 
   const handleSignIn = (provider: "google" | "github") => {
     // Check for invitation token
@@ -71,37 +76,31 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
   };
 
   const handleSignOut = async () => {
+    setIsSigningOut(true);
     setLoading(true);
 
-    const { error: clientSignOutError } = await supabaseClient.auth.signOut();
-
-    if (clientSignOutError) {
-      alert(
-        `Client sign-out error: ${clientSignOutError.message}. Attempting server sign-out.`
-      );
-    }
-
-    setUser(null);
-
     try {
-      const response = await fetch("/auth/signout", { method: "POST" });
-      if (!response.ok) {
-        const errorData = await response.json();
-        alert(
-          `Server sign out failed: ${
-            errorData.details || response.statusText
-          }. Client was signed out.`
-        );
-      } else {
+      // Sign out from client first
+      const { error: clientSignOutError } = await supabaseClient.auth.signOut();
+      
+      if (clientSignOutError) {
+        console.error('Client sign-out error:', clientSignOutError.message);
       }
+
+      // Set user to null immediately
+      setUser(null);
+
+      // Call server sign-out endpoint - this will redirect
+      window.location.href = '/auth/signout';
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      alert(`Server sign out error: ${errorMessage}. Client was signed out.`);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error('Sign out error:', errorMessage);
+      setIsSigningOut(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
+  if (loading || isSigningOut) {
     return (
       <div className="min-h-screen bg-hero-gradient flex flex-col items-center justify-center p-4">
         <h1 className="text-4xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">

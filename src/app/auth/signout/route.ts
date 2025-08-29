@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { unstable_noStore as noStore } from "next/cache";
 
+// Handle GET requests (direct navigation)
+export async function GET() {
+  return POST(); // Reuse the same logic
+}
+
 export async function POST() {
   noStore(); // Ensure dynamic execution
   const supabase = await createClient();
@@ -15,12 +20,19 @@ export async function POST() {
     );
   }
 
-  // Redirect to home or login page after sign out
+  // Create response with redirect
   const redirectUrl = new URL(
     "/",
     process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
   );
-  return NextResponse.redirect(redirectUrl.toString(), {
-    status: 302, // Use 302 for temporary redirect
+  
+  const response = NextResponse.redirect(redirectUrl.toString(), {
+    status: 302,
   });
+
+  // Ensure all auth cookies are cleared
+  response.cookies.delete('sb-access-token');
+  response.cookies.delete('sb-refresh-token');
+  
+  return response;
 }
