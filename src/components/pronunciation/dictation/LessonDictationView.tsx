@@ -11,6 +11,7 @@ import DictationResults from "./DictationResults";
 import { DictationAttempt } from "@/types/pronunciation";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import ActivitySwitcher from "../shared/ActivitySwitcher";
+import { useAdvancedNavigation } from "@/hooks/useAdvancedNavigation";
 
 export default function LessonDictationView() {
   const params = useParams();
@@ -62,17 +63,41 @@ export default function LessonDictationView() {
     refetchLastAttempt,
   ]);
 
-  const handleNext = () => {
+  const {
+    canNavigateNext: canAdvancedNext,
+    canNavigatePrevious: canAdvancedPrevious,
+    navigateNext: advancedNext,
+    navigatePrevious: advancedPrevious
+  } = useAdvancedNavigation({
+    unitId,
+    lessonId,
+    activity: "dictation",
+    phraseIndex: currentPhraseIndex
+  });
+
+  const handleNext = async () => {
+    // First try local phrase navigation
     if (data && currentPhraseIndex < data.phrases.length - 1) {
       setCurrentPhraseIndex(currentPhraseIndex + 1);
-      // State will be loaded by useEffect
+      return;
+    }
+    
+    // If at last phrase, use advanced navigation for cross-activity/lesson navigation
+    if (canAdvancedNext) {
+      await advancedNext();
     }
   };
 
-  const handlePrevious = () => {
+  const handlePrevious = async () => {
+    // First try local phrase navigation
     if (currentPhraseIndex > 0) {
       setCurrentPhraseIndex(currentPhraseIndex - 1);
-      // State will be loaded by useEffect
+      return;
+    }
+    
+    // If at first phrase, use advanced navigation for cross-activity/lesson navigation
+    if (canAdvancedPrevious) {
+      await advancedPrevious();
     }
   };
 
@@ -186,13 +211,13 @@ export default function LessonDictationView() {
             </div>
           </div>
 
-          {/* Navigation Buttons - Now outside content area */}
+          {/* Navigation Buttons - Enhanced with cross-content navigation */}
           <div className="border-t border-gray-200 px-4 py-4 sm:px-6">
             <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-between sm:items-center">
               <button
                 type="button"
                 onClick={handlePrevious}
-                disabled={currentPhraseIndex === 0 || isSubmitting}
+                disabled={(!canAdvancedPrevious && currentPhraseIndex === 0) || isSubmitting}
                 className="flex items-center justify-center sm:justify-start px-4 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px] touch-manipulation"
               >
                 <ChevronLeft className="h-5 w-5 mr-2 pointer-events-none" />
@@ -202,9 +227,7 @@ export default function LessonDictationView() {
               <button
                 type="button"
                 onClick={handleNext}
-                disabled={
-                  currentPhraseIndex >= totalPhrases - 1 || isSubmitting
-                }
+                disabled={(!canAdvancedNext && currentPhraseIndex >= totalPhrases - 1) || isSubmitting}
                 className="flex items-center justify-center sm:justify-start px-4 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px] touch-manipulation"
               >
                 <span className="pointer-events-none">Next</span>

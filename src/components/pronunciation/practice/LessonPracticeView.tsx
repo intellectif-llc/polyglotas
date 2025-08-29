@@ -13,6 +13,7 @@ import { useLastSpeechAttempt } from "@/hooks/speech/useLastSpeechAttempt";
 import { AssessmentResults } from "@/hooks/speech/useRecognitionState";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import ActivitySwitcher from "../shared/ActivitySwitcher";
+import { useAdvancedNavigation } from "@/hooks/useAdvancedNavigation";
 
 export default function LessonPracticeView() {
   const params = useParams();
@@ -102,17 +103,41 @@ export default function LessonPracticeView() {
     };
   }, [cleanupRecognizer]);
 
-  const handleNext = () => {
+  const {
+    canNavigateNext: canAdvancedNext,
+    canNavigatePrevious: canAdvancedPrevious,
+    navigateNext: advancedNext,
+    navigatePrevious: advancedPrevious
+  } = useAdvancedNavigation({
+    unitId,
+    lessonId,
+    activity: "practice",
+    phraseIndex: currentPhraseIndex
+  });
+
+  const handleNext = async () => {
+    // First try local phrase navigation
     if (data && currentPhraseIndex < data.phrases.length - 1) {
       setCurrentPhraseIndex(currentPhraseIndex + 1);
-      // State will be updated in useEffect based on last attempt
+      return;
+    }
+    
+    // If at last phrase, use advanced navigation for cross-activity/lesson navigation
+    if (canAdvancedNext) {
+      await advancedNext();
     }
   };
 
-  const handlePrevious = () => {
+  const handlePrevious = async () => {
+    // First try local phrase navigation
     if (currentPhraseIndex > 0) {
       setCurrentPhraseIndex(currentPhraseIndex - 1);
-      // State will be updated in useEffect based on last attempt
+      return;
+    }
+    
+    // If at first phrase, use advanced navigation for cross-activity/lesson navigation
+    if (canAdvancedPrevious) {
+      await advancedPrevious();
     }
   };
 
@@ -231,12 +256,12 @@ export default function LessonPracticeView() {
             className="mb-20"
           />
 
-          {/* Navigation Buttons - matching sample project positioning */}
+          {/* Navigation Buttons - Enhanced with cross-content navigation */}
           <div className="absolute bottom-6 left-6 right-6 flex justify-between">
             <button
               onClick={handlePrevious}
               disabled={
-                currentPhraseIndex === 0 ||
+                (!canAdvancedPrevious && currentPhraseIndex === 0) ||
                 uiState === UIState.Listening ||
                 uiState === UIState.Processing
               }
@@ -249,7 +274,7 @@ export default function LessonPracticeView() {
             <button
               onClick={handleNext}
               disabled={
-                currentPhraseIndex >= totalPhrases - 1 ||
+                (!canAdvancedNext && currentPhraseIndex >= totalPhrases - 1) ||
                 uiState === UIState.Listening ||
                 uiState === UIState.Processing
               }
