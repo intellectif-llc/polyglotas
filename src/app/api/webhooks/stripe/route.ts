@@ -180,6 +180,8 @@ async function handleSubscriptionCreated(
       return;
     }
 
+    console.log(`Creating subscription ${subscriptionData.id} for customer ${subscriptionData.customer}`);
+    
     // Use the new database function to handle subscription creation
     const { error } = await supabase.rpc("upsert_stripe_subscription", {
       p_stripe_subscription_id: subscriptionData.id as string,
@@ -214,6 +216,8 @@ async function handleSubscriptionUpdated(
       return;
     }
 
+    console.log(`Updating subscription ${subscriptionData.id} for customer ${subscriptionData.customer}`);
+    
     // Use the same database function to handle subscription updates
     const { error } = await supabase.rpc("upsert_stripe_subscription", {
       p_stripe_subscription_id: subscriptionData.id as string,
@@ -290,11 +294,35 @@ async function handleInvoicePaymentSucceeded(
   invoiceData: Record<string, unknown>
 ) {
   try {
+    let subscriptionId = (invoiceData.subscription as string) || "";
+    
+    // If no subscription ID in invoice, try to find active subscription for customer
+    if (!subscriptionId) {
+      const { data: activeSubscription } = await supabase
+        .from("student_subscriptions")
+        .select(`
+          stripe_subscription_id,
+          student_profiles!inner(stripe_customer_id)
+        `)
+        .eq("student_profiles.stripe_customer_id", invoiceData.customer as string)
+        .in("status", ["active", "trialing"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (activeSubscription?.stripe_subscription_id) {
+        subscriptionId = activeSubscription.stripe_subscription_id;
+        console.log(`Found active subscription ${subscriptionId} for customer ${invoiceData.customer}`);
+      }
+    }
+    
+    console.log(`Processing invoice ${invoiceData.id} with subscription_id: ${subscriptionId || 'NULL'}`);
+    
     // Use the new database function to handle invoice upsert
     const { error } = await supabase.rpc("upsert_stripe_invoice", {
       p_stripe_invoice_id: invoiceData.id as string,
       p_stripe_customer_id: invoiceData.customer as string,
-      p_stripe_subscription_id: (invoiceData.subscription as string) || null,
+      p_stripe_subscription_id: subscriptionId,
       p_invoice_data: {
         ...invoiceData,
         status: "paid", // Override status for successful payment
@@ -315,11 +343,35 @@ async function handleInvoicePaymentFailed(
   invoiceData: Record<string, unknown>
 ) {
   try {
+    let subscriptionId = (invoiceData.subscription as string) || "";
+    
+    // If no subscription ID in invoice, try to find active subscription for customer
+    if (!subscriptionId) {
+      const { data: activeSubscription } = await supabase
+        .from("student_subscriptions")
+        .select(`
+          stripe_subscription_id,
+          student_profiles!inner(stripe_customer_id)
+        `)
+        .eq("student_profiles.stripe_customer_id", invoiceData.customer as string)
+        .in("status", ["active", "trialing"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (activeSubscription?.stripe_subscription_id) {
+        subscriptionId = activeSubscription.stripe_subscription_id;
+        console.log(`Found active subscription ${subscriptionId} for customer ${invoiceData.customer}`);
+      }
+    }
+    
+    console.log(`Processing failed invoice ${invoiceData.id} with subscription_id: ${subscriptionId || 'NULL'}`);
+    
     // Use the new database function to handle invoice upsert
     const { error } = await supabase.rpc("upsert_stripe_invoice", {
       p_stripe_invoice_id: invoiceData.id as string,
       p_stripe_customer_id: invoiceData.customer as string,
-      p_stripe_subscription_id: (invoiceData.subscription as string) || null,
+      p_stripe_subscription_id: subscriptionId,
       p_invoice_data: {
         ...invoiceData,
         status: "past_due", // Override status for failed payment
