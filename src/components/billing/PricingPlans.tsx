@@ -54,7 +54,11 @@ export default function PricingPlans() {
   };
 
   const organizedPlans = useMemo(() => {
-    if (!plans) return { starter: {} as Record<'month' | 'year', PricingPlan>, pro: {} as Record<'month' | 'year', PricingPlan> };
+    if (!plans)
+      return {
+        starter: {} as Record<"month" | "year", PricingPlan>,
+        pro: {} as Record<"month" | "year", PricingPlan>,
+      };
 
     const starterPlans = plans.filter((p) => p.tier_key === "starter");
     const proPlans = plans.filter((p) => p.tier_key === "pro");
@@ -138,7 +142,7 @@ export default function PricingPlans() {
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               billingCycle === "month"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer"
             }`}
           >
             Monthly
@@ -148,12 +152,15 @@ export default function PricingPlans() {
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
               billingCycle === "year"
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer"
             }`}
           >
             Yearly
             {(starterSavings?.percentage || proSavings?.percentage) && (
-              <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+              <span
+                className="absolute -top-3 -right-2 bg-green-500 text-white text-xs px-1.5 
+              py-0.5 rounded-full cursor-pointer"
+              >
                 Save {starterSavings?.percentage || proSavings?.percentage}%
               </span>
             )}
