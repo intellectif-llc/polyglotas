@@ -135,14 +135,12 @@ export default function BillingDashboard() {
       />
 
       {/* Pricing Plans Section */}
-      {currentTier === "free" && (
-        <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Upgrade Your Plan
-          </h2>
-          <PricingPlans />
-        </div>
-      )}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {currentTier === "free" ? "Upgrade Your Plan" : "Change Your Plan"}
+        </h2>
+        <PricingPlans />
+      </div>
 
       {/* Quick Actions */}
       {currentSubscription && (

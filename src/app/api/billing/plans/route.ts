@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+type ProductInfo = {
+  name: string;
+  tier_key: string;
+};
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -26,6 +31,7 @@ export async function GET() {
         currency,
         billing_interval,
         interval_count,
+        product_id,
         products (
           name,
           tier_key
@@ -53,8 +59,8 @@ export async function GET() {
         currency: plan.currency,
         billing_interval: plan.billing_interval,
         interval_count: plan.interval_count,
-        product_name: plan.products?.[0]?.name,
-        tier_key: plan.products?.[0]?.tier_key,
+        product_name: Array.isArray(plan.products) ? plan.products[0]?.name : (plan.products as ProductInfo)?.name,
+        tier_key: Array.isArray(plan.products) ? plan.products[0]?.tier_key : (plan.products as ProductInfo)?.tier_key,
       })) || [];
 
     return NextResponse.json(formattedPlans);
