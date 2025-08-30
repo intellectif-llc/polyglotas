@@ -1327,11 +1327,9 @@ $function$
 ## process_user_activity
 
 ### Description
-
-A comprehensive function that acts as the main entry point for processing user activity within a lesson. It handles different activity types (pronunciation, dictation, chat), records attempts, calculates and awards various points bonuses (streaks, first-try, accuracy, comeback), updates user progress at the word, phrase, and activity level, and triggers checks for unit and level completion.
+A comprehensive function that acts as the main entry point for processing all user activity within a lesson. On the first user activity of the day, it calls the handle_user_streak function to award a daily streak bonus. It then handles different activity types ('pronunciation', 'dictation', 'chat'), records attempts, calculates and awards various points bonuses (first-try, accuracy, comeback), updates user progress at the word, phrase, and activity level, and triggers checks for unit completion.
 
 ### Parameters
-
 profile_id_param (uuid): The user's profile ID.
 
 lesson_id_param (integer): The lesson ID.
@@ -1365,10 +1363,9 @@ overall_similarity_score_param (numeric, optional): Similarity score for dictati
 word_level_feedback_param (jsonb, optional): Word-level feedback for dictation.
 
 ### Returns
-
 A table with the following column:
 
-points_awarded_total (integer): The total number of points awarded for the activity.
+points_awarded_total (integer): The total number of points awarded for the activity, including any streak bonuses.
 
 ### Definition
 
@@ -1377,10 +1374,10 @@ RETURNS TABLE(points_awarded_total integer)
 LANGUAGE plpgsql
 AS $function$
 DECLARE
--- IDs and Metadata
-v_lesson_progress_id INT;
-v_activity_progress_id INT;
-v_unit_id INT;
+    -- IDs and Metadata
+    v_lesson_progress_id INT;
+    v_activity_progress_id INT;
+    v_unit_id INT;
 
     -- Attempt & Progress Tracking
     next_attempt_number INT;
@@ -1399,50 +1396,44 @@ v_unit_id INT;
     v_word_text TEXT;
     v_accuracy_score NUMERIC;
     word_needs_practice BOOLEAN;
-
-    -- Streak variables
-    current_streak INT;
-    last_streak DATE;
-    new_streak INT;
-    points_for_streak INT := 0;
-    today DATE := current_date;
-    yesterday DATE := current_date - 1;
-
+    
+    -- No longer need streak variables here
 BEGIN
--- Handle chat activity (no phrase_id required)
-IF activity_type_param = 'chat' THEN
--- Check if user already engaged today (has any prompt addressed today)
-IF NOT EXISTS (
-SELECT 1 FROM public.conversation_prompt_status cps
-JOIN public.lesson_chat_conversations lcc ON cps.conversation_id = lcc.conversation_id
-WHERE lcc.profile_id = profile_id_param
-AND DATE(cps.addressed_at) = today
-) THEN
--- Handle Streaks for first chat engagement of the day
-SELECT current_streak_days, last_streak_date INTO current_streak, last_streak
-FROM public.student_profiles WHERE profile_id = profile_id_param;
+    -- --- ADDED ---
+    -- Step 1: Handle Daily Streak Bonus (now robust and centralized)
+    -- This function will only award points once per day on the first activity.
+    total_points_for_this_attempt := total_points_for_this_attempt + public.handle_user_streak(profile_id_param);
 
-            IF last_streak IS NULL OR last_streak < today THEN
-                IF last_streak = yesterday THEN
-                    new_streak := COALESCE(current_streak, 0) + 1;
-                ELSE
-                    new_streak := 1;
-                END IF;
+    -- Step 2: Ensure user_lesson_progress exists for all activity types
+    INSERT INTO public.user_lesson_progress (profile_id, lesson_id, last_progress_at)
+    VALUES (profile_id_param, lesson_id_param, NOW())
+    ON CONFLICT (profile_id, lesson_id) DO UPDATE SET last_progress_at = NOW()
+    RETURNING progress_id INTO v_lesson_progress_id;
 
-                points_for_streak := floor((new_streak - 1) / 7) + 1;
-                IF points_for_streak > 0 THEN
-                    total_points_for_this_attempt := total_points_for_this_attempt + points_for_streak;
-                    INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code)
-                    VALUES (profile_id_param, points_for_streak, 'STREAK_BONUS');
-                END IF;
+    IF v_lesson_progress_id IS NULL THEN
+      SELECT progress_id INTO v_lesson_progress_id FROM public.user_lesson_progress
+      WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param;
+    END IF;
 
-                UPDATE public.student_profiles
-                SET current_streak_days = new_streak, last_streak_date = today
-                WHERE profile_id = profile_id_param;
-            END IF;
-        END IF;
+    -- Step 3: Handle activity progress creation for all activity types
+    SELECT activity_progress_id, (status = 'completed')
+    INTO v_activity_progress_id, was_activity_already_completed
+    FROM public.user_lesson_activity_progress
+    WHERE user_lesson_progress_id = v_lesson_progress_id AND activity_type = activity_type_param;
 
-        -- Update total points if any were awarded
+    IF v_activity_progress_id IS NULL THEN
+        INSERT INTO public.user_lesson_activity_progress (user_lesson_progress_id, activity_type, status, started_at)
+        VALUES (v_lesson_progress_id, activity_type_param, 'in_progress', NOW())
+        RETURNING activity_progress_id INTO v_activity_progress_id;
+        was_activity_already_completed := FALSE;
+    END IF;
+
+    -- Step 4: Handle chat activity (no phrase_id required)
+    IF activity_type_param = 'chat' THEN
+        -- The streak logic that was here is now handled at the start of the function.
+        -- We only need to handle the final point update and return.
+        
+        -- Update total points if any were awarded from the streak
         IF total_points_for_this_attempt > 0 THEN
             UPDATE public.student_profiles SET points = points + total_points_for_this_attempt
             WHERE profile_id = profile_id_param;
@@ -1457,171 +1448,83 @@ FROM public.student_profiles WHERE profile_id = profile_id_param;
         RAISE EXCEPTION 'phrase_id_param is required for % activity', activity_type_param;
     END IF;
 
--- Step 1: Insert the specific attempt record
-IF activity_type_param = 'pronunciation' THEN
-SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number
-FROM public.speech_attempts
-WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
-
-        INSERT INTO public.speech_attempts (
-            profile_id, lesson_id, phrase_id, language_code, attempt_number,
-            reference_text, recognized_text, accuracy_score, fluency_score,
-            completeness_score, pronunciation_score, prosody_score, phonetic_data
-        ) VALUES (
-            profile_id_param, lesson_id_param, phrase_id_param, language_code_param, next_attempt_number,
-            reference_text_param, recognized_text_param, accuracy_score_param, fluency_score_param,
-            completeness_score_param, pronunciation_score_param, prosody_score_param, phonetic_data_param
-        );
+    -- Step 5: Insert the specific attempt record
+    IF activity_type_param = 'pronunciation' THEN
+        -- ... (rest of the function remains the same)
+        SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number FROM public.speech_attempts WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+        INSERT INTO public.speech_attempts (profile_id, lesson_id, phrase_id, language_code, attempt_number, reference_text, recognized_text, accuracy_score, fluency_score, completeness_score, pronunciation_score, prosody_score, phonetic_data) VALUES (profile_id_param, lesson_id_param, phrase_id_param, language_code_param, next_attempt_number, reference_text_param, recognized_text_param, accuracy_score_param, fluency_score_param, completeness_score_param, pronunciation_score_param, prosody_score_param, phonetic_data_param);
         v_score := accuracy_score_param;
     ELSIF activity_type_param = 'dictation' THEN
-        SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number
-        FROM public.dictation_attempts
-        WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
-
-        INSERT INTO public.dictation_attempts (
-            profile_id, lesson_id, phrase_id, language_code, attempt_number,
-            reference_text, written_text, overall_similarity_score, word_level_feedback
-        ) VALUES (
-            profile_id_param, lesson_id_param, phrase_id_param, language_code_param, next_attempt_number,
-            reference_text_param, written_text_param, overall_similarity_score_param, word_level_feedback_param
-        );
+        SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt_number FROM public.dictation_attempts WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+        INSERT INTO public.dictation_attempts (profile_id, lesson_id, phrase_id, language_code, attempt_number, reference_text, written_text, overall_similarity_score, word_level_feedback) VALUES (profile_id_param, lesson_id_param, phrase_id_param, language_code_param, next_attempt_number, reference_text_param, written_text_param, overall_similarity_score_param, word_level_feedback_param);
         v_score := overall_similarity_score_param;
     END IF;
 
-    -- Step 2: Handle word-level analytics (for pronunciation only)
+    -- Step 6: Handle word-level analytics (for pronunciation only)
+    -- ... (logic remains the same)
     IF activity_type_param = 'pronunciation' AND jsonb_typeof(phonetic_data_param->'words') = 'array' THEN
-        FOR word_record IN SELECT * FROM jsonb_array_elements(phonetic_data_param->'words')
-        LOOP
+        FOR word_record IN SELECT * FROM jsonb_array_elements(phonetic_data_param->'words') LOOP
             v_word_text := lower(word_record->>'word');
             v_accuracy_score := (word_record->>'accuracyScore')::numeric;
-
             IF v_word_text IS NOT NULL AND v_accuracy_score IS NOT NULL THEN
-                SELECT needs_practice INTO word_needs_practice FROM public.user_word_pronunciation
-                WHERE profile_id = profile_id_param AND word_text = v_word_text AND language_code = language_code_param;
-
+                SELECT needs_practice INTO word_needs_practice FROM public.user_word_pronunciation WHERE profile_id = profile_id_param AND word_text = v_word_text AND language_code = language_code_param;
                 IF COALESCE(word_needs_practice, false) AND v_accuracy_score >= 70 THEN
                     total_points_for_this_attempt := total_points_for_this_attempt + 1;
-                    INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_word_text, related_word_language_code, related_phrase_id, activity_type)
-                    VALUES (profile_id_param, 1, 'COMEBACK_BONUS', v_word_text, language_code_param, phrase_id_param, 'pronunciation');
+                    INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_word_text, related_word_language_code, related_phrase_id, activity_type) VALUES (profile_id_param, 1, 'COMEBACK_BONUS', v_word_text, language_code_param, phrase_id_param, 'pronunciation');
                 END IF;
-                 PERFORM public.handle_user_word_pronunciation_update(profile_id_param, language_code_param, word_record);
+                PERFORM public.handle_user_word_pronunciation_update(profile_id_param, language_code_param, word_record);
             END IF;
         END LOOP;
     END IF;
 
-    -- Step 3: Upsert phrase progress & handle phrase-level bonuses
+    -- Step 7: Upsert phrase progress & handle phrase-level bonuses
+    -- ... (logic remains the same)
     is_phrase_now_completed := (v_score >= 70);
-
     IF activity_type_param = 'pronunciation' THEN
         SELECT pronunciation_completed INTO was_phrase_already_completed FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
     ELSIF activity_type_param = 'dictation' THEN
         SELECT dictation_completed INTO was_phrase_already_completed FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
     END IF;
     was_phrase_already_completed := COALESCE(was_phrase_already_completed, false);
-
     IF NOT was_phrase_already_completed AND is_phrase_now_completed THEN
         IF next_attempt_number = 1 THEN
             total_points_for_this_attempt := total_points_for_this_attempt + 1;
-            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, related_phrase_id, activity_type)
-            VALUES (profile_id_param, 1, 'FIRST_TRY_BONUS', lesson_id_param, phrase_id_param, activity_type_param);
+            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, related_phrase_id, activity_type) VALUES (profile_id_param, 1, 'FIRST_TRY_BONUS', lesson_id_param, phrase_id_param, activity_type_param);
         END IF;
         IF v_score >= 90 THEN
             total_points_for_this_attempt := total_points_for_this_attempt + 1;
-            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, related_phrase_id, activity_type)
-            VALUES (profile_id_param, 1, 'PHRASE_ACCURACY_BONUS', lesson_id_param, phrase_id_param, activity_type_param);
+            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, related_phrase_id, activity_type) VALUES (profile_id_param, 1, 'PHRASE_ACCURACY_BONUS', lesson_id_param, phrase_id_param, activity_type_param);
         END IF;
     END IF;
-
-    INSERT INTO public.user_phrase_progress (profile_id, lesson_id, phrase_id, language_code)
-    VALUES (profile_id_param, lesson_id_param, phrase_id_param, language_code_param)
-    ON CONFLICT (profile_id, lesson_id, phrase_id, language_code) DO NOTHING;
-
+    INSERT INTO public.user_phrase_progress (profile_id, lesson_id, phrase_id, language_code) VALUES (profile_id_param, lesson_id_param, phrase_id_param, language_code_param) ON CONFLICT (profile_id, lesson_id, phrase_id, language_code) DO NOTHING;
     IF activity_type_param = 'pronunciation' THEN
-        UPDATE public.user_phrase_progress SET
-            pronunciation_attempts = COALESCE(pronunciation_attempts, 0) + 1,
-            pronunciation_last_attempt_at = NOW(),
-            pronunciation_completed = was_phrase_already_completed OR is_phrase_now_completed,
-            last_progress_at = NOW()
-        WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+        UPDATE public.user_phrase_progress SET pronunciation_attempts = COALESCE(pronunciation_attempts, 0) + 1, pronunciation_last_attempt_at = NOW(), pronunciation_completed = was_phrase_already_completed OR is_phrase_now_completed, last_progress_at = NOW() WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
     ELSIF activity_type_param = 'dictation' THEN
-        UPDATE public.user_phrase_progress SET
-            dictation_attempts = COALESCE(dictation_attempts, 0) + 1,
-            dictation_last_attempt_at = NOW(),
-            dictation_completed = was_phrase_already_completed OR is_phrase_now_completed,
-            last_progress_at = NOW()
-        WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
+        UPDATE public.user_phrase_progress SET dictation_attempts = COALESCE(dictation_attempts, 0) + 1, dictation_last_attempt_at = NOW(), dictation_completed = was_phrase_already_completed OR is_phrase_now_completed, last_progress_at = NOW() WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_id = phrase_id_param;
     END IF;
 
-    -- Step 4: Handle Activity Completion
-    INSERT INTO public.user_lesson_progress (profile_id, lesson_id, last_progress_at)
-    VALUES (profile_id_param, lesson_id_param, NOW())
-    ON CONFLICT (profile_id, lesson_id) DO UPDATE SET last_progress_at = NOW()
-    RETURNING progress_id INTO v_lesson_progress_id;
-
-    IF v_lesson_progress_id IS NULL THEN
-      SELECT progress_id INTO v_lesson_progress_id FROM public.user_lesson_progress
-      WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param;
-    END IF;
-
-    SELECT activity_progress_id, (status = 'completed')
-    INTO v_activity_progress_id, was_activity_already_completed
-    FROM public.user_lesson_activity_progress
-    WHERE user_lesson_progress_id = v_lesson_progress_id AND activity_type = activity_type_param;
-
-    IF v_activity_progress_id IS NULL THEN
-        INSERT INTO public.user_lesson_activity_progress (user_lesson_progress_id, activity_type, status, started_at)
-        VALUES (v_lesson_progress_id, activity_type_param, 'in_progress', NOW())
-        RETURNING activity_progress_id INTO v_activity_progress_id;
-        was_activity_already_completed := FALSE;
-    END IF;
-
+    -- Step 8: Handle Activity Completion for phrase-based activities
+    -- ... (logic remains the same)
     IF NOT COALESCE(was_activity_already_completed, false) THEN
         SELECT l.total_phrases INTO total_phrases_in_lesson FROM public.lessons l WHERE l.lesson_id = lesson_id_param;
-
         IF activity_type_param = 'pronunciation' THEN
             SELECT COUNT(*) INTO phrases_completed_for_activity FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND pronunciation_completed = TRUE;
         ELSIF activity_type_param = 'dictation' THEN
             SELECT COUNT(*) INTO phrases_completed_for_activity FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND dictation_completed = TRUE;
         END IF;
-
         IF phrases_completed_for_activity >= total_phrases_in_lesson THEN
-            UPDATE public.user_lesson_activity_progress
-            SET status = 'completed', completed_at = NOW()
-            WHERE activity_progress_id = v_activity_progress_id;
-
+            UPDATE public.user_lesson_activity_progress SET status = 'completed', completed_at = NOW() WHERE activity_progress_id = v_activity_progress_id;
             total_points_for_this_attempt := total_points_for_this_attempt + 10;
-            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, activity_type)
-            VALUES (profile_id_param, 10, 'ACTIVITY_COMPLETION', lesson_id_param, activity_type_param);
-
+            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code, related_lesson_id, activity_type) VALUES (profile_id_param, 10, 'ACTIVITY_COMPLETION', lesson_id_param, activity_type_param);
             SELECT l.unit_id INTO v_unit_id FROM public.lessons l WHERE l.lesson_id = lesson_id_param;
             PERFORM public.check_and_award_unit_completion_bonus(profile_id_param, v_unit_id, lesson_id_param);
         END IF;
     END IF;
+    
+    -- --- REMOVED ---
+    -- The old streak logic from Step 8 has been removed.
 
-    -- Step 5: Handle Streaks
-    SELECT current_streak_days, last_streak_date INTO current_streak, last_streak
-    FROM public.student_profiles WHERE profile_id = profile_id_param;
-
-    IF last_streak IS NULL OR last_streak < today THEN
-        IF last_streak = yesterday THEN
-            new_streak := COALESCE(current_streak, 0) + 1;
-        ELSE
-            new_streak := 1;
-        END IF;
-
-        points_for_streak := floor((new_streak - 1) / 7) + 1;
-        IF points_for_streak > 0 THEN
-            total_points_for_this_attempt := total_points_for_this_attempt + points_for_streak;
-            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code)
-            VALUES (profile_id_param, points_for_streak, 'STREAK_BONUS');
-        END IF;
-
-        UPDATE public.student_profiles
-        SET current_streak_days = new_streak, last_streak_date = today
-        WHERE profile_id = profile_id_param;
-    END IF;
-
-    -- Step 6: Final point update
+    -- Step 9: Final point update
     IF total_points_for_this_attempt > 0 THEN
         UPDATE public.student_profiles SET points = points + total_points_for_this_attempt
         WHERE profile_id = profile_id_param;
@@ -1630,7 +1533,78 @@ WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND phrase_i
     RETURN QUERY SELECT total_points_for_this_attempt;
 
 END;
+$function$;
+
+## handle_user_streak
+
+### Description
+A centralized and idempotent function to manage daily user streaks. It checks if a user has performed an activity for the day, continues or resets their streak accordingly, and awards a tiered points bonus. The points awarded increase based on the length of the streak, up to a maximum of 10 points per day. This function is designed to be called safely on every user activity but will only grant a bonus once per day.
+
+### Parameters
+profile_id_param (uuid): The unique identifier for the user's profile.
+
+### Returns
+integer: The total number of points awarded for the streak bonus. Returns 0 if a bonus has already been awarded for the current day.
+
+### definition
+CREATE OR REPLACE FUNCTION public.handle_user_streak(profile_id_param uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    current_streak INT;
+    last_streak_date DATE;
+    new_streak INT;
+    points_for_streak INT := 0;
+    today DATE := current_date;
+    yesterday DATE := current_date - 1;
+BEGIN
+    -- Get the user's current streak information
+    SELECT 
+        p.current_streak_days, 
+        p.last_streak_date 
+    INTO 
+        current_streak, 
+        last_streak_date
+    FROM public.student_profiles p
+    WHERE p.profile_id = profile_id_param;
+
+    -- Only proceed if the user hasn't already performed an activity today
+    IF last_streak_date IS NULL OR last_streak_date < today THEN
+        -- Determine if the streak is continuing or resetting
+        IF last_streak_date = yesterday THEN
+            new_streak := COALESCE(current_streak, 0) + 1; -- Continue the streak
+        ELSE
+            new_streak := 1; -- Reset the streak
+        END IF;
+
+        -- Calculate points based on the new tiered logic
+        -- 1. For every 5 days, the points-per-day increases by 1
+        -- 2. LEAST() ensures the maximum points awarded per streak is 10
+        points_for_streak := LEAST(floor((new_streak - 1) / 5) + 1, 10);
+
+        -- Update the user's profile with the new streak information
+        UPDATE public.student_profiles
+        SET 
+            current_streak_days = new_streak, 
+            last_streak_date = today
+        WHERE profile_id = profile_id_param;
+
+        -- If points were awarded, log them
+        IF points_for_streak > 0 THEN
+            INSERT INTO public.user_points_log (profile_id, points_awarded, reason_code)
+            VALUES (profile_id_param, points_for_streak, 'STREAK_BONUS');
+        END IF;
+
+        -- Return the points awarded for this streak
+        RETURN points_for_streak;
+    END IF;
+
+    -- If a streak was already awarded today, return 0 points
+    RETURN 0;
+END;
 $function$
+
 
 ## process_word_practice_attempt
 
