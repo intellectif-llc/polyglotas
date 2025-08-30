@@ -113,42 +113,39 @@ function SuggestedAnswerButton({
 
       {/* Persistent suggestion panel */}
       {isExpanded && (
-        <div className="fixed bottom-6 right-4 w-72 bg-white border border-gray-200 rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-2 duration-200">
-          {/* Header with close button */}
-          <div className="flex items-center justify-between p-3 border-b border-gray-100">
-            <div className="text-sm text-gray-600 font-medium flex items-center gap-2">
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 bg-white border-2 border-purple-200 rounded-xl shadow-2xl z-[9999] animate-in fade-in duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 rounded-t-xl">
+            <div className="text-sm text-purple-700 font-medium flex items-center gap-2">
               <Lightbulb size={14} className="text-yellow-600" />
               Sample response
             </div>
             <button
               onClick={() => setIsExpanded(false)}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
+              className="text-purple-400 hover:text-purple-600 p-1 rounded hover:bg-purple-100 transition-colors"
             >
               ✕
             </button>
           </div>
 
-          {/* Suggestion text */}
+          {/* Content */}
           <div className="p-3">
             <div
               ref={suggestionRef}
-              className="text-sm text-gray-800 p-3 bg-blue-50 rounded border-l-4 border-blue-400 italic selectable-ai-text cursor-text mb-3"
+              className="text-gray-800 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded border border-purple-200 italic selectable-ai-text cursor-text mb-3"
             >
               &ldquo;{suggestion}&rdquo;
             </div>
 
-            {/* Audio button */}
             <button
               onClick={handlePlayAudio}
               disabled={!!playingMessageId && !isPlaying}
-              className={`w-full flex items-center justify-center gap-2 text-sm bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors font-medium disabled:opacity-50 ${
-                isPlaying ? "animate-pulse bg-green-700" : ""
+              className={`w-full flex items-center justify-center gap-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors font-medium disabled:opacity-50 ${
+                isPlaying ? "animate-pulse" : ""
               }`}
             >
               {isPlaying ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              {isPlaying
-                ? "Playing pronunciation..."
-                : "Listen to pronunciation"}
+              {isPlaying ? "Playing..." : "Listen to pronunciation"}
             </button>
           </div>
         </div>
@@ -271,7 +268,13 @@ export default function MessageBubble({
         <div
           className={`
             max-w-xs lg:max-w-md px-4 pr-6 py-2 rounded-lg relative transition-all duration-500
-            ${isUser ? "bg-blue-600 text-white" : isLoadingAudio ? "bg-gradient-to-r from-blue-100 via-purple-100 to-blue-100 animate-shimmer" : "bg-gray-100 text-gray-900"}
+            ${
+              isUser
+                ? "bg-blue-600 text-white"
+                : isLoadingAudio
+                ? "bg-gradient-to-r from-blue-100 via-purple-100 to-blue-100 animate-shimmer"
+                : "bg-gray-100 text-gray-900"
+            }
           `}
         >
           {/* Audio controls for AI messages - moved to top right */}

@@ -154,7 +154,7 @@ const WordTooltip: React.FC<WordTooltipProps> = ({
       )}
       <div
         ref={tooltipRef}
-        className={`fixed z-50 p-3 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl transition-all duration-150 ${
+        className={`fixed z-[10000] p-3 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl transition-all duration-150 ${
           isMobile 
             ? "w-[calc(100vw-2rem)] max-w-sm" 
             : "w-70 max-w-[280px]"
