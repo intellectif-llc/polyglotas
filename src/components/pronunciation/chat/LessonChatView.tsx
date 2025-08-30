@@ -41,6 +41,7 @@ export default function LessonChatView({
     sendMessage,
     isSendingMessage,
     playingMessageId,
+    loadingAudioId,
     playAudioForMessage,
   } = useChatConversation(lessonId);
 
@@ -207,6 +208,7 @@ export default function LessonChatView({
                   key={`${message.message_id}-${index}`}
                   message={message}
                   playingMessageId={playingMessageId}
+                  loadingAudioId={loadingAudioId}
                   onPlayAudio={playAudioForMessage}
                 />
               ))

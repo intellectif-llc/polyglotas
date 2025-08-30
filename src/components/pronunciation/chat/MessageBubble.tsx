@@ -171,17 +171,20 @@ function SuggestedAnswerButton({
 interface MessageBubbleProps {
   message: ChatMessage;
   playingMessageId: string | null;
+  loadingAudioId: string | null;
   onPlayAudio: (messageId: string, text: string) => void;
 }
 
 export default function MessageBubble({
   message,
   playingMessageId,
+  loadingAudioId,
   onPlayAudio,
 }: MessageBubbleProps) {
   const isUser = message.sender_type === "user";
   const isAI = message.sender_type === "ai";
   const isPlayingAudio = playingMessageId === message.message_id;
+  const isLoadingAudio = loadingAudioId === message.message_id;
 
   const [tooltipConfig, setTooltipConfig] = useState({
     visible: false,
@@ -267,8 +270,8 @@ export default function MessageBubble({
       <div className="relative">
         <div
           className={`
-            max-w-xs lg:max-w-md px-4 pr-6 py-2 rounded-lg relative
-            ${isUser ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"}
+            max-w-xs lg:max-w-md px-4 pr-6 py-2 rounded-lg relative transition-all duration-500
+            ${isUser ? "bg-blue-600 text-white" : isLoadingAudio ? "bg-gradient-to-r from-blue-100 via-purple-100 to-blue-100 animate-shimmer" : "bg-gray-100 text-gray-900"}
           `}
         >
           {/* Audio controls for AI messages - moved to top right */}
@@ -294,9 +297,9 @@ export default function MessageBubble({
           {/* Message text */}
           <div
             ref={messageContentRef}
-            className={`whitespace-pre-wrap break-words ${
+            className={`whitespace-pre-wrap break-words transition-all duration-300 ${
               isAI ? "selectable-ai-text" : ""
-            }`}
+            } ${isLoadingAudio ? "animate-pulse blur-[0.5px]" : ""}`}
           >
             {message.message_text}
           </div>

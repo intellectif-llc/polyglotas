@@ -27,6 +27,7 @@ const config: Config = {
       animation: {
         'slide-in-from-top': 'slideInFromTop 0.3s ease-out',
         'fade-in': 'fadeIn 0.3s ease-out',
+        'shimmer': 'shimmer 2s ease-in-out infinite',
       },
       keyframes: {
         slideInFromTop: {
@@ -36,6 +37,11 @@ const config: Config = {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '50%': { backgroundPosition: '0% 0' },
+          '100%': { backgroundPosition: '200% 0' },
         },
       },
     },

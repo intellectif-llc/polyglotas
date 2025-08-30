@@ -42,6 +42,8 @@ export function useChatConversation(lessonId: string) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [addressedPromptIds, setAddressedPromptIds] = useState<number[]>([]);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [loadingAudioId, setLoadingAudioId] = useState<string | null>(null);
+  const [loadingTimeouts, setLoadingTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
 
   // Stop playing audio when component unmounts
   useEffect(() => {
@@ -178,10 +180,22 @@ export function useChatConversation(lessonId: string) {
   // Function to play audio for a specific message
   const playAudioForMessage = useCallback(async (messageId: string, text: string) => {
     if (playingMessageId === messageId) {
-      // Logic to stop audio if it's already playing could go here
-      // For now, we just prevent re-playing
       return;
     }
+
+    setLoadingAudioId(messageId);
+
+    // Set 10-second timeout to clear loading state if request fails
+    const timeout = setTimeout(() => {
+      setLoadingAudioId(prev => prev === messageId ? null : prev);
+      setLoadingTimeouts(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(messageId);
+        return newMap;
+      });
+    }, 10000);
+
+    setLoadingTimeouts(prev => new Map(prev).set(messageId, timeout));
 
     try {
       const response = await fetch("/api/chat/stream-audio", {
@@ -198,7 +212,16 @@ export function useChatConversation(lessonId: string) {
         const audio = new Audio(audioUrl);
 
         audio.oncanplaythrough = () => {
-          // Only set playing state when audio is ready to play
+          const timeout = loadingTimeouts.get(messageId);
+          if (timeout) {
+            clearTimeout(timeout);
+            setLoadingTimeouts(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(messageId);
+              return newMap;
+            });
+          }
+          setLoadingAudioId(null);
           setPlayingMessageId(messageId);
         };
 
@@ -209,14 +232,44 @@ export function useChatConversation(lessonId: string) {
 
         audio.onerror = () => {
           URL.revokeObjectURL(audioUrl);
+          const timeout = loadingTimeouts.get(messageId);
+          if (timeout) {
+            clearTimeout(timeout);
+            setLoadingTimeouts(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(messageId);
+              return newMap;
+            });
+          }
+          setLoadingAudioId(null);
           setPlayingMessageId(null);
         };
 
         await audio.play();
+      } else {
+        const timeout = loadingTimeouts.get(messageId);
+        if (timeout) {
+          clearTimeout(timeout);
+          setLoadingTimeouts(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(messageId);
+            return newMap;
+          });
+        }
+        setLoadingAudioId(null);
       }
     } catch (error) {
       console.error("Failed to play AI message:", error);
-      setPlayingMessageId(null);
+      const timeout = loadingTimeouts.get(messageId);
+      if (timeout) {
+        clearTimeout(timeout);
+        setLoadingTimeouts(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(messageId);
+          return newMap;
+        });
+      }
+      setLoadingAudioId(null);
     }
   }, [playingMessageId]);
 
@@ -261,6 +314,7 @@ export function useChatConversation(lessonId: string) {
     sendMessage: sendMessageMutation.mutateAsync,
     isSendingMessage: sendMessageMutation.isPending,
     playingMessageId,
+    loadingAudioId,
     playAudioForMessage,
   };
 }
