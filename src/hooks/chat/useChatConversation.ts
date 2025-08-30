@@ -183,8 +183,6 @@ export function useChatConversation(lessonId: string) {
       return;
     }
 
-    setPlayingMessageId(messageId);
-
     try {
       const response = await fetch("/api/chat/stream-audio", {
         method: "POST",
@@ -199,6 +197,11 @@ export function useChatConversation(lessonId: string) {
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
 
+        audio.oncanplaythrough = () => {
+          // Only set playing state when audio is ready to play
+          setPlayingMessageId(messageId);
+        };
+
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl);
           setPlayingMessageId(null);
@@ -210,12 +213,10 @@ export function useChatConversation(lessonId: string) {
         };
 
         await audio.play();
-      } else {
-        setPlayingMessageId(null); // Clear on error
       }
     } catch (error) {
       console.error("Failed to play AI message:", error);
-      setPlayingMessageId(null); // Clear on error
+      setPlayingMessageId(null);
     }
   }, [playingMessageId]);
 
