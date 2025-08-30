@@ -2,23 +2,25 @@
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Github, Mail } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function SignUpPage() {
   const supabase = createSupabaseBrowserClient();
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const handleSignUpWithGoogle = async () => {
     setError(null);
     setSuccessMessage(null);
-    
+
     // Check for invitation token
-    const invitationToken = localStorage.getItem('invitation_token');
-    const redirectUrl = invitationToken 
+    const invitationToken = localStorage.getItem("invitation_token");
+    const redirectUrl = invitationToken
       ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?invitation_token=${invitationToken}`
       : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
-    
+
     const { error: signUpError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -33,13 +35,13 @@ export default function SignUpPage() {
   const handleSignUpWithGitHub = async () => {
     setError(null);
     setSuccessMessage(null);
-    
+
     // Check for invitation token
-    const invitationToken = localStorage.getItem('invitation_token');
-    const redirectUrl = invitationToken 
+    const invitationToken = localStorage.getItem("invitation_token");
+    const redirectUrl = invitationToken
       ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?invitation_token=${invitationToken}`
       : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
-    
+
     const { error: signUpError } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
@@ -109,7 +111,8 @@ export default function SignUpPage() {
             <button
               onClick={handleSignUpWithGoogle}
               type="button"
-              className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              disabled={!agreedToTerms}
+              className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Mail className="w-5 h-5 mr-2" />{" "}
               {/* Using Mail as a placeholder for Google icon */}
@@ -119,11 +122,44 @@ export default function SignUpPage() {
             <button
               onClick={handleSignUpWithGitHub}
               type="button"
-              className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              disabled={!agreedToTerms}
+              className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Github className="w-5 h-5 mr-2" />
               Sign up with GitHub
             </button>
+          </div>
+          <div className="mt-6">
+            <div className="flex items-center">
+              <input
+                id="terms-agreement"
+                name="terms-agreement"
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+              <label
+                htmlFor="terms-agreement"
+                className="ml-2 block text-sm text-gray-900"
+              >
+                I agree to the{" "}
+                <Link
+                  href="/terms"
+                  className="font-medium text-indigo-600 hover:text-indigo-500"
+                >
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy"
+                  className="font-medium text-indigo-600 hover:text-indigo-500"
+                >
+                  Privacy Policy
+                </Link>
+                .
+              </label>
+            </div>
           </div>
 
           {/* Email/Password form commented out, similar to sign-in */}

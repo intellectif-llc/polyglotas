@@ -271,7 +271,7 @@ export function useChatConversation(lessonId: string) {
       }
       setLoadingAudioId(null);
     }
-  }, [playingMessageId]);
+  }, [playingMessageId, loadingTimeouts]);
 
   // Initialize messages with initial AI message if present and auto-play
   useEffect(() => {
