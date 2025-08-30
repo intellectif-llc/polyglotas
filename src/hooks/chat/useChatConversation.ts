@@ -326,5 +326,10 @@ export function useChatConversation(lessonId: string) {
     playingMessageId,
     loadingAudioId,
     playAudioForMessage,
+    // Expose query client for efficient voice message integration
+    invalidateQueries: () => {
+      queryClient.invalidateQueries({ queryKey: ["chatMessages", conversationId] });
+      queryClient.invalidateQueries({ queryKey: ["promptStatuses", conversationId] });
+    },
   };
 }

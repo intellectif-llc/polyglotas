@@ -35,6 +35,7 @@ export default function LessonChatView({
   const { data: userProfile } = useUserProfile();
 
   const {
+    conversationId,
     messages,
     prompts,
     addressedPromptIds,
@@ -45,6 +46,7 @@ export default function LessonChatView({
     playingMessageId,
     loadingAudioId,
     playAudioForMessage,
+    invalidateQueries,
   } = useChatConversation(lessonId);
 
   const [inputText, setInputText] = useState("");
@@ -111,6 +113,22 @@ export default function LessonChatView({
       console.error("❌ Failed to send message:", error);
       // Restore input text on error
       setInputText(messageText);
+    }
+  };
+
+  const handleEfficientVoiceMessage = (result: any) => {
+    console.log('✨ Efficient voice message result received:', result);
+    // The efficient endpoint handles everything, just refresh the UI
+    invalidateQueries();
+    
+    // Auto-play the AI response
+    if (result.ai_message?.message_text) {
+      setTimeout(() => {
+        playAudioForMessage(
+          result.ai_message.message_id,
+          result.ai_message.message_text
+        );
+      }, 300);
     }
   };
 
@@ -256,6 +274,8 @@ export default function LessonChatView({
               targetLanguage={userProfile?.current_target_language_code || "en"}
               nativeLanguage={userProfile?.native_language_code || "en"}
               lessonLevel={lessonData?.lesson?.level || "A1"}
+              conversationId={conversationId}
+              onEfficientVoiceMessage={handleEfficientVoiceMessage}
             />
           </div>
           
