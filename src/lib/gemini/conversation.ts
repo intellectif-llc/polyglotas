@@ -11,6 +11,10 @@ export interface LessonContext {
   level: string;
   targetLanguage: string;
   nativeLanguage: string;
+  allowNativeLanguage?: boolean;
+  detectedUserLanguage?: string;
+  languageSwitchingAllowed?: boolean;
+  encourageTargetLanguage?: boolean;
 }
 
 export interface ConversationPrompt {
@@ -19,13 +23,15 @@ export interface ConversationPrompt {
 }
 
 /**
- * Generates an AI response for a chat conversation
+ * Generates an AI response for a chat conversation with multilingual support
  */
 export async function generateAIResponse(
   userMessage: string,
   conversationHistory: ConversationMessage[],
   lessonContext: LessonContext,
-  conversationPrompts: ConversationPrompt[] = []
+  conversationPrompts: ConversationPrompt[] = [],
+  detectedLanguage?: string,
+  languageSwitch?: { switched: boolean; fromLanguage: string; toLanguage: string; confidence: number }
 ): Promise<string> {
   try {
     const model = getTextGenerationModel();
@@ -58,8 +64,17 @@ export async function generateAIResponse(
       ],
     });
 
+    // Build language context for the prompt
+    let languageContext = "";
+    if (detectedLanguage && detectedLanguage !== lessonContext.targetLanguage) {
+      languageContext = `\r\n\r\nIMPORTANT: The user just spoke in ${detectedLanguage} instead of ${lessonContext.targetLanguage}. `;
+      if (languageSwitch?.switched) {
+        languageContext += "Gently encourage them to practice in their target language while still being helpful. ";
+      }
+    }
+    
     // Send the user message and get response with structured format
-    const structuredPrompt = `${userMessage}
+    const structuredPrompt = `${userMessage}${languageContext}
 
 Respond with ONLY a JSON object in this exact format:
 {
@@ -67,7 +82,7 @@ Respond with ONLY a JSON object in this exact format:
   "suggested_answer": "a complete natural sentence the student could say"
 }
 
-For suggested_answer: Create a natural, complete sentence that directly answers your question. Use simple ${lessonContext.level} level vocabulary. Example: if you ask "What's your favorite food?", suggest "My favorite food is pizza" not just "pizza".`;
+For suggested_answer: Create a natural, complete sentence that directly answers your question. Use simple ${lessonContext.level} level vocabulary in ${lessonContext.targetLanguage}. Example: if you ask "What's your favorite food?", suggest "My favorite food is pizza" not just "pizza".`;
 
     const result = await chat.sendMessage(structuredPrompt);
     const response = await result.response;
@@ -164,7 +179,9 @@ Guidelines:
 - Use vocabulary appropriate for ${lessonContext.level} level
 - Be patient and encouraging
 - Ask questions to engage the student
-- Provide gentle corrections when needed${promptsText}`;
+- Provide gentle corrections when needed
+- If student uses their native language (${lessonContext.nativeLanguage}), gently encourage ${lessonContext.targetLanguage} practice
+- Understand both ${lessonContext.targetLanguage} and ${lessonContext.nativeLanguage} but respond primarily in ${lessonContext.targetLanguage}${promptsText}`;
 }
 
 /**

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
+  console.log('🔑 Azure Token: Request received');
   try {
     // Verify user is authenticated
     const supabase = await createClient();
@@ -11,36 +12,44 @@ export async function GET() {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error('🔑 Azure Token: Authentication failed:', authError?.message);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    console.log('🔑 Azure Token: User authenticated:', user.id);
 
     const speechKey = process.env.SPEECH_KEY;
     const speechRegion = process.env.SPEECH_REGION;
 
     if (!speechKey || !speechRegion) {
-      console.error("Azure Speech credentials not configured");
+      console.error('🔑 Azure Token: Credentials not configured - speechKey:', !!speechKey, 'speechRegion:', speechRegion);
       return NextResponse.json(
         { error: "Speech service not configured" },
         { status: 500 }
       );
     }
 
+    console.log('🔑 Azure Token: Using region:', speechRegion);
+
     // Get Azure Speech token
-    const tokenResponse = await fetch(
-      `https://${speechRegion}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
-      {
-        method: "POST",
-        headers: {
-          "Ocp-Apim-Subscription-Key": speechKey,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
-    );
+    const tokenUrl = `https://${speechRegion}.api.cognitive.microsoft.com/sts/v1.0/issueToken`;
+    console.log('🔑 Azure Token: Requesting token from:', tokenUrl);
+    
+    const tokenResponse = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "Ocp-Apim-Subscription-Key": speechKey,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
 
     if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
       console.error(
-        "Failed to get Azure Speech token:",
-        tokenResponse.statusText
+        '🔑 Azure Token: Failed to get token:',
+        tokenResponse.status,
+        tokenResponse.statusText,
+        errorText
       );
       return NextResponse.json(
         { error: "Failed to get speech token" },
@@ -49,6 +58,7 @@ export async function GET() {
     }
 
     const authToken = await tokenResponse.text();
+    console.log('🔑 Azure Token: Token obtained successfully, length:', authToken.length);
 
     return NextResponse.json({
       authToken,

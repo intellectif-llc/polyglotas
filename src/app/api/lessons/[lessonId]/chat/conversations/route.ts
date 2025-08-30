@@ -153,7 +153,7 @@ export async function POST(
       })
     );
 
-    // Build lesson context for AI
+    // Build enhanced lesson context for AI with multilingual support
     const lessonContext: LessonContext = {
       lessonTitle:
         lesson.lesson_translations[0]?.lesson_title || `Lesson ${lessonId}`,
@@ -163,6 +163,9 @@ export async function POST(
       level: lesson.units[0]?.level || "A1",
       targetLanguage: targetLanguage,
       nativeLanguage: profile.native_language_code || "en",
+      allowNativeLanguage: true,
+      languageSwitchingAllowed: true,
+      encourageTargetLanguage: true,
     };
 
     try {

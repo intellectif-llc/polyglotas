@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Send, Mic, MicOff, Keyboard, X } from "lucide-react";
-import { useSpeechRecognition } from "@/lib/speech/recognition";
+import { useEnhancedSpeechRecognition } from "@/lib/speech/enhancedRecognition";
 import {
   LoadingIndicator,
   ListeningIndicator,
@@ -14,6 +14,9 @@ interface ImprovedChatInputProps {
   onChange: (value: string) => void;
   onSend: () => void;
   disabled?: boolean;
+  targetLanguage?: string;
+  nativeLanguage?: string;
+  lessonLevel?: string;
 }
 
 export default function ImprovedChatInput({
@@ -21,48 +24,89 @@ export default function ImprovedChatInput({
   onChange,
   onSend,
   disabled = false,
+  targetLanguage = "en",
+  nativeLanguage = "en",
+  lessonLevel = "A1",
 }: ImprovedChatInputProps) {
   const [showTextInput, setShowTextInput] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [voiceSessionActive, setVoiceSessionActive] = useState(false);
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
 
   const {
     isListening,
-    transcript,
+    isProcessing,
+    result: speechResult,
     error: speechError,
     isSupported: speechSupported,
-    isProcessing,
     startListening,
     stopListening,
-  } = useSpeechRecognition({
-    language: "en-US",
-    continuous: false,
-    interimResults: true,
+  } = useEnhancedSpeechRecognition({
+    targetLanguage,
+    nativeLanguage,
+    lessonLevel,
+    allowNativeLanguage: true,
+    preferredProvider: 'auto',
   });
 
-  // Update input value with speech transcript
+  // Update input value with speech result
   useEffect(() => {
-    if (transcript && isVoiceMode) {
-      onChange(transcript);
+    console.log('📝 Speech result received:', speechResult);
+    console.log('📝 Current state when result received:', { isVoiceMode, voiceSessionActive, isListening, isProcessing });
+    
+    if (speechResult?.transcript) {
+      console.log('✅ Updating input with transcript:', speechResult.transcript);
+      onChange(speechResult.transcript);
+      setPendingTranscript(speechResult.transcript);
+      
+
+      
+      // Log language detection results
+      if (speechResult.languageSwitch?.switched) {
+        console.log(`Language switch detected: ${speechResult.languageSwitch.fromLanguage} → ${speechResult.languageSwitch.toLanguage}`);
+      }
+      console.log(`Speech recognized via ${speechResult.provider} with confidence ${speechResult.confidence}`);
     }
-  }, [transcript, isVoiceMode, onChange]);
+  }, [speechResult, onChange, isVoiceMode, voiceSessionActive]);
+
+
 
   // Auto-send when speech recognition ends with final result
   useEffect(() => {
+    console.log('🔄 Auto-send check:', {
+      isListening,
+      isProcessing,
+      hasTranscript: !!pendingTranscript,
+      isVoiceMode,
+      voiceSessionActive,
+      transcript: pendingTranscript
+    });
+    
+    // Auto-send if we have a transcript and speech recognition is complete
     if (
       !isListening &&
       !isProcessing &&
-      transcript &&
-      isVoiceMode &&
-      transcript.trim()
+      pendingTranscript &&
+      pendingTranscript.trim()
     ) {
+      console.log('✅ Auto-sending message:', pendingTranscript);
       const timer = setTimeout(() => {
+        console.log('🚀 Executing onSend() with transcript:', pendingTranscript);
         onSend();
         setIsVoiceMode(false);
+        setVoiceSessionActive(false);
+        setPendingTranscript(null);
       }, 500);
 
       return () => clearTimeout(timer);
+    } else if (!isListening && !isProcessing && pendingTranscript) {
+      console.log('❌ Auto-send blocked - conditions not met:', { 
+        isVoiceMode, 
+        voiceSessionActive,
+        transcript: pendingTranscript 
+      });
     }
-  }, [isListening, isProcessing, transcript, isVoiceMode, onSend]);
+  }, [isListening, isProcessing, pendingTranscript, onSend]);
 
   const handleVoiceToggle = async () => {
     if (!speechSupported) {
@@ -71,19 +115,51 @@ export default function ImprovedChatInput({
     }
 
     if (isListening || isProcessing) {
+      console.log('🔴 Stopping voice recognition manually');
       stopListening();
-      setIsVoiceMode(false);
+      // Keep isVoiceMode true to wait for the result
+      console.log('🔴 Voice mode remains active to wait for result');
     } else {
       try {
+        console.log('🟢 Starting voice recognition');
         setIsVoiceMode(true);
+        setVoiceSessionActive(true);
         onChange("");
         await startListening();
+        console.log('🟢 Voice recognition started, isVoiceMode=true');
       } catch (error) {
         console.error("Failed to start voice recognition:", error);
         setIsVoiceMode(false);
+        setVoiceSessionActive(false);
       }
     }
   };
+
+  // Reset voice mode if there's a speech error
+  useEffect(() => {
+    if (speechError) {
+      console.log('⚠️ Speech error detected, resetting voice mode');
+      setIsVoiceMode(false);
+      setVoiceSessionActive(false);
+      setPendingTranscript(null);
+    }
+  }, [speechError]);
+
+  // Ensure voice session is reset when not listening and not processing and no recent result
+  // Only reset if we're not in the middle of an auto-send process
+  useEffect(() => {
+    if (!isListening && !isProcessing && !pendingTranscript && (voiceSessionActive || isVoiceMode)) {
+      console.log('🔄 Scheduling voice session reset - no activity after 5 seconds');
+      const timer = setTimeout(() => {
+        console.log('⏰ Timeout: Resetting voice mode and session');
+        setIsVoiceMode(false);
+        setVoiceSessionActive(false);
+        setPendingTranscript(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isListening, isProcessing, pendingTranscript, voiceSessionActive, isVoiceMode]);
 
   const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,10 +177,14 @@ export default function ImprovedChatInput({
   };
 
   const toggleTextInput = () => {
+    console.log('🔄 Toggling text input, current showTextInput:', showTextInput);
     setShowTextInput(!showTextInput);
-    if (isVoiceMode) {
-      setIsVoiceMode(false);
+    if (isVoiceMode || voiceSessionActive) {
+      console.log('🔴 Canceling voice mode for text input');
       stopListening();
+      setIsVoiceMode(false);
+      setVoiceSessionActive(false);
+      setPendingTranscript(null);
     }
   };
 
@@ -128,11 +208,16 @@ export default function ImprovedChatInput({
       );
     }
 
-    if (isVoiceMode && transcript) {
+    if (isVoiceMode && speechResult?.transcript) {
       return (
         <div className="flex flex-col items-center space-y-3">
           <ProcessingIndicator />
           <p className="text-sm text-blue-600">Processing your message...</p>
+          {speechResult.languageSwitch?.switched && (
+            <p className="text-xs text-orange-600">
+              Detected {speechResult.detectedLanguage} (via {speechResult.provider})
+            </p>
+          )}
         </div>
       );
     }
@@ -165,9 +250,18 @@ export default function ImprovedChatInput({
             {renderSpeechState()}
 
             {/* Transcript display */}
-            {transcript && (
+            {speechResult?.transcript && (
               <div className="mt-4 p-3 bg-white rounded-lg border border-gray-200 max-w-md">
-                <p className="text-sm text-gray-700">{transcript}</p>
+                <p className="text-sm text-gray-700">{speechResult.transcript}</p>
+                {speechResult.languageSwitch?.switched && (
+                  <div className="mt-2 text-xs text-orange-600 flex items-center gap-1">
+                    <span>🌐</span>
+                    <span>Detected: {speechResult.detectedLanguage}</span>
+                  </div>
+                )}
+                <div className="mt-1 text-xs text-gray-500">
+                  via {speechResult.provider} • {Math.round(speechResult.confidence * 100)}% confidence
+                </div>
               </div>
             )}
           </div>
@@ -273,11 +367,18 @@ export default function ImprovedChatInput({
               {isVoiceMode
                 ? isListening
                   ? "Speak clearly into your microphone"
+                  : isProcessing
+                  ? "Processing your speech..."
                   : "Preparing to listen..."
                 : showTextInput
                 ? "Type your message above"
                 : "Tap the microphone to speak or keyboard to type"}
             </p>
+            {isVoiceMode && (
+              <p className="text-xs text-gray-400 mt-1">
+                You can speak in {targetLanguage} or {nativeLanguage}
+              </p>
+            )}
           </div>
         </div>
       </div>

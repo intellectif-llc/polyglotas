@@ -12,10 +12,11 @@ let tokenExpiry: number = 0;
 
 /**
  * Fetches a speech token from the backend or returns cached token if still valid
+ * @param request - Optional NextRequest to forward headers for authentication
  * @returns Promise<TokenResponse>
  * @throws Error if fetching fails
  */
-export async function getTokenOrRefresh(): Promise<TokenResponse> {
+export async function getTokenOrRefresh(request?: { headers: { get: (name: string) => string | null } }): Promise<TokenResponse> {
   // Check if we have a valid cached token (Azure tokens expire in 10 minutes)
   const now = Date.now();
   if (cachedToken && now < tokenExpiry) {
@@ -26,7 +27,21 @@ export async function getTokenOrRefresh(): Promise<TokenResponse> {
   console.log("Fetching new Azure Speech token...");
 
   try {
-    const response = await fetch("/api/speech/token");
+    // Use absolute URL for server-side fetch
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const tokenUrl = `${baseUrl}/api/speech/token`;
+    console.log('🔑 Fetching Azure token from:', tokenUrl);
+    
+    // Forward authentication headers if request is provided
+    const headers: HeadersInit = {};
+    if (request) {
+      const authHeader = request.headers.get('authorization');
+      const cookieHeader = request.headers.get('cookie');
+      if (authHeader) headers['authorization'] = authHeader;
+      if (cookieHeader) headers['cookie'] = cookieHeader;
+    }
+    
+    const response = await fetch(tokenUrl, { headers });
 
     if (!response.ok) {
       const errorText = await response.text();

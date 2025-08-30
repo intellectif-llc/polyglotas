@@ -133,10 +133,13 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
+  console.log('🚀 [API] Chat messages POST endpoint called');
   try {
     // Validate subscription tier access
     const subscriptionResult = await validateChatAccess();
+    console.log('🚀 [API] Subscription validation result:', subscriptionResult.isValid);
     if (!subscriptionResult.isValid) {
+      console.log('❌ [API] Subscription validation failed');
       return createSubscriptionErrorResponse(subscriptionResult);
     }
 
@@ -155,7 +158,9 @@ export async function POST(
     let requestBody: SendMessageRequest;
     try {
       requestBody = await request.json();
+      console.log('🚀 [API] Request body parsed:', requestBody);
     } catch {
+      console.log('❌ [API] Failed to parse request body');
       return new NextResponse(
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -163,8 +168,10 @@ export async function POST(
     }
 
     const { text_message } = requestBody;
+    console.log('🚀 [API] Message text received:', text_message);
 
     if (!text_message || text_message.trim().length === 0) {
+      console.log('❌ [API] Empty message text');
       return new NextResponse(
         JSON.stringify({ error: "Message text is required" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -296,11 +303,19 @@ export async function POST(
         nativeLanguage: profile?.native_language_code || "en",
       };
 
-      // Generate AI response with suggested answer
+      // Enhanced lesson context with multilingual support
+      const enhancedLessonContext = {
+        ...lessonContext,
+        allowNativeLanguage: true,
+        languageSwitchingAllowed: true,
+        encourageTargetLanguage: true,
+      };
+      
+      // Generate AI response with suggested answer and multilingual support
       const aiResponseRaw = await generateAIResponse(
         text_message.trim(),
         conversationHistory,
-        lessonContext,
+        enhancedLessonContext,
         conversationPrompts
       );
       

@@ -1,4 +1,5 @@
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+import { generateTTSCacheKey, getCachedTTS, cacheTTS } from "@/lib/cache/ttsCache";
 
 export interface TTSOptions {
   language?: string;
@@ -19,12 +20,21 @@ function getElevenLabsClient(): ElevenLabsClient {
 }
 
 /**
- * Generates speech audio from text using ElevenLabs TTS
+ * Generates speech audio from text using ElevenLabs TTS with caching
  */
 export async function generateSpeech(
   text: string,
   options: TTSOptions = {}
 ): Promise<ArrayBuffer> {
+  // Check cache first
+  const cacheKey = generateTTSCacheKey(text, options);
+  const cachedAudio = await getCachedTTS(cacheKey);
+  
+  if (cachedAudio) {
+    console.log("Using cached TTS audio");
+    return cachedAudio;
+  }
+
   try {
     const client = getElevenLabsClient();
     
@@ -67,7 +77,13 @@ export async function generateSpeech(
       offset += chunk.length;
     }
 
-    return result.buffer;
+    const audioBuffer = result.buffer;
+    
+    // Cache the result
+    await cacheTTS(cacheKey, audioBuffer);
+    console.log("Generated and cached new TTS audio");
+    
+    return audioBuffer;
   } catch (error) {
     console.error("Error generating speech with ElevenLabs:", error);
     throw new Error("Failed to generate speech audio");
@@ -99,12 +115,28 @@ export async function generateSpeechBase64(
 }
 
 /**
- * Streams audio generation for real-time playback
+ * Streams audio generation for real-time playback with caching
  */
 export async function generateSpeechStream(
   text: string,
   options: TTSOptions = {}
 ): Promise<ReadableStream> {
+  // Check cache first
+  const cacheKey = generateTTSCacheKey(text, options);
+  const cachedAudio = await getCachedTTS(cacheKey);
+  
+  if (cachedAudio) {
+    console.log("Using cached TTS audio for streaming");
+    // Convert ArrayBuffer to ReadableStream
+    return new ReadableStream({
+      start(controller) {
+        const uint8Array = new Uint8Array(cachedAudio);
+        controller.enqueue(uint8Array);
+        controller.close();
+      }
+    });
+  }
+
   try {
     const client = getElevenLabsClient();
     
@@ -124,7 +156,39 @@ export async function generateSpeechStream(
       },
     });
 
-    return audioStream;
+    // Cache the stream data as it's read
+    const chunks: Uint8Array[] = [];
+    const reader = audioStream.getReader();
+    
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            controller.enqueue(value);
+          }
+          
+          // Cache the complete audio
+          const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+          const result = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const chunk of chunks) {
+            result.set(chunk, offset);
+            offset += chunk.length;
+          }
+          await cacheTTS(cacheKey, result.buffer);
+          console.log("Streamed and cached new TTS audio");
+          
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        } finally {
+          reader.releaseLock();
+        }
+      }
+    });
   } catch (error) {
     console.error("Error generating speech stream:", error);
     throw new Error("Failed to generate speech stream");

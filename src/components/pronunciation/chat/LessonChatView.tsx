@@ -7,6 +7,7 @@ import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import ActivitySwitcher from "../shared/ActivitySwitcher";
 import { useAdvancedNavigation } from "@/hooks/useAdvancedNavigation";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import MessageBubble from "./MessageBubble";
 import ImprovedChatInput from "./ImprovedChatInput";
 import ConversationStarters from "./ConversationStarters";
@@ -31,6 +32,7 @@ export default function LessonChatView({
   } = useLessonPhrases(lessonId);
   const { permissions, isLoading: isLoadingSubscription } =
     useSubscriptionTier();
+  const { data: userProfile } = useUserProfile();
 
   const {
     messages,
@@ -90,15 +92,23 @@ export default function LessonChatView({
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputText.trim() || isSendingMessage) return;
+    console.log('🚀 handleSendMessage called with inputText:', inputText);
+    console.log('🚀 Current state:', { inputText: inputText.trim(), isSendingMessage });
+    
+    if (!inputText.trim() || isSendingMessage) {
+      console.log('❌ handleSendMessage blocked - no text or already sending');
+      return;
+    }
 
     const messageText = inputText.trim();
+    console.log('🚀 Sending message to chat hook:', messageText);
     setInputText("");
 
     try {
       await sendMessage(messageText);
+      console.log('✅ Message sent successfully via chat hook');
     } catch (error) {
-      console.error("Failed to send message:", error);
+      console.error("❌ Failed to send message:", error);
       // Restore input text on error
       setInputText(messageText);
     }
@@ -243,6 +253,9 @@ export default function LessonChatView({
               onChange={setInputText}
               onSend={handleSendMessage}
               disabled={isSendingMessage}
+              targetLanguage={userProfile?.current_target_language_code || "en"}
+              nativeLanguage={userProfile?.native_language_code || "en"}
+              lessonLevel={lessonData?.lesson?.level || "A1"}
             />
           </div>
           

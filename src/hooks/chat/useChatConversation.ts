@@ -131,15 +131,25 @@ export function useChatConversation(lessonId: string) {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (messageText: string) => {
-      if (!conversationId) throw new Error("No conversation ID");
+      console.log('🚀 [useChatConversation] Starting message send process');
+      console.log('🚀 [useChatConversation] Message text:', messageText);
+      console.log('🚀 [useChatConversation] Conversation ID:', conversationId);
+      
+      if (!conversationId) {
+        console.error('❌ [useChatConversation] No conversation ID available');
+        throw new Error("No conversation ID");
+      }
 
+      console.log('🚀 [useChatConversation] Making API request to:', `/api/chat/conversations/${conversationId}/messages`);
       const response = await axios.post(
         `/api/chat/conversations/${conversationId}/messages`,
         { text_message: messageText }
       );
+      console.log('✅ [useChatConversation] Gemini API response received:', response.data);
       return response.data as SendMessageResponse;
     },
     onSuccess: (data) => {
+      console.log('✅ Message sent successfully, updating UI with:', data);
       // Update messages cache with new messages
       queryClient.setQueryData<ChatMessage[]>(
         ["chatMessages", conversationId],
@@ -173,7 +183,7 @@ export function useChatConversation(lessonId: string) {
       }
     },
     onError: (error) => {
-      console.error("Failed to send message:", error);
+      console.error('❌ Failed to send message to Gemini:', error);
     },
   });
 
