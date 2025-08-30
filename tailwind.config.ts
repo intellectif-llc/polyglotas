@@ -24,6 +24,20 @@ const config: Config = {
         "brand-gradient": "linear-gradient(135deg, #a855f7 0%, #ec4899 100%)",
         "hero-gradient": "linear-gradient(135deg, #1e1b4b 0%, #581c87 50%, #be185d 100%)",
       },
+      animation: {
+        'slide-in-from-top': 'slideInFromTop 0.3s ease-out',
+        'fade-in': 'fadeIn 0.3s ease-out',
+      },
+      keyframes: {
+        slideInFromTop: {
+          '0%': { transform: 'translateY(-10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+      },
     },
   },
   plugins: [require("@tailwindcss/forms")],
