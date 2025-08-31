@@ -9,7 +9,7 @@ interface EnhancedSTTRequest {
   nativeLanguage: string;
   lessonLevel: string;
   allowNativeLanguage?: boolean;
-  preferredProvider?: 'elevenlabs' | 'azure' | 'auto';
+  preferredProvider?: "elevenlabs" | "azure" | "auto";
 }
 
 // ElevenLabs STT implementation
@@ -23,47 +23,51 @@ async function transcribeWithElevenLabsAPI(
   languageConfidence: number;
   provider: string;
 }> {
-  console.log('🎤 ElevenLabs STT: Starting transcription...');
-  
+  console.log("🎤 ElevenLabs STT: Starting transcription...");
+
   if (!process.env.ELEVENLABS_API_KEY) {
-    throw new Error('ElevenLabs API key not configured');
+    throw new Error("ElevenLabs API key not configured");
   }
 
   const formData = new FormData();
-  formData.append('file', audioBlob, 'audio.webm');
-  formData.append('model_id', process.env.STT_MODEL || 'scribe_v1');
-  
-  console.log('🎤 ElevenLabs STT: Sending request with file and model_id=' + (process.env.STT_MODEL || 'scribe_v1'));
-  
-  const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
-    method: 'POST',
+  formData.append("file", audioBlob, "audio.webm");
+  formData.append("model_id", process.env.STT_MODEL || "scribe_v1");
+
+  console.log(
+    "🎤 ElevenLabs STT: Sending request with file and model_id=" +
+      (process.env.STT_MODEL || "scribe_v1")
+  );
+
+  const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+    method: "POST",
     headers: {
-      'xi-api-key': process.env.ELEVENLABS_API_KEY,
+      "xi-api-key": process.env.ELEVENLABS_API_KEY,
     },
     body: formData,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('🎤 ElevenLabs STT: API Error:', response.status, errorText);
+    console.error("🎤 ElevenLabs STT: API Error:", response.status, errorText);
     throw new Error(`ElevenLabs STT failed: ${response.status} ${errorText}`);
   }
 
   const result = await response.json();
-  console.log('🎤 ElevenLabs STT: Raw API response:', result);
-  
+  console.log("🎤 ElevenLabs STT: Raw API response:", result);
+
   // ElevenLabs scribe_v1 model returns different structure
-  const transcript = result.text || result.transcript || '';
-  const detectedLang = result.detected_language || result.language || context.targetLanguage;
-  
-  console.log('🎤 ElevenLabs STT: Processed:', { transcript, detectedLang });
-  
+  const transcript = result.text || result.transcript || "";
+  const detectedLang =
+    result.detected_language || result.language || context.targetLanguage;
+
+  console.log("🎤 ElevenLabs STT: Processed:", { transcript, detectedLang });
+
   return {
     text: transcript,
     detectedLanguage: detectedLang,
     confidence: result.confidence || 0.9,
     languageConfidence: result.language_confidence || 0.9,
-    provider: 'elevenlabs',
+    provider: "elevenlabs",
   };
 }
 
@@ -78,47 +82,52 @@ async function transcribeWithGeminiAPI(
   languageConfidence: number;
   provider: string;
 }> {
-  console.log('🟡 Gemini STT: Starting direct audio transcription...');
-  
+  console.log("🟡 Gemini STT: Starting direct audio transcription...");
+
   if (!process.env.GEMINI_API_KEY) {
-    throw new Error('Gemini API key not configured');
+    throw new Error("Gemini API key not configured");
   }
 
   try {
     // Convert audio blob to base64
-    console.log('🟡 Gemini STT: Converting audio to base64...');
+    console.log("🟡 Gemini STT: Converting audio to base64...");
     const arrayBuffer = await audioBlob.arrayBuffer();
-    const base64Audio = Buffer.from(arrayBuffer).toString('base64');
-    console.log('🟡 Gemini STT: Base64 conversion complete, length:', base64Audio.length);
+    const base64Audio = Buffer.from(arrayBuffer).toString("base64");
+    console.log(
+      "🟡 Gemini STT: Base64 conversion complete, length:",
+      base64Audio.length
+    );
 
     // Prepare the request payload for Gemini
     const requestBody = {
-      contents: [{
-        parts: [
-          {
-            text: `Please transcribe this audio file. The expected language is ${context.targetLanguage}. Return only the transcribed text without any additional formatting or explanation.`
-          },
-          {
-            inline_data: {
-              mime_type: audioBlob.type || 'audio/webm',
-              data: base64Audio
-            }
-          }
-        ]
-      }],
+      contents: [
+        {
+          parts: [
+            {
+              text: `Please transcribe this audio file. The expected language is ${context.targetLanguage}. Return only the transcribed text without any additional formatting or explanation.`,
+            },
+            {
+              inline_data: {
+                mime_type: audioBlob.type || "audio/webm",
+                data: base64Audio,
+              },
+            },
+          ],
+        },
+      ],
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 1000,
-      }
+      },
     };
 
-    console.log('🟡 Gemini STT: Sending request to Gemini 2.0 Flash API...');
+    console.log("🟡 Gemini STT: Sending request to Gemini 2.0 Flash API...");
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
       }
@@ -126,19 +135,20 @@ async function transcribeWithGeminiAPI(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('🟡 Gemini STT: API Error:', response.status, errorText);
+      console.error("🟡 Gemini STT: API Error:", response.status, errorText);
       throw new Error(`Gemini API failed: ${response.status} ${errorText}`);
     }
 
     const result = await response.json();
-    console.log('🟡 Gemini STT: Raw API response:', result);
+    console.log("🟡 Gemini STT: Raw API response:", result);
 
     // Extract text from Gemini response
-    const transcript = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    console.log('🟡 Gemini STT: Extracted transcript:', transcript);
+    const transcript =
+      result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    console.log("🟡 Gemini STT: Extracted transcript:", transcript);
 
     if (!transcript) {
-      throw new Error('No transcript found in Gemini response');
+      throw new Error("No transcript found in Gemini response");
     }
 
     return {
@@ -146,10 +156,10 @@ async function transcribeWithGeminiAPI(
       detectedLanguage: context.targetLanguage, // Gemini doesn't provide language detection
       confidence: 0.85, // Estimated confidence for Gemini
       languageConfidence: 0.9,
-      provider: 'gemini',
+      provider: "gemini",
     };
   } catch (error) {
-    console.error('🟡 Gemini STT: Error during transcription:', error);
+    console.error("🟡 Gemini STT: Error during transcription:", error);
     throw error;
   }
 }
@@ -160,23 +170,31 @@ async function transcribeWithGeminiAPI(
 
 // Use Azure's audio stream input for WebM compatibility
 async function createAzureAudioConfig(audioBlob: Blob) {
-  console.log('🔵 Azure Audio Config: Creating audio stream from blob, size:', audioBlob.size, 'type:', audioBlob.type);
-  
+  console.log(
+    "🔵 Azure Audio Config: Creating audio stream from blob, size:",
+    audioBlob.size,
+    "type:",
+    audioBlob.type
+  );
+
   const arrayBuffer = await audioBlob.arrayBuffer();
-  console.log('🔵 Azure Audio Config: Converted to ArrayBuffer, size:', arrayBuffer.byteLength);
-  
+  console.log(
+    "🔵 Azure Audio Config: Converted to ArrayBuffer, size:",
+    arrayBuffer.byteLength
+  );
+
   const audioStream = SpeechSDK.AudioInputStream.createPushStream();
-  console.log('🔵 Azure Audio Config: Created push stream');
-  
+  console.log("🔵 Azure Audio Config: Created push stream");
+
   audioStream.write(arrayBuffer);
-  console.log('🔵 Azure Audio Config: Written audio data to stream');
-  
+  console.log("🔵 Azure Audio Config: Written audio data to stream");
+
   audioStream.close();
-  console.log('🔵 Azure Audio Config: Closed audio stream');
-  
+  console.log("🔵 Azure Audio Config: Closed audio stream");
+
   const audioConfig = SpeechSDK.AudioConfig.fromStreamInput(audioStream);
-  console.log('🔵 Azure Audio Config: Created AudioConfig from stream');
-  
+  console.log("🔵 Azure Audio Config: Created AudioConfig from stream");
+
   return audioConfig;
 }
 
@@ -231,20 +249,28 @@ export async function POST(request: NextRequest) {
     try {
       // Server-side smart STT with fallbacks
       let result;
-      const attempts: Array<{ provider: string; success: boolean; error?: string }> = [];
+      const attempts: Array<{
+        provider: string;
+        success: boolean;
+        error?: string;
+      }> = [];
       let lastError: Error | null = null;
-      
+
       // Strategy 1: Try ElevenLabs STT first (primary)
-      if (options.preferredProvider !== 'azure') {
+      if (options.preferredProvider !== "azure") {
         try {
-          console.log('Attempting ElevenLabs STT...');
-          const elevenLabsResult = await transcribeWithElevenLabsAPI(audioBlob, context);
-          attempts.push({ provider: 'elevenlabs', success: true });
-          
+          console.log("Attempting ElevenLabs STT...");
+          const elevenLabsResult = await transcribeWithElevenLabsAPI(
+            audioBlob,
+            context
+          );
+          attempts.push({ provider: "elevenlabs", success: true });
+
           result = {
             result: elevenLabsResult,
             languageSwitch: {
-              switched: elevenLabsResult.detectedLanguage !== context.targetLanguage,
+              switched:
+                elevenLabsResult.detectedLanguage !== context.targetLanguage,
               fromLanguage: context.targetLanguage,
               toLanguage: elevenLabsResult.detectedLanguage,
               confidence: elevenLabsResult.languageConfidence,
@@ -252,42 +278,63 @@ export async function POST(request: NextRequest) {
             attempts,
           };
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          attempts.push({ provider: 'elevenlabs', success: false, error: errorMsg });
+          const errorMsg =
+            error instanceof Error ? error.message : "Unknown error";
+          attempts.push({
+            provider: "elevenlabs",
+            success: false,
+            error: errorMsg,
+          });
           lastError = error instanceof Error ? error : new Error(errorMsg);
-          console.error('❌ ElevenLabs STT failed:', errorMsg);
+          console.error("❌ ElevenLabs STT failed:", errorMsg);
         }
       }
-      
+
       // Strategy 2: Try Azure Speech SDK as fallback
       if (!result) {
         try {
-          console.log('🔵 === AZURE STT FALLBACK INITIATED ===');
-          console.log('🔵 Azure STT: Audio blob info - size:', audioBlob.size, 'type:', audioBlob.type);
-          console.log('🔵 Azure STT: Target language:', context.targetLanguage);
-          
-          console.log('🔵 Azure STT: Step 1 - Getting authentication token...');
+          console.log("🔵 === AZURE STT FALLBACK INITIATED ===");
+          console.log(
+            "🔵 Azure STT: Audio blob info - size:",
+            audioBlob.size,
+            "type:",
+            audioBlob.type
+          );
+          console.log("🔵 Azure STT: Target language:", context.targetLanguage);
+
+          console.log("🔵 Azure STT: Step 1 - Getting authentication token...");
           const { authToken, region } = await getTokenOrRefresh(request);
-          console.log('🔵 Azure STT: Token obtained successfully');
-          console.log('🔵 Azure STT: Region:', region);
-          console.log('🔵 Azure STT: Token length:', authToken.length);
-          
-          console.log('🔵 Azure STT: Step 2 - Creating speech configuration...');
-          const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authToken, region);
+          console.log("🔵 Azure STT: Token obtained successfully");
+          console.log("🔵 Azure STT: Region:", region);
+          console.log("🔵 Azure STT: Token length:", authToken.length);
+
+          console.log(
+            "🔵 Azure STT: Step 2 - Creating speech configuration..."
+          );
+          const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(
+            authToken,
+            region
+          );
           speechConfig.speechRecognitionLanguage = context.targetLanguage;
-          console.log('🔵 Azure STT: Speech config created with language:', context.targetLanguage);
-          
-          console.log('🔵 Azure STT: Step 3 - Creating audio configuration...');
+          console.log(
+            "🔵 Azure STT: Speech config created with language:",
+            context.targetLanguage
+          );
+
+          console.log("🔵 Azure STT: Step 3 - Creating audio configuration...");
           const audioConfig = await createAzureAudioConfig(audioBlob);
-          console.log('🔵 Azure STT: Audio config created successfully');
-          
-          console.log('🔵 Azure STT: Step 4 - Creating speech recognizer...');
-          const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
-          console.log('🔵 Azure STT: Speech recognizer created');
-          
-          console.log('🔵 Azure STT: Step 5 - Starting recognition process...');
+          console.log("🔵 Azure STT: Audio config created successfully");
+
+          console.log("🔵 Azure STT: Step 4 - Creating speech recognizer...");
+          const recognizer = new SpeechSDK.SpeechRecognizer(
+            speechConfig,
+            audioConfig
+          );
+          console.log("🔵 Azure STT: Speech recognizer created");
+
+          console.log("🔵 Azure STT: Step 5 - Starting recognition process...");
           const recognitionStartTime = Date.now();
-          
+
           const azureResult = await new Promise<{
             text: string;
             detectedLanguage: string;
@@ -295,66 +342,97 @@ export async function POST(request: NextRequest) {
             languageConfidence: number;
             provider: string;
           }>((resolve, reject) => {
-            console.log('🔵 Azure STT: Recognition promise started');
-            
+            console.log("🔵 Azure STT: Recognition promise started");
+
             recognizer.recognizeOnceAsync(
               (result) => {
                 const recognitionDuration = Date.now() - recognitionStartTime;
-                console.log('🔵 Azure STT: Recognition completed in', recognitionDuration, 'ms');
-                console.log('🔵 Azure STT: Result reason:', result.reason);
-                console.log('🔵 Azure STT: Result text:', result.text);
-                console.log('🔵 Azure STT: Result duration:', result.duration);
-                console.log('🔵 Azure STT: Result offset:', result.offset);
-                
+                console.log(
+                  "🔵 Azure STT: Recognition completed in",
+                  recognitionDuration,
+                  "ms"
+                );
+                console.log("🔵 Azure STT: Result reason:", result.reason);
+                console.log("🔵 Azure STT: Result text:", result.text);
+                console.log("🔵 Azure STT: Result duration:", result.duration);
+                console.log("🔵 Azure STT: Result offset:", result.offset);
+
                 if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-                  console.log('✅ Azure STT: Speech successfully recognized!');
+                  console.log("✅ Azure STT: Speech successfully recognized!");
                   const azureResponse = {
                     text: result.text,
                     detectedLanguage: context.targetLanguage,
                     confidence: 0.8,
                     languageConfidence: 0.9,
-                    provider: 'azure',
+                    provider: "azure",
                   };
-                  console.log('🔵 Azure STT: Returning result:', azureResponse);
+                  console.log("🔵 Azure STT: Returning result:", azureResponse);
                   resolve(azureResponse);
                 } else if (result.reason === SpeechSDK.ResultReason.NoMatch) {
-                  console.error('🔵 Azure STT: No speech could be recognized');
-                  reject(new Error('Azure STT: No speech could be recognized'));
+                  console.error("🔵 Azure STT: No speech could be recognized");
+                  reject(new Error("Azure STT: No speech could be recognized"));
                 } else if (result.reason === SpeechSDK.ResultReason.Canceled) {
-                  console.error('🔵 Azure STT: Recognition was cancelled');
-                  const cancellation = SpeechSDK.CancellationDetails.fromResult(result);
-                  console.error('🔵 Azure STT: Cancellation reason:', cancellation.reason);
-                  if (cancellation.reason === SpeechSDK.CancellationReason.Error) {
-                    console.error('🔵 Azure STT: Error code:', cancellation.ErrorCode);
-                    console.error('🔵 Azure STT: Error details:', cancellation.errorDetails);
+                  console.error("🔵 Azure STT: Recognition was cancelled");
+                  const cancellation =
+                    SpeechSDK.CancellationDetails.fromResult(result);
+                  console.error(
+                    "🔵 Azure STT: Cancellation reason:",
+                    cancellation.reason
+                  );
+                  if (
+                    cancellation.reason === SpeechSDK.CancellationReason.Error
+                  ) {
+                    console.error(
+                      "🔵 Azure STT: Error code:",
+                      cancellation.ErrorCode
+                    );
+                    console.error(
+                      "🔵 Azure STT: Error details:",
+                      cancellation.errorDetails
+                    );
                   }
-                  reject(new Error(`Azure STT cancelled: ${cancellation.reason} - ${cancellation.errorDetails}`));
+                  reject(
+                    new Error(
+                      `Azure STT cancelled: ${cancellation.reason} - ${cancellation.errorDetails}`
+                    )
+                  );
                 } else {
-                  console.error('🔵 Azure STT: Unexpected result reason:', result.reason);
-                  reject(new Error(`Azure recognition failed with reason: ${result.reason}`));
+                  console.error(
+                    "🔵 Azure STT: Unexpected result reason:",
+                    result.reason
+                  );
+                  reject(
+                    new Error(
+                      `Azure recognition failed with reason: ${result.reason}`
+                    )
+                  );
                 }
-                
-                console.log('🔵 Azure STT: Closing recognizer...');
+
+                console.log("🔵 Azure STT: Closing recognizer...");
                 recognizer.close();
               },
               (error) => {
                 const recognitionDuration = Date.now() - recognitionStartTime;
-                console.error('🔵 Azure STT: Recognition error after', recognitionDuration, 'ms');
-                console.error('🔵 Azure STT: Error details:', error);
-                console.error('🔵 Azure STT: Error type:', typeof error);
-                console.error('🔵 Azure STT: Error string:', String(error));
-                
-                console.log('🔵 Azure STT: Closing recognizer after error...');
+                console.error(
+                  "🔵 Azure STT: Recognition error after",
+                  recognitionDuration,
+                  "ms"
+                );
+                console.error("🔵 Azure STT: Error details:", error);
+                console.error("🔵 Azure STT: Error type:", typeof error);
+                console.error("🔵 Azure STT: Error string:", String(error));
+
+                console.log("🔵 Azure STT: Closing recognizer after error...");
                 recognizer.close();
                 reject(new Error(`Azure STT error: ${error}`));
               }
             );
           });
-          
-          console.log('✅ Azure STT: Recognition successful!');
-          console.log('🔵 Azure STT: Final result:', azureResult);
-          
-          attempts.push({ provider: 'azure', success: true });
+
+          console.log("✅ Azure STT: Recognition successful!");
+          console.log("🔵 Azure STT: Final result:", azureResult);
+
+          attempts.push({ provider: "azure", success: true });
           result = {
             result: azureResult,
             languageSwitch: {
@@ -365,56 +443,80 @@ export async function POST(request: NextRequest) {
             },
             attempts,
           };
-          
-          console.log('🔵 Azure STT: Result object created:', result);
+
+          console.log("🔵 Azure STT: Result object created:", result);
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          attempts.push({ provider: 'azure', success: false, error: errorMsg });
+          const errorMsg =
+            error instanceof Error ? error.message : "Unknown error";
+          attempts.push({ provider: "azure", success: false, error: errorMsg });
           lastError = error instanceof Error ? error : new Error(errorMsg);
-          console.error('❌ Azure STT failed:', errorMsg);
+          console.error("❌ Azure STT failed:", errorMsg);
         }
       }
-      
+
       // Strategy 3: Try Gemini direct audio as final fallback (EFFICIENT APPROACH)
       if (!result) {
         try {
-          console.log('🟡 === GEMINI EFFICIENT MULTIMODAL FALLBACK INITIATED ===');
-          console.log('🟡 Gemini Multimodal: Audio blob info - size:', audioBlob.size, 'type:', audioBlob.type);
-          console.log('✨ Using EFFICIENT single-request multimodal approach');
-          
+          console.log(
+            "🟡 === GEMINI EFFICIENT MULTIMODAL FALLBACK INITIATED ==="
+          );
+          console.log(
+            "🟡 Gemini Multimodal: Audio blob info - size:",
+            audioBlob.size,
+            "type:",
+            audioBlob.type
+          );
+          console.log("✨ Using EFFICIENT single-request multimodal approach");
+
           // Use efficient STT-only for this endpoint (conversation handled separately)
           // NOTE: This is still the inefficient approach - only transcription
-          const geminiResult = await transcribeWithGeminiAPI(audioBlob, context);
-          attempts.push({ provider: 'gemini-stt-only', success: true });
-          
+          const geminiResult = await transcribeWithGeminiAPI(
+            audioBlob,
+            context
+          );
+          attempts.push({ provider: "gemini-stt-only", success: true });
+
           result = {
             result: {
               ...geminiResult,
-              provider: 'gemini-stt-only' // Mark as STT-only (inefficient)
+              provider: "gemini-stt-only", // Mark as STT-only (inefficient)
             },
             languageSwitch: {
-              switched: geminiResult.detectedLanguage !== context.targetLanguage,
+              switched:
+                geminiResult.detectedLanguage !== context.targetLanguage,
               fromLanguage: context.targetLanguage,
               toLanguage: geminiResult.detectedLanguage,
               confidence: geminiResult.languageConfidence,
             },
             attempts,
           };
-          
-          console.log('✅ Gemini STT-Only: Transcription result:', geminiResult);
-          console.log('⚠️  WARNING: Still using inefficient two-request approach');
-          console.log('💡 SOLUTION: Use /api/chat/voice-message for true single multimodal request');
+
+          console.log(
+            "✅ Gemini STT-Only: Transcription result:",
+            geminiResult
+          );
+          console.log(
+            "⚠️  WARNING: Still using inefficient two-request approach"
+          );
+          console.log(
+            "💡 SOLUTION: Use /api/chat/voice-message for true single multimodal request"
+          );
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          attempts.push({ provider: 'gemini-stt-only', success: false, error: errorMsg });
+          const errorMsg =
+            error instanceof Error ? error.message : "Unknown error";
+          attempts.push({
+            provider: "gemini-stt-only",
+            success: false,
+            error: errorMsg,
+          });
           lastError = error instanceof Error ? error : new Error(errorMsg);
-          console.error('❌ Gemini STT-only fallback failed:', errorMsg);
+          console.error("❌ Gemini STT-only fallback failed:", errorMsg);
         }
       }
-      
+
       if (!result) {
-        console.error('❌ All STT providers failed:', attempts);
-        throw lastError || new Error('All STT providers failed');
+        console.error("❌ All STT providers failed:", attempts);
+        throw lastError || new Error("All STT providers failed");
       }
 
       return NextResponse.json({
@@ -432,7 +534,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "Speech transcription failed",
-          details: sttError instanceof Error ? sttError.message : "Unknown error",
+          details:
+            sttError instanceof Error ? sttError.message : "Unknown error",
         },
         { status: 500 }
       );

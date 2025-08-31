@@ -264,7 +264,11 @@ Example: [1, 3] or []`;
     const response = await result.response;
     const text = response.text().trim();
     
-    const addressedIds = JSON.parse(text);
+    // Extract JSON from markdown code blocks if present
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/\[.*\]/);
+    const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text;
+    
+    const addressedIds = JSON.parse(jsonText);
     return Array.isArray(addressedIds) ? addressedIds.filter(id => typeof id === 'number') : [];
   } catch (error) {
     console.error('AI prompt detection failed:', error);

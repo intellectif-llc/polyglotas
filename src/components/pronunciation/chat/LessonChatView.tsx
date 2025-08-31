@@ -12,6 +12,7 @@ import MessageBubble from "./MessageBubble";
 import ImprovedChatInput from "./ImprovedChatInput";
 import ConversationStarters from "./ConversationStarters";
 import { useChatConversation } from "@/hooks/chat/useChatConversation";
+import { EfficientVoiceMessageResponse } from "@/hooks/chat/useEfficientVoiceMessage";
 
 interface LessonChatViewProps {
   unitId: string;
@@ -55,12 +56,12 @@ export default function LessonChatView({
     canNavigateNext: canAdvancedNext,
     canNavigatePrevious: canAdvancedPrevious,
     navigateNext: advancedNext,
-    navigatePrevious: advancedPrevious
+    navigatePrevious: advancedPrevious,
   } = useAdvancedNavigation({
     unitId,
     lessonId,
     activity: "chat",
-    phraseIndex: 0
+    phraseIndex: 0,
   });
 
   const handleNext = async () => {
@@ -94,21 +95,24 @@ export default function LessonChatView({
   }, [messages]);
 
   const handleSendMessage = async () => {
-    console.log('🚀 handleSendMessage called with inputText:', inputText);
-    console.log('🚀 Current state:', { inputText: inputText.trim(), isSendingMessage });
-    
+    console.log("🚀 handleSendMessage called with inputText:", inputText);
+    console.log("🚀 Current state:", {
+      inputText: inputText.trim(),
+      isSendingMessage,
+    });
+
     if (!inputText.trim() || isSendingMessage) {
-      console.log('❌ handleSendMessage blocked - no text or already sending');
+      console.log("❌ handleSendMessage blocked - no text or already sending");
       return;
     }
 
     const messageText = inputText.trim();
-    console.log('🚀 Sending message to chat hook:', messageText);
+    console.log("🚀 Sending message to chat hook:", messageText);
     setInputText("");
 
     try {
       await sendMessage(messageText);
-      console.log('✅ Message sent successfully via chat hook');
+      console.log("✅ Message sent successfully via chat hook");
     } catch (error) {
       console.error("❌ Failed to send message:", error);
       // Restore input text on error
@@ -116,11 +120,13 @@ export default function LessonChatView({
     }
   };
 
-  const handleEfficientVoiceMessage = (result: any) => {
-    console.log('✨ Efficient voice message result received:', result);
+  const handleEfficientVoiceMessage = (
+    result: EfficientVoiceMessageResponse
+  ) => {
+    console.log("✨ Efficient voice message result received:", result);
     // The efficient endpoint handles everything, just refresh the UI
     invalidateQueries();
-    
+
     // Auto-play the AI response
     if (result.ai_message?.message_text) {
       setTimeout(() => {
@@ -131,8 +137,6 @@ export default function LessonChatView({
       }, 300);
     }
   };
-
-
 
   // Show loading state
   if (isLoadingLesson || isLoadingSubscription) {
@@ -221,13 +225,26 @@ export default function LessonChatView({
             ) : messages.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <div className="mb-4">
-                  <svg className="w-16 h-16 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  <svg
+                    className="w-16 h-16 mx-auto text-gray-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
                   </svg>
                 </div>
-                <p className="text-lg font-medium mb-2">Ready to practice speaking?</p>
+                <p className="text-lg font-medium mb-2">
+                  Ready to practice speaking?
+                </p>
                 <p className="text-sm">
-                  Use the prompts above or tap the microphone to start a conversation.
+                  Use the prompts above or tap the microphone to start a
+                  conversation.
                 </p>
               </div>
             ) : (
@@ -274,11 +291,11 @@ export default function LessonChatView({
               targetLanguage={userProfile?.current_target_language_code || "en"}
               nativeLanguage={userProfile?.native_language_code || "en"}
               lessonLevel={lessonData?.lesson?.level || "A1"}
-              conversationId={conversationId}
+              conversationId={conversationId || undefined}
               onEfficientVoiceMessage={handleEfficientVoiceMessage}
             />
           </div>
-          
+
           {/* Navigation Area */}
           <div className="border-t border-gray-200 px-4 py-4">
             <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-between sm:items-center">

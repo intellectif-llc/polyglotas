@@ -11,12 +11,25 @@ if (!process.env.GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY environment variable is required");
 }
 
+// Set global fetch to include referer header for API restrictions
+const originalFetch = global.fetch;
+global.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Referer")) {
+    headers.set(
+      "Referer",
+      process.env.NEXT_PUBLIC_SITE_URL || "https://polyglotas.com"
+    );
+  }
+  return originalFetch(input, { ...init, headers });
+};
+
 // Initialize the Gemini client
 export const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Configuration for different use cases
 export const GEMINI_MODELS = {
-  TEXT_GENERATION: "gemini-2.0-flash-exp", // Latest Gemini 2.0 model
+  TEXT_GENERATION: "gemini-2.0-flash", // Latest Gemini 2.0 model
 } as const;
 
 // Default generation config

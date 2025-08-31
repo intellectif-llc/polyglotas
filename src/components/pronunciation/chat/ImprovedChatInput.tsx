@@ -1,9 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Send, Mic, MicOff, Keyboard, X } from "lucide-react";
+import { Send, Mic, Square, Keyboard, X } from "lucide-react";
 import { useEnhancedSpeechRecognition } from "@/lib/speech/enhancedRecognition";
-import { useEfficientVoiceMessage } from "@/hooks/chat/useEfficientVoiceMessage";
+import {
+  useEfficientVoiceMessage,
+  EfficientVoiceMessageResponse,
+} from "@/hooks/chat/useEfficientVoiceMessage";
 import {
   LoadingIndicator,
   ListeningIndicator,
@@ -19,7 +22,7 @@ interface ImprovedChatInputProps {
   nativeLanguage?: string;
   lessonLevel?: string;
   conversationId?: string;
-  onEfficientVoiceMessage?: (result: any) => void;
+  onEfficientVoiceMessage?: (result: EfficientVoiceMessageResponse) => void;
 }
 
 export default function ImprovedChatInput({
@@ -28,7 +31,7 @@ export default function ImprovedChatInput({
   onSend,
   disabled = false,
   targetLanguage = "en",
-  nativeLanguage = "en",
+  nativeLanguage = "es",
   lessonLevel = "A1",
   conversationId,
   onEfficientVoiceMessage,
@@ -36,7 +39,9 @@ export default function ImprovedChatInput({
   const [showTextInput, setShowTextInput] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [voiceSessionActive, setVoiceSessionActive] = useState(false);
-  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(
+    null
+  );
   const [useEfficientMode, setUseEfficientMode] = useState(false);
 
   const {
@@ -52,7 +57,7 @@ export default function ImprovedChatInput({
     nativeLanguage,
     lessonLevel,
     allowNativeLanguage: true,
-    preferredProvider: 'auto',
+    preferredProvider: "auto",
   });
 
   const {
@@ -63,45 +68,64 @@ export default function ImprovedChatInput({
 
   // Update input value with speech result
   useEffect(() => {
-    console.log('📝 Speech result received:', speechResult);
-    console.log('📝 Current state when result received:', { isVoiceMode, voiceSessionActive, isListening, isProcessing });
-    
+    console.log("📝 Speech result received:", speechResult);
+    console.log("📝 Current state when result received:", {
+      isVoiceMode,
+      voiceSessionActive,
+      isListening,
+      isProcessing,
+    });
+
     if (speechResult?.transcript) {
-      console.log('✅ Updating input with transcript:', speechResult.transcript);
+      console.log(
+        "✅ Updating input with transcript:",
+        speechResult.transcript
+      );
       onChange(speechResult.transcript);
       setPendingTranscript(speechResult.transcript);
-      
 
-      
       // Log language detection results and provider efficiency
       if (speechResult.languageSwitch?.switched) {
-        console.log(`Language switch detected: ${speechResult.languageSwitch.fromLanguage} → ${speechResult.languageSwitch.toLanguage}`);
+        console.log(
+          `Language switch detected: ${speechResult.languageSwitch.fromLanguage} → ${speechResult.languageSwitch.toLanguage}`
+        );
       }
-      console.log(`Speech recognized via ${speechResult.provider} with confidence ${speechResult.confidence}`);
-      
+      console.log(
+        `Speech recognized via ${speechResult.provider} with confidence ${speechResult.confidence}`
+      );
+
       // Log efficiency information for Gemini fallback
-      if (speechResult.provider === 'gemini-stt-only') {
-        console.log('⚠️  Gemini STT-only fallback used - still inefficient (two requests)');
-        console.log('💡 SWITCHING: Will use efficient multimodal approach for next voice input');
+      if (speechResult.provider === "gemini-stt-only") {
+        console.log(
+          "⚠️  Gemini STT-only fallback used - still inefficient (two requests)"
+        );
+        console.log(
+          "💡 SWITCHING: Will use efficient multimodal approach for next voice input"
+        );
         setUseEfficientMode(true); // Switch to efficient mode after detecting Gemini fallback
       }
     }
-  }, [speechResult, onChange, isVoiceMode, voiceSessionActive]);
-
-
+  }, [
+    speechResult,
+    onChange,
+    isVoiceMode,
+    voiceSessionActive,
+    isListening,
+    isProcessing,
+  ]);
 
   // Auto-send when speech recognition ends with final result
   useEffect(() => {
-    console.log('🔄 Auto-send check:', {
+    console.log("🔄 Auto-send check:", {
       isListening,
       isProcessing,
       hasTranscript: !!pendingTranscript,
       isVoiceMode,
       voiceSessionActive,
       transcript: pendingTranscript,
-      useEfficientMode
+      useEfficientMode,
     });
-    
+
     // Auto-send if we have a transcript and speech recognition is complete
     if (
       !isListening &&
@@ -109,9 +133,12 @@ export default function ImprovedChatInput({
       pendingTranscript &&
       pendingTranscript.trim()
     ) {
-      console.log('✅ Auto-sending message:', pendingTranscript);
+      console.log("✅ Auto-sending message:", pendingTranscript);
       const timer = setTimeout(() => {
-        console.log('🚀 Executing onSend() with transcript:', pendingTranscript);
+        console.log(
+          "🚀 Executing onSend() with transcript:",
+          pendingTranscript
+        );
         onSend();
         setIsVoiceMode(false);
         setVoiceSessionActive(false);
@@ -120,13 +147,21 @@ export default function ImprovedChatInput({
 
       return () => clearTimeout(timer);
     } else if (!isListening && !isProcessing && pendingTranscript) {
-      console.log('❌ Auto-send blocked - conditions not met:', { 
-        isVoiceMode, 
+      console.log("❌ Auto-send blocked - conditions not met:", {
+        isVoiceMode,
         voiceSessionActive,
-        transcript: pendingTranscript 
+        transcript: pendingTranscript,
       });
     }
-  }, [isListening, isProcessing, pendingTranscript, onSend, useEfficientMode]);
+  }, [
+    isListening,
+    isProcessing,
+    pendingTranscript,
+    onSend,
+    useEfficientMode,
+    isVoiceMode,
+    voiceSessionActive,
+  ]);
 
   const handleVoiceToggle = async () => {
     if (!speechSupported) {
@@ -135,25 +170,25 @@ export default function ImprovedChatInput({
     }
 
     if (isListening || isProcessing || isEfficientProcessing) {
-      console.log('🔴 Stopping voice recognition manually');
+      console.log("🔴 Stopping voice recognition manually");
       stopListening();
-      console.log('🔴 Voice mode remains active to wait for result');
+      console.log("🔴 Voice mode remains active to wait for result");
     } else {
       try {
-        console.log('🟢 Starting voice recognition');
+        console.log("🟢 Starting voice recognition");
         setIsVoiceMode(true);
         setVoiceSessionActive(true);
         onChange("");
-        
+
         if (useEfficientMode && conversationId && onEfficientVoiceMessage) {
-          console.log('✨ Using EFFICIENT multimodal voice message approach');
+          console.log("✨ Using EFFICIENT multimodal voice message approach");
           await handleEfficientVoiceInput();
         } else {
-          console.log('🔄 Using standard STT + conversation approach');
+          console.log("🔄 Using standard STT + conversation approach");
           await startListening();
         }
-        
-        console.log('🟢 Voice recognition started, isVoiceMode=true');
+
+        console.log("🟢 Voice recognition started, isVoiceMode=true");
       } catch (error) {
         console.error("Failed to start voice recognition:", error);
         setIsVoiceMode(false);
@@ -165,19 +200,19 @@ export default function ImprovedChatInput({
   const handleEfficientVoiceInput = async () => {
     try {
       // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-        }
+        },
       });
 
       // Setup MediaRecorder for efficient approach
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType: "audio/webm;codecs=opus",
       });
-      
+
       const audioChunks: Blob[] = [];
 
       mediaRecorder.ondataavailable = (event) => {
@@ -187,17 +222,23 @@ export default function ImprovedChatInput({
       };
 
       mediaRecorder.onstop = async () => {
-        console.log('✨ Efficient: MediaRecorder stopped, processing with multimodal approach');
+        console.log(
+          "✨ Efficient: MediaRecorder stopped, processing with multimodal approach"
+        );
         setIsVoiceMode(false);
-        
+
         try {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
-          
+          const audioBlob = new Blob(audioChunks, {
+            type: "audio/webm;codecs=opus",
+          });
+
           if (audioBlob.size === 0) {
             throw new Error("No audio data recorded");
           }
 
-          console.log('✨ Efficient: Sending single multimodal request to Gemini');
+          console.log(
+            "✨ Efficient: Sending single multimodal request to Gemini"
+          );
           const result = await sendVoiceMessage(audioBlob, {
             conversationId: conversationId!,
             targetLanguage,
@@ -205,15 +246,17 @@ export default function ImprovedChatInput({
             lessonLevel,
           });
 
-          console.log('✅ Efficient: Single multimodal request completed:', result);
+          console.log(
+            "✅ Efficient: Single multimodal request completed:",
+            result
+          );
           onEfficientVoiceMessage?.(result);
-          
         } catch (error) {
-          console.error('❌ Efficient: Multimodal request failed:', error);
+          console.error("❌ Efficient: Multimodal request failed:", error);
           setIsVoiceMode(false);
         } finally {
           setVoiceSessionActive(false);
-          stream.getTracks().forEach(track => track.stop());
+          stream.getTracks().forEach((track) => track.stop());
         }
       };
 
@@ -221,22 +264,21 @@ export default function ImprovedChatInput({
         console.error("Efficient: MediaRecorder error:", event);
         setIsVoiceMode(false);
         setVoiceSessionActive(false);
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       // Start recording
       mediaRecorder.start();
       console.log("✨ Efficient: Started recording for multimodal approach");
-      
+
       // Auto-stop after reasonable time
       setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
+        if (mediaRecorder.state === "recording") {
           mediaRecorder.stop();
         }
       }, 10000); // 10 second max
-      
     } catch (error) {
-      console.error('❌ Efficient: Failed to start recording:', error);
+      console.error("❌ Efficient: Failed to start recording:", error);
       setIsVoiceMode(false);
       setVoiceSessionActive(false);
     }
@@ -245,7 +287,7 @@ export default function ImprovedChatInput({
   // Reset voice mode if there's a speech error
   useEffect(() => {
     if (speechError || efficientError) {
-      console.log('⚠️ Speech error detected, resetting voice mode');
+      console.log("⚠️ Speech error detected, resetting voice mode");
       setIsVoiceMode(false);
       setVoiceSessionActive(false);
       setPendingTranscript(null);
@@ -255,18 +297,31 @@ export default function ImprovedChatInput({
   // Ensure voice session is reset when not listening and not processing and no recent result
   // Only reset if we're not in the middle of an auto-send process
   useEffect(() => {
-    if (!isListening && !isProcessing && !pendingTranscript && (voiceSessionActive || isVoiceMode)) {
-      console.log('🔄 Scheduling voice session reset - no activity after 5 seconds');
+    if (
+      !isListening &&
+      !isProcessing &&
+      !pendingTranscript &&
+      (voiceSessionActive || isVoiceMode)
+    ) {
+      console.log(
+        "🔄 Scheduling voice session reset - no activity after 5 seconds"
+      );
       const timer = setTimeout(() => {
-        console.log('⏰ Timeout: Resetting voice mode and session');
+        console.log("⏰ Timeout: Resetting voice mode and session");
         setIsVoiceMode(false);
         setVoiceSessionActive(false);
         setPendingTranscript(null);
       }, 5000);
-      
+
       return () => clearTimeout(timer);
     }
-  }, [isListening, isProcessing, pendingTranscript, voiceSessionActive, isVoiceMode]);
+  }, [
+    isListening,
+    isProcessing,
+    pendingTranscript,
+    voiceSessionActive,
+    isVoiceMode,
+  ]);
 
   const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,10 +339,13 @@ export default function ImprovedChatInput({
   };
 
   const toggleTextInput = () => {
-    console.log('🔄 Toggling text input, current showTextInput:', showTextInput);
+    console.log(
+      "🔄 Toggling text input, current showTextInput:",
+      showTextInput
+    );
     setShowTextInput(!showTextInput);
     if (isVoiceMode || voiceSessionActive) {
-      console.log('🔴 Canceling voice mode for text input');
+      console.log("🔴 Canceling voice mode for text input");
       stopListening();
       setIsVoiceMode(false);
       setVoiceSessionActive(false);
@@ -302,7 +360,9 @@ export default function ImprovedChatInput({
         <div className="flex flex-col items-center space-y-3">
           <LoadingIndicator />
           <p className="text-sm text-gray-600">
-            {useEfficientMode ? 'Processing with efficient multimodal approach...' : 'Wait ...'}
+            {useEfficientMode
+              ? "Processing with efficient multimodal approach..."
+              : "Wait ..."}
           </p>
         </div>
       );
@@ -314,7 +374,9 @@ export default function ImprovedChatInput({
           <ListeningIndicator />
           <p className="text-sm text-green-600 font-medium">Speak now!</p>
           {useEfficientMode && (
-            <p className="text-xs text-blue-600">✨ Using efficient multimodal approach</p>
+            <p className="text-xs text-blue-600">
+              ✨ Using efficient multimodal approach
+            </p>
           )}
         </div>
       );
@@ -327,7 +389,8 @@ export default function ImprovedChatInput({
           <p className="text-sm text-blue-600">Processing your message...</p>
           {speechResult.languageSwitch?.switched && (
             <p className="text-xs text-orange-600">
-              Detected {speechResult.detectedLanguage} (via {speechResult.provider})
+              Detected {speechResult.detectedLanguage} (via{" "}
+              {speechResult.provider})
             </p>
           )}
         </div>
@@ -364,7 +427,9 @@ export default function ImprovedChatInput({
             {/* Transcript display */}
             {speechResult?.transcript && (
               <div className="mt-4 p-3 bg-white rounded-lg border border-gray-200 max-w-md">
-                <p className="text-sm text-gray-700">{speechResult.transcript}</p>
+                <p className="text-sm text-gray-700">
+                  {speechResult.transcript}
+                </p>
                 {speechResult.languageSwitch?.switched && (
                   <div className="mt-2 text-xs text-orange-600 flex items-center gap-1">
                     <span>🌐</span>
@@ -372,7 +437,11 @@ export default function ImprovedChatInput({
                   </div>
                 )}
                 <div className="mt-1 text-xs text-gray-500">
-                  via {speechResult.provider === 'gemini-stt-only' ? 'Gemini (inefficient)' : speechResult.provider} • {Math.round(speechResult.confidence * 100)}% confidence
+                  via{" "}
+                  {speechResult.provider === "gemini-stt-only"
+                    ? "Gemini (inefficient)"
+                    : speechResult.provider}{" "}
+                  • {Math.round(speechResult.confidence * 100)}% confidence
                 </div>
               </div>
             )}
@@ -451,7 +520,7 @@ export default function ImprovedChatInput({
                   </div>
                 )}
                 {isVoiceMode && !isListening && <Mic size={24} />}
-                {isListening && <MicOff size={24} />}
+                {isListening && <Square size={24} />}
               </button>
             )}
 
