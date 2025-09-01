@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.redirect(new URL(`/invite/${token}`, request.url));
+      return NextResponse.redirect(new URL(`/invite/${token}`, process.env.NEXT_PUBLIC_SITE_URL));
     }
 
     // Get invitation details
@@ -32,15 +32,13 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (!invitation) {
-      return NextResponse.json({ error: 'Invalid or expired invitation' }, { status: 400 });
+      return NextResponse.redirect(new URL('/invite/error?error=invalid', process.env.NEXT_PUBLIC_SITE_URL));
     }
 
     // Check if invitation is for this user's email
     const { data: userIdentity } = await serviceSupabase.auth.admin.getUserById(user.id);
     if (userIdentity.user?.email !== invitation.intended_for_email) {
-      return NextResponse.json({ 
-        error: 'This invitation is not for your email address' 
-      }, { status: 403 });
+      return NextResponse.redirect(new URL('/invite/error?error=wrong_email', process.env.NEXT_PUBLIC_SITE_URL));
     }
 
     // Mark invitation as redeemed

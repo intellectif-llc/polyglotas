@@ -31,7 +31,7 @@ export async function getTokenOrRefresh(request?: { headers: { get: (name: strin
 
   try {
     // Use absolute URL for server-side fetch
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://polyglotas.com';
     const tokenUrl = `${baseUrl}/api/speech/token`;
     console.log('🔑 Token URL:', tokenUrl);
     

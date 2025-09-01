@@ -23,16 +23,16 @@ export async function POST() {
   // Create response with redirect
   const redirectUrl = new URL(
     "/",
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+    process.env.NEXT_PUBLIC_SITE_URL || "https://polyglotas.com"
   );
-  
+
   const response = NextResponse.redirect(redirectUrl.toString(), {
     status: 302,
   });
 
   // Ensure all auth cookies are cleared
-  response.cookies.delete('sb-access-token');
-  response.cookies.delete('sb-refresh-token');
-  
+  response.cookies.delete("sb-access-token");
+  response.cookies.delete("sb-refresh-token");
+
   return response;
 }
