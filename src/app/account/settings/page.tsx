@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Settings, Globe, Bell, Shield, Palette } from "lucide-react";
+import { Settings, Globe } from "lucide-react";
 import LanguageManagement from "@/components/settings/LanguageManagement";
 import { useUserProfile } from "@/hooks/useUserProfile";
 

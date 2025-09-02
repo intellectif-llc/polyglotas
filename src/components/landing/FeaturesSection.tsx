@@ -37,7 +37,7 @@ export default function FeaturesSection() {
       icon: GlobeAltIcon,
       title: "Multiple Languages",
       description:
-        "Support for 50+ languages with native speaker models and cultural context.",
+        "Support for multiple languages with native speaker models and cultural context.",
       color: "from-orange-500 to-red-500",
     },
     {

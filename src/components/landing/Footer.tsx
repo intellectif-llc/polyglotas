@@ -26,15 +26,18 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-purple-400 transition-colors">
+                <a
+                  href="/pricing"
+                  className="hover:text-purple-400 transition-colors"
+                >
                   Pricing
                 </a>
               </li>
-              <li>
+              {/*               <li>
                 <a href="#" className="hover:text-purple-400 transition-colors">
                   Languages
                 </a>
-              </li>
+              </li> */}
               {/*               <li>
                 <a href="#" className="hover:text-purple-400 transition-colors">
                   Mobile App
@@ -47,23 +50,29 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4">Support</h4>
             <ul className="space-y-2 text-gray-400">
-              <li>
+              {/*               <li>
                 <a href="#" className="hover:text-purple-400 transition-colors">
                   Help Center
                 </a>
-              </li>
-              <li>
+              </li> */}
+              {/*               <li>
                 <a href="#" className="hover:text-purple-400 transition-colors">
                   Contact Us
                 </a>
-              </li>
+              </li> */}
               <li>
-                <a href="/privacy" className="hover:text-purple-400 transition-colors">
+                <a
+                  href="/privacy"
+                  className="hover:text-purple-400 transition-colors"
+                >
                   Privacy Policy
                 </a>
               </li>
               <li>
-                <a href="/terms" className="hover:text-purple-400 transition-colors">
+                <a
+                  href="/terms"
+                  className="hover:text-purple-400 transition-colors"
+                >
                   Terms of Service
                 </a>
               </li>
