@@ -27,7 +27,9 @@ export default function SettingsPage() {
           <div>
             <div className="flex items-center space-x-3 mb-4">
               <Globe className="text-blue-600" size={24} />
-              <h2 className="text-lg font-semibold text-gray-900">Language Settings</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Language Settings
+              </h2>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="mb-4">
@@ -37,7 +39,8 @@ export default function SettingsPage() {
                       Native Language
                     </label>
                     <p className="text-gray-900 bg-white p-2 rounded border">
-                      {profile?.native_language_code?.toUpperCase() || "Not set"}
+                      {profile?.native_language_code?.toUpperCase() ||
+                        "Not set"}
                     </p>
                   </div>
                   <div>
@@ -45,15 +48,19 @@ export default function SettingsPage() {
                       Target Language
                     </label>
                     <p className="text-gray-900 bg-white p-2 rounded border">
-                      {profile?.current_target_language_code?.toUpperCase() || "EN"} (Default)
+                      {profile?.current_target_language_code?.toUpperCase() ||
+                        "EN"}{" "}
+                      (Default)
                     </p>
                   </div>
                 </div>
                 <p className="text-gray-600 text-sm mb-4">
-                  Set your native language to get better learning recommendations. Target language is currently fixed to English.
+                  Set your native language to get better learning
+                  recommendations. Target language is currently fixed to
+                  English.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => setShowLanguageManagement(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
@@ -63,7 +70,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Notifications */}
-          <div>
+          {/*           <div>
             <div className="flex items-center space-x-3 mb-4">
               <Bell className="text-green-600" size={24} />
               <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
@@ -76,10 +83,10 @@ export default function SettingsPage() {
                 Notification Settings
               </button>
             </div>
-          </div>
+          </div> */}
 
           {/* Privacy & Security */}
-          <div>
+          {/*           <div>
             <div className="flex items-center space-x-3 mb-4">
               <Shield className="text-red-600" size={24} />
               <h2 className="text-lg font-semibold text-gray-900">Privacy & Security</h2>
@@ -92,10 +99,10 @@ export default function SettingsPage() {
                 Security Settings
               </button>
             </div>
-          </div>
+          </div> */}
 
           {/* Appearance */}
-          <div>
+          {/*           <div>
             <div className="flex items-center space-x-3 mb-4">
               <Palette className="text-purple-600" size={24} />
               <h2 className="text-lg font-semibold text-gray-900">Appearance</h2>
@@ -108,7 +115,7 @@ export default function SettingsPage() {
                 Theme Settings
               </button>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
