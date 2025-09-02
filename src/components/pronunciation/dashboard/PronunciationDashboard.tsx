@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import LevelSelector from "@/components/pronunciation/dashboard/LevelSelector";
 import UnitsCarousel from "@/components/pronunciation/dashboard/UnitsCarousel";
 import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
 import { useUserName } from "@/hooks/useUserName";
+import { useLevelSelection } from "@/hooks/useLevelSelection";
 import { Unit } from "@/types/pronunciation";
 
 const PronunciationDashboard = () => {
-  const [selectedLevel, setSelectedLevel] = useState("A1");
+  const { selectedLevel } = useLevelSelection();
   const { data: allUnits, isLoading, error } = usePronunciationUnits();
   const { data: firstName } = useUserName();
   const router = useRouter();
@@ -18,10 +19,6 @@ const PronunciationDashboard = () => {
     if (!allUnits) return [];
     return allUnits.filter((unit: Unit) => unit.level === selectedLevel);
   }, [allUnits, selectedLevel]);
-
-  const handleLevelSelect = (level: string) => {
-    setSelectedLevel(level);
-  };
 
   const handleUnitSelect = (unit: Unit) => {
     router.push(`/learn/${unit.unit_id}`);
@@ -33,10 +30,7 @@ const PronunciationDashboard = () => {
         <h2 className="text-xl font-semibold mt-6 text-white">Welcome back, {firstName || "User"}</h2>
       </div>
       <div className="bg-white p-4 sm:p-5 mb-5 shadow-sm">
-        <LevelSelector
-          currentLevel={selectedLevel}
-          onSelectLevel={handleLevelSelect}
-        />
+        <LevelSelector />
       </div>
       <div
         className={`

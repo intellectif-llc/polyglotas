@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { useUserStats } from "@/hooks/useUserProfile";
 import { useLanguageLevels } from "@/hooks/useLanguageLevels";
+import { useLevelSelection } from "@/hooks/useLevelSelection";
 
 interface LevelSelectorProps {
   isCollapsed: boolean;
@@ -16,6 +17,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { data: userStats } = useUserStats();
   const { data: levels = [] } = useLanguageLevels();
+  const { selectedLevel, selectLevel } = useLevelSelection();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -28,7 +30,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const currentLevel = userStats?.currentLevel || "A1";
+  const currentLevel = selectedLevel;
 
   if (isCollapsed) {
     return (
@@ -76,8 +78,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
                 <button
                   key={level.level_code}
                   onClick={() => {
-                    // For now, just close the dropdown
-                    // Level switching logic can be implemented when needed
+                    selectLevel(level.level_code);
                     setIsOpen(false);
                   }}
                   className={`w-full flex items-center space-x-3 px-2 py-2 rounded-md text-sm transition-colors ${

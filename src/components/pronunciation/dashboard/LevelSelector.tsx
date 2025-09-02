@@ -1,19 +1,19 @@
 import React from "react";
 import { useLanguageLevels } from "@/hooks/useLanguageLevels";
+import { useLevelSelection } from "@/hooks/useLevelSelection";
 
-
-
-function LevelSelector({ currentLevel, onSelectLevel }: { currentLevel: string; onSelectLevel: (level: string) => void }) {
+function LevelSelector() {
   const { data: levels = [] } = useLanguageLevels();
+  const { selectedLevel, selectLevel } = useLevelSelection();
 
   return (
     <div className="flex justify-center items-center space-x-2 sm:space-x-3">
       {levels.map((level) => {
-        const isSelected = currentLevel === level.level_code;
+        const isSelected = selectedLevel === level.level_code;
         return (
           <button
             key={level.level_code}
-            onClick={() => onSelectLevel(level.level_code)}
+            onClick={() => selectLevel(level.level_code)}
             className={`
               w-12 h-12 sm:w-14 sm:h-14
               rounded-full

@@ -405,10 +405,8 @@ export async function POST(
       const currentAddressedIds = [...previouslyAddressedIds, ...newlyAddressedIds];
       const allPromptsAddressed = currentAddressedIds.length === conversationPrompts.length;
 
-      // Award points and update conversation status if all prompts addressed for first time
-      const wasAlreadyCompleted = previouslyAddressedIds.length === conversationPrompts.length;
-      
-      if (allPromptsAddressed && !wasAlreadyCompleted) {
+      // Award points and update conversation status if all prompts addressed
+      if (allPromptsAddressed) {
         // Award points for chat completion
         const { error: completionError } = await supabase.rpc('process_chat_completion', {
           profile_id_param: subscriptionResult.userId,
