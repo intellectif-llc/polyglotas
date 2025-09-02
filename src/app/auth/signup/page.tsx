@@ -1,7 +1,7 @@
 "use client";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { Github, Mail } from "lucide-react";
+import { Github, Mail, Send } from "lucide-react";
 import { Building2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -11,6 +11,8 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSignUpWithGoogle = async () => {
     setError(null);
@@ -72,6 +74,36 @@ export default function SignUpPage() {
     });
     if (signUpError) {
       setError(signUpError.message);
+    }
+  };
+
+  const handleMagicLinkSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    
+    setError(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+
+    // Check for invitation token
+    const invitationToken = localStorage.getItem("invitation_token");
+    const redirectUrl = invitationToken
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?invitation_token=${invitationToken}`
+      : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
+
+    const { error: signUpError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
+    });
+    
+    setIsLoading(false);
+    
+    if (signUpError) {
+      setError(signUpError.message);
+    } else {
+      setSuccessMessage(`Check your email! We sent a magic link to ${email}`);
     }
   };
 
@@ -160,6 +192,40 @@ export default function SignUpPage() {
               <Building2 className="w-5 h-5 mr-2" />
               Sign up with Microsoft
             </button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleMagicLinkSignUp} className="space-y-4">
+              <div>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={!agreedToTerms || isLoading || !email.trim()}
+                className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {isLoading ? "Sending..." : "Send magic link"}
+              </button>
+            </form>
           </div>
           <div className="mt-6">
             <div className="flex items-center">

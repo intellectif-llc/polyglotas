@@ -75,6 +75,32 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
     });
   };
 
+  const handleMagicLinkSignIn = async (email: string) => {
+    try {
+      // Check for invitation token
+      const invitationToken = localStorage.getItem("invitation_token");
+      const redirectUrl = invitationToken
+        ? `${window.location.origin}/auth/callback?invitation_token=${invitationToken}`
+        : `${window.location.origin}/auth/callback`;
+
+      const { error } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return { error: errorMessage };
+    }
+  };
+
   const handleSignOut = async () => {
     setIsSigningOut(true);
     setLoading(true);
@@ -117,7 +143,7 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
       {user ? (
         <AuthenticatedDashboard user={user} onSignOut={handleSignOut} />
       ) : (
-        <LandingHero onSignIn={handleSignIn} />
+        <LandingHero onSignIn={handleSignIn} onMagicLinkSignIn={handleMagicLinkSignIn} />
       )}
     </>
   );

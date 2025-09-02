@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowRightIcon, PlayIcon } from "@heroicons/react/24/outline";
 import FeaturesSection from "./FeaturesSection";
 import TestimonialsSection from "./TestimonialsSection";
@@ -7,9 +8,33 @@ import Footer from "./Footer";
 
 interface LandingHeroProps {
   onSignIn: (provider: "google" | "github" | "azure") => void;
+  onMagicLinkSignIn: (email: string) => Promise<{ error?: string; success?: boolean }>;
 }
 
-export default function LandingHero({ onSignIn }: LandingHeroProps) {
+export default function LandingHero({ onSignIn, onMagicLinkSignIn }: LandingHeroProps) {
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleMagicLinkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    
+    const result = await onMagicLinkSignIn(email);
+    
+    setIsLoading(false);
+    
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setSuccessMessage(`Check your email! We sent a magic link to ${email}`);
+    }
+  };
   return (
     <div>
       {/* Hero Section */}
@@ -142,7 +167,57 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
               </button>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-4">
+            <div className="mt-8 max-w-md mx-auto">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/20" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-gray-900 text-gray-400">Or continue with email</span>
+                </div>
+              </div>
+              
+              {error && (
+                <div className="mt-4 rounded-md bg-red-50 p-3">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+              
+              {successMessage && (
+                <div className="mt-4 rounded-md bg-green-50 p-3">
+                  <p className="text-sm text-green-800">{successMessage}</p>
+                </div>
+              )}
+              
+              <form onSubmit={handleMagicLinkSubmit} className="mt-6 space-y-4">
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 border border-white/20 rounded-xl bg-white/10 backdrop-blur-sm text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading || !email.trim()}
+                  className="w-full px-4 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/20 rounded-xl text-white font-semibold transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  )}
+                  <span>{isLoading ? "Sending..." : "Send magic link"}</span>
+                </button>
+              </form>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
               <button
                 onClick={() => onSignIn("github")}
                 className="px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 rounded-xl text-white font-semibold transition-all duration-300 flex items-center space-x-3 cursor-pointer shadow-lg"

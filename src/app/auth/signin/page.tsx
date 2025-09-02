@@ -1,13 +1,16 @@
 "use client";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { Github, Mail } from "lucide-react";
+import { Github, Mail, Send } from "lucide-react";
 import { Building2 } from "lucide-react";
 import { useState } from "react";
 
 export default function SignInPage() {
   const supabase = createSupabaseBrowserClient();
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSignInWithGoogle = async () => {
     setError(null);
@@ -48,6 +51,30 @@ export default function SignInPage() {
     }
   };
 
+  const handleMagicLinkSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    
+    setError(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+
+    const { error: signInError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      },
+    });
+    
+    setIsLoading(false);
+    
+    if (signInError) {
+      setError(signInError.message);
+    } else {
+      setSuccessMessage(`Check your email! We sent a magic link to ${email}`);
+    }
+  };
+
   // Optional: Email/Password Sign In (as per your requirements, social is primary)
   // const handleSignInWithEmail = async (e: React.FormEvent<HTMLFormElement>) => {
   //   e.preventDefault();
@@ -83,6 +110,17 @@ export default function SignInPage() {
               </div>
             </div>
           )}
+          {successMessage && (
+            <div className="mb-4 rounded-md bg-green-50 p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-green-800">
+                    {successMessage}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="space-y-6">
             <button
               onClick={handleSignInWithGoogle}
@@ -111,6 +149,40 @@ export default function SignInPage() {
               <Building2 className="w-5 h-5 mr-2" />
               Sign in with Microsoft
             </button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleMagicLinkSignIn} className="space-y-4">
+              <div>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading || !email.trim()}
+                className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                {isLoading ? "Sending..." : "Send magic link"}
+              </button>
+            </form>
           </div>
 
           {/* <div className="mt-6 relative">
