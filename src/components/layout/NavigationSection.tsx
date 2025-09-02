@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   User,
-  Trophy,
   Settings,
   BarChart3,
   CreditCard,
@@ -14,8 +13,9 @@ import {
   LucideIcon,
   Shield,
   Users,
+  PlayCircle,
 } from "lucide-react";
-import { usePronunciationUnits } from "@/hooks/pronunciation/usePronunciationData";
+import { useContinueLearning } from "@/hooks/useContinueLearning";
 import { useUserStats } from "@/hooks/useUserProfile";
 import { useNavigationState } from "@/hooks/useNavigationState";
 import { useRealtimeUserStats } from "@/hooks/useRealtimeUserStats";
@@ -50,7 +50,7 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
 }) => {
   const pathname = usePathname();
   const { pendingHref, handleNavigation } = useNavigationState(onNavigate);
-  const { data: units, isLoading: unitsLoading } = usePronunciationUnits();
+  const { data: continueData, isLoading: continueLoading } = useContinueLearning();
   const { data: userStats } = useUserStats();
   const { role } = useUserRole();
 
@@ -60,8 +60,8 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
   const iconSize = isCollapsed && !isMobile ? 24 : 20;
   const textHidden = isCollapsed && !isMobile;
 
-  // Show loading state for units section
-  const unitsSection = unitsLoading
+  // Continue learning section
+  const continueSection = continueLoading
     ? {
         title: "Learning",
         items: [],
@@ -69,19 +69,17 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
       }
     : {
         title: "Learning",
-        items:
-          units?.slice(0, 5).map((unit) => ({
-            href: `/learn/${unit.unit_id}`,
-            label: unit.unit_title,
-            icon: Trophy,
-            badge:
-              unit.progress.percent === 100
-                ? "✓"
-                : unit.progress.percent > 0
-                ? `${unit.progress.percent}%`
-                : undefined,
-            isActive: pathname.startsWith(`/learn/${unit.unit_id}`),
-          })) || [],
+        items: continueData ? [{
+          href: continueData.href,
+          label: continueData.hasProgress ? "Continue learning" : "Get started",
+          icon: PlayCircle,
+          isActive: pathname.startsWith(`/learn/${continueData.unitId}/lesson/${continueData.lessonId}`),
+        }] : [{
+          href: "/learn/1/lesson/1/dictation",
+          label: "Get started",
+          icon: PlayCircle,
+          isActive: false,
+        }],
       };
 
   // Build navigation sections based on user role
@@ -102,7 +100,7 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
         },
       ],
     },
-    unitsSection,
+    continueSection,
     {
       title: "Account",
       items: [
@@ -178,6 +176,11 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
               : "text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
           } ${isNavigating ? "animate-spin" : ""}`}
         />
+        {textHidden && continueData && item.label.includes("Continue") && (
+          <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+            {continueData.lessonTitle}
+          </div>
+        )}
         {!textHidden && (
           <>
             <span
@@ -209,7 +212,7 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
   return (
     <nav
       className={`flex-1 py-4 px-2 space-y-6 overflow-y-auto transition-all duration-200 ${
-        unitsLoading ? "opacity-75" : "opacity-100"
+        continueLoading ? "opacity-75" : "opacity-100"
       }`}
     >
       {navSections.map((section, sectionIndex) => (

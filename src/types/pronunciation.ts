@@ -48,3 +48,12 @@ export interface DictationAttempt {
   written_text?: string;
   reference_text?: string;
 }
+
+export interface ContinueLearningData {
+  hasProgress: boolean;
+  lessonTitle: string;
+  href: string;
+  unitId: number;
+  lessonId: number;
+  activityType: 'dictation' | 'pronunciation' | 'chat';
+}
