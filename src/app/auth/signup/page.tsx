@@ -2,6 +2,7 @@
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Github, Mail } from "lucide-react";
+import { Building2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -44,6 +45,27 @@ export default function SignUpPage() {
 
     const { error: signUpError } = await supabase.auth.signInWithOAuth({
       provider: "github",
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+    if (signUpError) {
+      setError(signUpError.message);
+    }
+  };
+
+  const handleSignUpWithAzure = async () => {
+    setError(null);
+    setSuccessMessage(null);
+
+    // Check for invitation token
+    const invitationToken = localStorage.getItem("invitation_token");
+    const redirectUrl = invitationToken
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?invitation_token=${invitationToken}`
+      : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
+
+    const { error: signUpError } = await supabase.auth.signInWithOAuth({
+      provider: "azure",
       options: {
         redirectTo: redirectUrl,
       },
@@ -127,6 +149,16 @@ export default function SignUpPage() {
             >
               <Github className="w-5 h-5 mr-2" />
               Sign up with GitHub
+            </button>
+
+            <button
+              onClick={handleSignUpWithAzure}
+              type="button"
+              disabled={!agreedToTerms}
+              className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Building2 className="w-5 h-5 mr-2" />
+              Sign up with Microsoft
             </button>
           </div>
           <div className="mt-6">

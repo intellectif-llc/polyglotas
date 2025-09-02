@@ -60,7 +60,7 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
     };
   }, [initialUser, supabaseClient]);
 
-  const handleSignIn = (provider: "google" | "github") => {
+  const handleSignIn = (provider: "google" | "github" | "azure") => {
     // Check for invitation token
     const invitationToken = localStorage.getItem("invitation_token");
     const redirectUrl = invitationToken
