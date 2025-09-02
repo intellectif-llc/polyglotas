@@ -118,9 +118,13 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <a
                 href="/auth"
-                className="group px-8 py-4 bg-brand-gradient hover:shadow-2xl hover:shadow-purple-500/25 rounded-xl text-white font-semibold transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 cursor-pointer border border-white/10 shadow-lg"
+                className="group relative px-8 py-4 bg-brand-gradient hover:shadow-2xl hover:shadow-purple-500/25 rounded-xl text-white font-semibold transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 cursor-pointer border border-white/10 shadow-lg animate-pulse hover:animate-none"
+                style={{
+                  boxShadow: '0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(236, 72, 153, 0.2), 0 0 60px rgba(99, 102, 241, 0.1)'
+                }}
               >
-                <span>Get Started</span>
+                <span className="relative z-10">Get Started</span>
+                <div className="absolute inset-0 bg-brand-gradient rounded-xl opacity-75 blur-sm animate-pulse"></div>
                 <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </a>
             </div>
