@@ -105,10 +105,6 @@ export default function LessonDictationView() {
     setLastAttempt(null);
   };
 
-  const handleContinueToPractice = () => {
-    router.push(`/learn/${unitId}/lesson/${lessonId}/practice`);
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -203,7 +199,6 @@ export default function LessonDictationView() {
                   attempt={lastAttempt}
                   userText={userText}
                   onTryAgain={handleTryAgain}
-                  onContinue={handleContinueToPractice}
                   audioUrlNormal={currentPhrase.audio_url_normal}
                   audioUrlSlow={currentPhrase.audio_url_slow}
                 />

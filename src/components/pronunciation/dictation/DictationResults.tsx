@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { CheckCircle, XCircle, RotateCcw, ArrowRight, Volume2, Turtle } from "lucide-react";
+import { CheckCircle, XCircle, RotateCcw, Volume2, Turtle } from "lucide-react";
 import { DictationAttempt } from "@/types/pronunciation";
 import CharacterLevelFeedback from "./CharacterLevelFeedback";
 
@@ -9,7 +9,6 @@ interface DictationResultsProps {
   attempt: DictationAttempt;
   userText: string;
   onTryAgain: () => void;
-  onContinue: () => void;
   audioUrlNormal?: string;
   audioUrlSlow?: string;
 }
@@ -18,7 +17,6 @@ export default function DictationResults({
   attempt,
   userText,
   onTryAgain,
-  onContinue,
   audioUrlNormal,
   audioUrlSlow,
 }: DictationResultsProps) {
@@ -30,14 +28,14 @@ export default function DictationResults({
   useEffect(() => {
     const audioNormal = audioNormalRef.current;
     const audioSlow = audioSlowRef.current;
-    
+
     if (audioNormal) {
       audioNormal.onended = () => setIsPlayingNormal(false);
     }
     if (audioSlow) {
       audioSlow.onended = () => setIsPlayingSlow(false);
     }
-    
+
     return () => {
       if (audioNormal) {
         audioNormal.onended = null;
@@ -62,7 +60,9 @@ export default function DictationResults({
       audio.pause();
       setIsPlayingNormal(false);
     } else {
-      audio.play().catch((e) => console.error("Error playing normal audio:", e));
+      audio
+        .play()
+        .catch((e) => console.error("Error playing normal audio:", e));
       setIsPlayingNormal(true);
     }
   }, [isPlayingNormal, isPlayingSlow]);
@@ -125,9 +125,10 @@ export default function DictationResults({
               onClick={toggleNormalPlayback}
               className={`
                 cursor-pointer p-3 rounded-full 
-                ${isPlayingNormal 
-                  ? 'bg-blue-100 text-blue-700 border-blue-300' 
-                  : 'bg-blue-50 text-blue-600 border-blue-200'
+                ${
+                  isPlayingNormal
+                    ? "bg-blue-100 text-blue-700 border-blue-300"
+                    : "bg-blue-50 text-blue-600 border-blue-200"
                 }
                 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300
                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
@@ -137,7 +138,9 @@ export default function DictationResults({
                 w-12 h-12
               `}
               aria-label={
-                isPlayingNormal ? "Pause normal speed audio" : "Play normal speed audio"
+                isPlayingNormal
+                  ? "Pause normal speed audio"
+                  : "Play normal speed audio"
               }
               title="Listen at normal speed"
             >
@@ -145,7 +148,7 @@ export default function DictationResults({
             </button>
           </>
         )}
-        
+
         {audioUrlSlow && (
           <>
             <audio ref={audioSlowRef} src={audioUrlSlow} preload="auto" />
@@ -153,9 +156,10 @@ export default function DictationResults({
               onClick={toggleSlowPlayback}
               className={`
                 cursor-pointer p-3 rounded-full 
-                ${isPlayingSlow 
-                  ? 'bg-orange-100 text-orange-700 border-orange-300' 
-                  : 'bg-orange-50 text-orange-600 border-orange-200'
+                ${
+                  isPlayingSlow
+                    ? "bg-orange-100 text-orange-700 border-orange-300"
+                    : "bg-orange-50 text-orange-600 border-orange-200"
                 }
                 hover:bg-orange-100 hover:text-orange-700 hover:border-orange-300
                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 
@@ -165,7 +169,9 @@ export default function DictationResults({
                 w-12 h-12 relative
               `}
               aria-label={
-                isPlayingSlow ? "Pause slow speed audio" : "Play slow speed audio"
+                isPlayingSlow
+                  ? "Pause slow speed audio"
+                  : "Play slow speed audio"
               }
               title="Listen at slow speed"
             >
@@ -179,7 +185,7 @@ export default function DictationResults({
       </div>
 
       {/* Character-Level Feedback */}
-      <CharacterLevelFeedback 
+      <CharacterLevelFeedback
         referenceText={attempt.reference_text || ""}
         userText={attempt.written_text || userText}
       />
@@ -194,17 +200,6 @@ export default function DictationResults({
           <RotateCcw className="w-5 h-5 mr-2 pointer-events-none" />
           <span className="pointer-events-none">Try Again</span>
         </button>
-
-        {attempt.is_correct && (
-          <button
-            type="button"
-            onClick={onContinue}
-            className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium min-h-[48px] touch-manipulation"
-          >
-            <span className="pointer-events-none">Continue to Practice</span>
-            <ArrowRight className="w-5 h-5 ml-2 pointer-events-none" />
-          </button>
-        )}
       </div>
     </div>
   );

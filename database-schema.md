@@ -4,457 +4,457 @@
 -- Table order and constraints may not be valid for execution.
 
 CREATE TABLE public.conversation_messages (
-  message_id bigint NOT NULL DEFAULT nextval('conversation_messages_message_id_seq'::regclass),
-  conversation_id bigint NOT NULL,
-  sender_type USER-DEFINED NOT NULL,
-  message_order integer NOT NULL,
-  message_text text NOT NULL,
-  message_language_code character varying NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  related_prompt_id integer,
-  feedback_text text,
-  feedback_language_code character varying,
-  suggested_answer jsonb,
-  CONSTRAINT conversation_messages_pkey PRIMARY KEY (message_id),
-  CONSTRAINT conversation_messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id),
-  CONSTRAINT fk_conversation_messages_msg_lang FOREIGN KEY (message_language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT conversation_messages_related_prompt_id_fkey FOREIGN KEY (related_prompt_id) REFERENCES public.conversation_starters(id),
-  CONSTRAINT fk_conversation_messages_fb_lang FOREIGN KEY (feedback_language_code) REFERENCES public.languages(language_code)
+message_id bigint NOT NULL DEFAULT nextval('conversation_messages_message_id_seq'::regclass),
+conversation_id bigint NOT NULL,
+sender_type USER-DEFINED NOT NULL,
+message_order integer NOT NULL,
+message_text text NOT NULL,
+message_language_code character varying NOT NULL,
+created_at timestamp with time zone DEFAULT now(),
+related_prompt_id integer,
+feedback_text text,
+feedback_language_code character varying,
+suggested_answer jsonb,
+CONSTRAINT conversation_messages_pkey PRIMARY KEY (message_id),
+CONSTRAINT conversation_messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id),
+CONSTRAINT fk_conversation_messages_msg_lang FOREIGN KEY (message_language_code) REFERENCES public.languages(language_code),
+CONSTRAINT conversation_messages_related_prompt_id_fkey FOREIGN KEY (related_prompt_id) REFERENCES public.conversation_starters(id),
+CONSTRAINT fk_conversation_messages_fb_lang FOREIGN KEY (feedback_language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.conversation_prompt_status (
-  prompt_status_id bigint NOT NULL DEFAULT nextval('conversation_prompt_status_prompt_status_id_seq'::regclass),
-  conversation_id bigint NOT NULL,
-  prompt_id integer NOT NULL,
-  first_addressed_message_id bigint,
-  addressed_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT conversation_prompt_status_pkey PRIMARY KEY (prompt_status_id),
-  CONSTRAINT conversation_prompt_status_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id),
-  CONSTRAINT conversation_prompt_status_prompt_id_fkey FOREIGN KEY (prompt_id) REFERENCES public.conversation_starters(id),
-  CONSTRAINT conversation_prompt_status_first_addressed_message_id_fkey FOREIGN KEY (first_addressed_message_id) REFERENCES public.conversation_messages(message_id)
+prompt_status_id bigint NOT NULL DEFAULT nextval('conversation_prompt_status_prompt_status_id_seq'::regclass),
+conversation_id bigint NOT NULL,
+prompt_id integer NOT NULL,
+first_addressed_message_id bigint,
+addressed_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT conversation_prompt_status_pkey PRIMARY KEY (prompt_status_id),
+CONSTRAINT conversation_prompt_status_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id),
+CONSTRAINT conversation_prompt_status_prompt_id_fkey FOREIGN KEY (prompt_id) REFERENCES public.conversation_starters(id),
+CONSTRAINT conversation_prompt_status_first_addressed_message_id_fkey FOREIGN KEY (first_addressed_message_id) REFERENCES public.conversation_messages(message_id)
 );
 CREATE TABLE public.conversation_starter_translations (
-  starter_translation_id integer NOT NULL DEFAULT nextval('conversation_starter_translations_starter_translation_id_seq'::regclass),
-  starter_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  starter_text text NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT conversation_starter_translations_pkey PRIMARY KEY (starter_translation_id),
-  CONSTRAINT conversation_starter_translations_starter_id_fkey FOREIGN KEY (starter_id) REFERENCES public.conversation_starters(id),
-  CONSTRAINT fk_conversation_starter_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+starter_translation_id integer NOT NULL DEFAULT nextval('conversation_starter_translations_starter_translation_id_seq'::regclass),
+starter_id integer NOT NULL,
+language_code character varying NOT NULL,
+starter_text text NOT NULL,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT conversation_starter_translations_pkey PRIMARY KEY (starter_translation_id),
+CONSTRAINT conversation_starter_translations_starter_id_fkey FOREIGN KEY (starter_id) REFERENCES public.conversation_starters(id),
+CONSTRAINT fk_conversation_starter_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.conversation_starters (
-  id integer NOT NULL DEFAULT nextval('conversation_starters_id_seq'::regclass),
-  lesson_id integer NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT conversation_starters_pkey PRIMARY KEY (id),
-  CONSTRAINT conversation_starters_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+id integer NOT NULL DEFAULT nextval('conversation_starters_id_seq'::regclass),
+lesson_id integer NOT NULL,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT conversation_starters_pkey PRIMARY KEY (id),
+CONSTRAINT conversation_starters_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
 );
 CREATE TABLE public.dictation_attempts (
-  attempt_id integer NOT NULL DEFAULT nextval('dictation_attempts_attempt_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  lesson_id integer NOT NULL,
-  phrase_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  attempt_number integer NOT NULL,
-  reference_text text NOT NULL,
-  written_text text NOT NULL,
-  overall_similarity_score numeric CHECK (overall_similarity_score IS NULL OR overall_similarity_score >= 0::numeric AND overall_similarity_score <= 100::numeric),
-  word_level_feedback jsonb,
-  created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT dictation_attempts_pkey PRIMARY KEY (attempt_id),
-  CONSTRAINT dictation_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-  CONSTRAINT fk_dictation_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT dictation_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-  CONSTRAINT dictation_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id)
+attempt_id integer NOT NULL DEFAULT nextval('dictation_attempts_attempt_id_seq'::regclass),
+profile_id uuid NOT NULL,
+lesson_id integer NOT NULL,
+phrase_id integer NOT NULL,
+language_code character varying NOT NULL,
+attempt_number integer NOT NULL,
+reference_text text NOT NULL,
+written_text text NOT NULL,
+overall_similarity_score numeric CHECK (overall_similarity_score IS NULL OR overall_similarity_score >= 0::numeric AND overall_similarity_score <= 100::numeric),
+word_level_feedback jsonb,
+created_at timestamp with time zone DEFAULT now(),
+CONSTRAINT dictation_attempts_pkey PRIMARY KEY (attempt_id),
+CONSTRAINT dictation_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT fk_dictation_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT dictation_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT dictation_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id)
 );
 CREATE TABLE public.invoices (
-  id integer NOT NULL DEFAULT nextval('invoices_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  stripe_invoice_id character varying NOT NULL UNIQUE,
-  stripe_subscription_id character varying,
-  stripe_customer_id character varying,
-  status USER-DEFINED NOT NULL,
-  amount_due integer NOT NULL,
-  amount_paid integer NOT NULL,
-  amount_remaining integer NOT NULL,
-  currency character NOT NULL,
-  due_date timestamp with time zone,
-  paid_at timestamp with time zone,
-  invoice_pdf_url text,
-  hosted_invoice_url text,
-  billing_reason text,
-  metadata jsonb,
-  issued_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT invoices_pkey PRIMARY KEY (id),
-  CONSTRAINT invoices_stripe_subscription_id_fkey FOREIGN KEY (stripe_subscription_id) REFERENCES public.student_subscriptions(stripe_subscription_id),
-  CONSTRAINT invoices_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+id integer NOT NULL DEFAULT nextval('invoices_id_seq'::regclass),
+profile_id uuid NOT NULL,
+stripe_invoice_id character varying NOT NULL UNIQUE,
+stripe_subscription_id character varying,
+stripe_customer_id character varying,
+status USER-DEFINED NOT NULL,
+amount_due integer NOT NULL,
+amount_paid integer NOT NULL,
+amount_remaining integer NOT NULL,
+currency character NOT NULL,
+due_date timestamp with time zone,
+paid_at timestamp with time zone,
+invoice_pdf_url text,
+hosted_invoice_url text,
+billing_reason text,
+metadata jsonb,
+issued_at timestamp with time zone,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT invoices_pkey PRIMARY KEY (id),
+CONSTRAINT invoices_stripe_subscription_id_fkey FOREIGN KEY (stripe_subscription_id) REFERENCES public.student_subscriptions(stripe_subscription_id),
+CONSTRAINT invoices_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.language_levels (
-  level_code USER-DEFINED NOT NULL,
-  level_name text NOT NULL,
-  sort_order integer NOT NULL UNIQUE,
-  is_available boolean NOT NULL DEFAULT false,
-  description text,
-  CONSTRAINT language_levels_pkey PRIMARY KEY (level_code)
+level_code USER-DEFINED NOT NULL,
+level_name text NOT NULL,
+sort_order integer NOT NULL UNIQUE,
+is_available boolean NOT NULL DEFAULT false,
+description text,
+CONSTRAINT language_levels_pkey PRIMARY KEY (level_code)
 );
 CREATE TABLE public.languages (
-  language_code character varying NOT NULL,
-  language_name character varying NOT NULL UNIQUE,
-  created_at timestamp with time zone DEFAULT now(),
-  is_enabled boolean NOT NULL DEFAULT true,
-  CONSTRAINT languages_pkey PRIMARY KEY (language_code)
+language_code character varying NOT NULL,
+language_name character varying NOT NULL UNIQUE,
+created_at timestamp with time zone DEFAULT now(),
+is_enabled boolean NOT NULL DEFAULT true,
+CONSTRAINT languages_pkey PRIMARY KEY (language_code)
 );
 CREATE TABLE public.learning_outcome_translations (
-  outcome_translation_id integer NOT NULL DEFAULT nextval('learning_outcome_translations_outcome_translation_id_seq'::regclass),
-  outcome_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  outcome_text text NOT NULL CHECK (outcome_text <> ''::text),
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT learning_outcome_translations_pkey PRIMARY KEY (outcome_translation_id),
-  CONSTRAINT learning_outcome_translations_outcome_id_fkey FOREIGN KEY (outcome_id) REFERENCES public.learning_outcomes(outcome_id),
-  CONSTRAINT fk_learning_outcome_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+outcome_translation_id integer NOT NULL DEFAULT nextval('learning_outcome_translations_outcome_translation_id_seq'::regclass),
+outcome_id integer NOT NULL,
+language_code character varying NOT NULL,
+outcome_text text NOT NULL CHECK (outcome_text <> ''::text),
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT learning_outcome_translations_pkey PRIMARY KEY (outcome_translation_id),
+CONSTRAINT learning_outcome_translations_outcome_id_fkey FOREIGN KEY (outcome_id) REFERENCES public.learning_outcomes(outcome_id),
+CONSTRAINT fk_learning_outcome_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.learning_outcomes (
-  outcome_id integer NOT NULL DEFAULT nextval('learning_outcomes_outcome_id_seq'::regclass),
-  lesson_id integer NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT learning_outcomes_pkey PRIMARY KEY (outcome_id),
-  CONSTRAINT learning_outcomes_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+outcome_id integer NOT NULL DEFAULT nextval('learning_outcomes_outcome_id_seq'::regclass),
+lesson_id integer NOT NULL,
+created_at timestamp with time zone DEFAULT now(),
+CONSTRAINT learning_outcomes_pkey PRIMARY KEY (outcome_id),
+CONSTRAINT learning_outcomes_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
 );
 CREATE TABLE public.lesson_chat_conversations (
-  conversation_id bigint NOT NULL DEFAULT nextval('lesson_chat_conversations_conversation_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  lesson_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  all_prompts_addressed_at timestamp with time zone,
-  last_message_at timestamp with time zone,
-  CONSTRAINT lesson_chat_conversations_pkey PRIMARY KEY (conversation_id),
-  CONSTRAINT lesson_chat_conversations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-  CONSTRAINT lesson_chat_conversations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-  CONSTRAINT fk_lesson_chat_conversations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+conversation_id bigint NOT NULL DEFAULT nextval('lesson_chat_conversations_conversation_id_seq'::regclass),
+profile_id uuid NOT NULL,
+lesson_id integer NOT NULL,
+language_code character varying NOT NULL,
+created_at timestamp with time zone DEFAULT now(),
+all_prompts_addressed_at timestamp with time zone,
+last_message_at timestamp with time zone,
+CONSTRAINT lesson_chat_conversations_pkey PRIMARY KEY (conversation_id),
+CONSTRAINT lesson_chat_conversations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT lesson_chat_conversations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT fk_lesson_chat_conversations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.lesson_translations (
-  lesson_translation_id integer NOT NULL DEFAULT nextval('lesson_translations_lesson_translation_id_seq'::regclass),
-  lesson_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  lesson_title character varying NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  grammar_focus ARRAY,
-  CONSTRAINT lesson_translations_pkey PRIMARY KEY (lesson_translation_id),
-  CONSTRAINT lesson_translations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-  CONSTRAINT fk_lesson_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+lesson_translation_id integer NOT NULL DEFAULT nextval('lesson_translations_lesson_translation_id_seq'::regclass),
+lesson_id integer NOT NULL,
+language_code character varying NOT NULL,
+lesson_title character varying NOT NULL,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+grammar_focus ARRAY,
+CONSTRAINT lesson_translations_pkey PRIMARY KEY (lesson_translation_id),
+CONSTRAINT lesson_translations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT fk_lesson_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.lessons (
-  lesson_id integer NOT NULL DEFAULT nextval('lessons_lesson_id_seq'::regclass),
-  unit_id integer NOT NULL,
-  lesson_order integer NOT NULL,
-  total_phrases integer NOT NULL DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  has_dictation boolean NOT NULL DEFAULT true,
-  has_pronunciation boolean NOT NULL DEFAULT true,
-  has_chat boolean NOT NULL DEFAULT true,
-  CONSTRAINT lessons_pkey PRIMARY KEY (lesson_id),
-  CONSTRAINT lessons_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.units(unit_id)
+lesson_id integer NOT NULL DEFAULT nextval('lessons_lesson_id_seq'::regclass),
+unit_id integer NOT NULL,
+lesson_order integer NOT NULL,
+total_phrases integer NOT NULL DEFAULT 0,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+has_dictation boolean NOT NULL DEFAULT true,
+has_pronunciation boolean NOT NULL DEFAULT true,
+has_chat boolean NOT NULL DEFAULT true,
+CONSTRAINT lessons_pkey PRIMARY KEY (lesson_id),
+CONSTRAINT lessons_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.units(unit_id)
 );
 CREATE TABLE public.partnership_invitations (
-  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  partnership_id bigint NOT NULL,
-  token uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
-  intended_for_email text NOT NULL,
-  redeemed_by_profile_id uuid UNIQUE,
-  redeemed_at timestamp with time zone,
-  expires_at timestamp with time zone NOT NULL,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  status USER-DEFINED NOT NULL DEFAULT 'pending'::partnership_invitation_status,
-  CONSTRAINT partnership_invitations_pkey PRIMARY KEY (id),
-  CONSTRAINT partnership_invitations_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
-  CONSTRAINT partnership_invitations_redeemed_by_profile_id_fkey FOREIGN KEY (redeemed_by_profile_id) REFERENCES public.student_profiles(profile_id)
+id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+partnership_id bigint NOT NULL,
+token uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+intended_for_email text NOT NULL,
+redeemed_by_profile_id uuid UNIQUE,
+redeemed_at timestamp with time zone,
+expires_at timestamp with time zone NOT NULL,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+status USER-DEFINED NOT NULL DEFAULT 'pending'::partnership_invitation_status,
+CONSTRAINT partnership_invitations_pkey PRIMARY KEY (id),
+CONSTRAINT partnership_invitations_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
+CONSTRAINT partnership_invitations_redeemed_by_profile_id_fkey FOREIGN KEY (redeemed_by_profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.partnerships (
-  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  name character varying NOT NULL,
-  description text,
-  trial_duration_days integer NOT NULL DEFAULT 7,
-  trial_tier USER-DEFINED NOT NULL DEFAULT 'pro'::subscription_tier_enum,
-  discount_percentage numeric NOT NULL DEFAULT 0 CHECK (discount_percentage >= 0::numeric AND discount_percentage <= 100::numeric),
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT partnerships_pkey PRIMARY KEY (id)
+id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+name character varying NOT NULL,
+description text,
+trial_duration_days integer NOT NULL DEFAULT 7,
+trial_tier USER-DEFINED NOT NULL DEFAULT 'pro'::subscription_tier_enum,
+discount_percentage numeric NOT NULL DEFAULT 0 CHECK (discount_percentage >= 0::numeric AND discount_percentage <= 100::numeric),
+is_active boolean NOT NULL DEFAULT true,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT partnerships_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.phrase_versions (
-  phrase_version_id integer NOT NULL DEFAULT nextval('phrase_versions_phrase_version_id_seq'::regclass),
-  phrase_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  phrase_text text NOT NULL,
-  audio_url_normal character varying,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  audio_url_slow character varying,
-  CONSTRAINT phrase_versions_pkey PRIMARY KEY (phrase_version_id),
-  CONSTRAINT phrase_versions_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
-  CONSTRAINT fk_phrase_versions_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+phrase_version_id integer NOT NULL DEFAULT nextval('phrase_versions_phrase_version_id_seq'::regclass),
+phrase_id integer NOT NULL,
+language_code character varying NOT NULL,
+phrase_text text NOT NULL,
+audio_url_normal character varying,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+audio_url_slow character varying,
+CONSTRAINT phrase_versions_pkey PRIMARY KEY (phrase_version_id),
+CONSTRAINT phrase_versions_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
+CONSTRAINT fk_phrase_versions_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.prices (
-  id integer NOT NULL DEFAULT nextval('prices_id_seq'::regclass),
-  stripe_price_id character varying NOT NULL UNIQUE,
-  product_id integer NOT NULL,
-  active boolean DEFAULT true,
-  unit_amount integer,
-  currency character NOT NULL,
-  type USER-DEFINED NOT NULL,
-  billing_interval USER-DEFINED,
-  interval_count integer,
-  description text,
-  trial_period_days integer,
-  metadata jsonb,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT prices_pkey PRIMARY KEY (id),
-  CONSTRAINT prices_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+id integer NOT NULL DEFAULT nextval('prices_id_seq'::regclass),
+stripe_price_id character varying NOT NULL UNIQUE,
+product_id integer NOT NULL,
+active boolean DEFAULT true,
+unit_amount integer,
+currency character NOT NULL,
+type USER-DEFINED NOT NULL,
+billing_interval USER-DEFINED,
+interval_count integer,
+description text,
+trial_period_days integer,
+metadata jsonb,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT prices_pkey PRIMARY KEY (id),
+CONSTRAINT prices_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
 );
 CREATE TABLE public.products (
-  id integer NOT NULL DEFAULT nextval('products_id_seq'::regclass),
-  stripe_product_id character varying NOT NULL UNIQUE,
-  active boolean DEFAULT true,
-  name character varying NOT NULL,
-  description text,
-  tier_key USER-DEFINED,
-  metadata jsonb,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT products_pkey PRIMARY KEY (id)
+id integer NOT NULL DEFAULT nextval('products_id_seq'::regclass),
+stripe_product_id character varying NOT NULL UNIQUE,
+active boolean DEFAULT true,
+name character varying NOT NULL,
+description text,
+tier_key USER-DEFINED,
+metadata jsonb,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT products_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.profiles (
-  id uuid NOT NULL,
-  first_name character varying,
-  last_name character varying,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  role USER-DEFINED NOT NULL DEFAULT 'student'::user_role_enum,
-  partnership_id bigint,
-  CONSTRAINT profiles_pkey PRIMARY KEY (id),
-  CONSTRAINT profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
-  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+id uuid NOT NULL,
+first_name character varying,
+last_name character varying,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+role USER-DEFINED NOT NULL DEFAULT 'student'::user_role_enum,
+partnership_id bigint,
+CONSTRAINT profiles_pkey PRIMARY KEY (id),
+CONSTRAINT profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
+CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.speech_attempts (
-  attempt_id integer NOT NULL DEFAULT nextval('speech_attempts_attempt_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  lesson_id integer NOT NULL,
-  phrase_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  attempt_number integer NOT NULL,
-  reference_text text NOT NULL,
-  recognized_text text,
-  created_at timestamp with time zone DEFAULT now(),
-  accuracy_score numeric CHECK (accuracy_score >= 0::numeric AND accuracy_score <= 100::numeric),
-  fluency_score numeric CHECK (fluency_score >= 0::numeric AND fluency_score <= 100::numeric),
-  completeness_score numeric CHECK (completeness_score >= 0::numeric AND completeness_score <= 100::numeric),
-  pronunciation_score numeric CHECK (pronunciation_score >= 0::numeric AND pronunciation_score <= 100::numeric),
-  prosody_score numeric CHECK (prosody_score >= 0::numeric AND prosody_score <= 100::numeric),
-  phonetic_data jsonb,
-  CONSTRAINT speech_attempts_pkey PRIMARY KEY (attempt_id),
-  CONSTRAINT speech_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
-  CONSTRAINT speech_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-  CONSTRAINT fk_speech_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT speech_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+attempt_id integer NOT NULL DEFAULT nextval('speech_attempts_attempt_id_seq'::regclass),
+profile_id uuid NOT NULL,
+lesson_id integer NOT NULL,
+phrase_id integer NOT NULL,
+language_code character varying NOT NULL,
+attempt_number integer NOT NULL,
+reference_text text NOT NULL,
+recognized_text text,
+created_at timestamp with time zone DEFAULT now(),
+accuracy_score numeric CHECK (accuracy_score >= 0::numeric AND accuracy_score <= 100::numeric),
+fluency_score numeric CHECK (fluency_score >= 0::numeric AND fluency_score <= 100::numeric),
+completeness_score numeric CHECK (completeness_score >= 0::numeric AND completeness_score <= 100::numeric),
+pronunciation_score numeric CHECK (pronunciation_score >= 0::numeric AND pronunciation_score <= 100::numeric),
+prosody_score numeric CHECK (prosody_score >= 0::numeric AND prosody_score <= 100::numeric),
+phonetic_data jsonb,
+CONSTRAINT speech_attempts_pkey PRIMARY KEY (attempt_id),
+CONSTRAINT speech_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
+CONSTRAINT speech_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT fk_speech_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT speech_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.student_profiles (
-  profile_id uuid NOT NULL,
-  discount numeric,
-  status USER-DEFINED NOT NULL,
-  current_streak_days integer NOT NULL DEFAULT 0,
-  last_streak_date date,
-  subscription_tier USER-DEFINED NOT NULL DEFAULT 'free'::subscription_tier_enum,
-  points integer NOT NULL DEFAULT 0 CHECK (points >= 0),
-  native_language_code character varying,
-  current_target_language_code character varying,
-  stripe_customer_id character varying UNIQUE,
-  default_payment_method_details jsonb,
-  billing_address jsonb,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  partnership_id bigint,
-  selected_level_code USER-DEFINED,
-  CONSTRAINT student_profiles_pkey PRIMARY KEY (profile_id),
-  CONSTRAINT fk_student_profiles_native_lang FOREIGN KEY (native_language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT fk_student_profiles_target_lang FOREIGN KEY (current_target_language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT student_profiles_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
-  CONSTRAINT fk_student_profiles_selected_level FOREIGN KEY (selected_level_code) REFERENCES public.language_levels(level_code),
-  CONSTRAINT student_profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id)
+profile_id uuid NOT NULL,
+discount numeric,
+status USER-DEFINED NOT NULL,
+current_streak_days integer NOT NULL DEFAULT 0,
+last_streak_date date,
+subscription_tier USER-DEFINED NOT NULL DEFAULT 'free'::subscription_tier_enum,
+points integer NOT NULL DEFAULT 0 CHECK (points >= 0),
+native_language_code character varying,
+current_target_language_code character varying,
+stripe_customer_id character varying UNIQUE,
+default_payment_method_details jsonb,
+billing_address jsonb,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+partnership_id bigint,
+selected_level_code USER-DEFINED,
+CONSTRAINT student_profiles_pkey PRIMARY KEY (profile_id),
+CONSTRAINT fk_student_profiles_native_lang FOREIGN KEY (native_language_code) REFERENCES public.languages(language_code),
+CONSTRAINT fk_student_profiles_target_lang FOREIGN KEY (current_target_language_code) REFERENCES public.languages(language_code),
+CONSTRAINT student_profiles_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
+CONSTRAINT fk_student_profiles_selected_level FOREIGN KEY (selected_level_code) REFERENCES public.language_levels(level_code),
+CONSTRAINT student_profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id)
 );
 CREATE TABLE public.student_subscriptions (
-  id integer NOT NULL DEFAULT nextval('student_subscriptions_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  price_id integer NOT NULL,
-  stripe_subscription_id character varying NOT NULL UNIQUE,
-  status USER-DEFINED NOT NULL,
-  quantity integer DEFAULT 1,
-  current_period_start timestamp with time zone NOT NULL,
-  current_period_end timestamp with time zone NOT NULL,
-  cancel_at_period_end boolean DEFAULT false,
-  canceled_at timestamp with time zone,
-  ended_at timestamp with time zone,
-  trial_start_at timestamp with time zone,
-  trial_end_at timestamp with time zone,
-  metadata jsonb,
-  stripe_created_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT student_subscriptions_pkey PRIMARY KEY (id),
-  CONSTRAINT student_subscriptions_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-  CONSTRAINT student_subscriptions_price_id_fkey FOREIGN KEY (price_id) REFERENCES public.prices(id)
+id integer NOT NULL DEFAULT nextval('student_subscriptions_id_seq'::regclass),
+profile_id uuid NOT NULL,
+price_id integer NOT NULL,
+stripe_subscription_id character varying NOT NULL UNIQUE,
+status USER-DEFINED NOT NULL,
+quantity integer DEFAULT 1,
+current_period_start timestamp with time zone NOT NULL,
+current_period_end timestamp with time zone NOT NULL,
+cancel_at_period_end boolean DEFAULT false,
+canceled_at timestamp with time zone,
+ended_at timestamp with time zone,
+trial_start_at timestamp with time zone,
+trial_end_at timestamp with time zone,
+metadata jsonb,
+stripe_created_at timestamp with time zone,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT student_subscriptions_pkey PRIMARY KEY (id),
+CONSTRAINT student_subscriptions_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT student_subscriptions_price_id_fkey FOREIGN KEY (price_id) REFERENCES public.prices(id)
 );
 CREATE TABLE public.student_target_languages (
-  profile_id uuid NOT NULL,
-  language_code character varying NOT NULL,
-  added_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT student_target_languages_pkey PRIMARY KEY (profile_id, language_code),
-  CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-  CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+profile_id uuid NOT NULL,
+language_code character varying NOT NULL,
+added_at timestamp with time zone DEFAULT now(),
+CONSTRAINT student_target_languages_pkey PRIMARY KEY (profile_id, language_code),
+CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.unit_translations (
-  unit_translation_id integer NOT NULL DEFAULT nextval('unit_translations_unit_translation_id_seq'::regclass),
-  unit_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  unit_title character varying NOT NULL,
-  description text,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT unit_translations_pkey PRIMARY KEY (unit_translation_id),
-  CONSTRAINT unit_translations_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.units(unit_id),
-  CONSTRAINT fk_unit_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+unit_translation_id integer NOT NULL DEFAULT nextval('unit_translations_unit_translation_id_seq'::regclass),
+unit_id integer NOT NULL,
+language_code character varying NOT NULL,
+unit_title character varying NOT NULL,
+description text,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT unit_translations_pkey PRIMARY KEY (unit_translation_id),
+CONSTRAINT unit_translations_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.units(unit_id),
+CONSTRAINT fk_unit_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.units (
-  unit_id integer NOT NULL DEFAULT nextval('units_unit_id_seq'::regclass),
-  level USER-DEFINED NOT NULL,
-  unit_order integer NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT units_pkey PRIMARY KEY (unit_id),
-  CONSTRAINT fk_units_to_language_levels FOREIGN KEY (level) REFERENCES public.language_levels(level_code)
+unit_id integer NOT NULL DEFAULT nextval('units_unit_id_seq'::regclass),
+level USER-DEFINED NOT NULL,
+unit_order integer NOT NULL,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT units_pkey PRIMARY KEY (unit_id),
+CONSTRAINT fk_units_to_language_levels FOREIGN KEY (level) REFERENCES public.language_levels(level_code)
 );
 CREATE TABLE public.user_lesson_activity_progress (
-  activity_progress_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  user_lesson_progress_id integer NOT NULL,
-  activity_type USER-DEFINED NOT NULL,
-  status USER-DEFINED NOT NULL DEFAULT 'not_started'::activity_status_enum,
-  started_at timestamp with time zone,
-  completed_at timestamp with time zone,
-  CONSTRAINT user_lesson_activity_progress_pkey PRIMARY KEY (activity_progress_id),
-  CONSTRAINT user_lesson_activity_progress_user_lesson_progress_id_fkey FOREIGN KEY (user_lesson_progress_id) REFERENCES public.user_lesson_progress(progress_id)
+activity_progress_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+user_lesson_progress_id integer NOT NULL,
+activity_type USER-DEFINED NOT NULL,
+status USER-DEFINED NOT NULL DEFAULT 'not_started'::activity_status_enum,
+started_at timestamp with time zone,
+completed_at timestamp with time zone,
+CONSTRAINT user_lesson_activity_progress_pkey PRIMARY KEY (activity_progress_id),
+CONSTRAINT user_lesson_activity_progress_user_lesson_progress_id_fkey FOREIGN KEY (user_lesson_progress_id) REFERENCES public.user_lesson_progress(progress_id)
 );
 CREATE TABLE public.user_lesson_progress (
-  progress_id integer NOT NULL DEFAULT nextval('user_lesson_progress_progress_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  lesson_id integer NOT NULL,
-  started_at timestamp with time zone DEFAULT now(),
-  last_progress_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT user_lesson_progress_pkey PRIMARY KEY (progress_id),
-  CONSTRAINT user_lesson_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-  CONSTRAINT user_lesson_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+progress_id integer NOT NULL DEFAULT nextval('user_lesson_progress_progress_id_seq'::regclass),
+profile_id uuid NOT NULL,
+lesson_id integer NOT NULL,
+started_at timestamp with time zone DEFAULT now(),
+last_progress_at timestamp with time zone DEFAULT now(),
+CONSTRAINT user_lesson_progress_pkey PRIMARY KEY (progress_id),
+CONSTRAINT user_lesson_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT user_lesson_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_level_completion (
-  profile_id uuid NOT NULL,
-  level_code USER-DEFINED NOT NULL,
-  completed_at timestamp with time zone NOT NULL DEFAULT now(),
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT user_level_completion_pkey PRIMARY KEY (profile_id, level_code),
-  CONSTRAINT user_level_completion_level_code_fkey FOREIGN KEY (level_code) REFERENCES public.language_levels(level_code),
-  CONSTRAINT user_level_completion_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+profile_id uuid NOT NULL,
+level_code USER-DEFINED NOT NULL,
+completed_at timestamp with time zone NOT NULL DEFAULT now(),
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT user_level_completion_pkey PRIMARY KEY (profile_id, level_code),
+CONSTRAINT user_level_completion_level_code_fkey FOREIGN KEY (level_code) REFERENCES public.language_levels(level_code),
+CONSTRAINT user_level_completion_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_phrase_progress (
-  phrase_progress_id integer NOT NULL DEFAULT nextval('user_phrase_progress_phrase_progress_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  lesson_id integer NOT NULL,
-  phrase_id integer NOT NULL,
-  language_code character varying NOT NULL,
-  pronunciation_completed boolean DEFAULT false,
-  pronunciation_attempts integer DEFAULT 0,
-  pronunciation_last_attempt_at timestamp with time zone,
-  dictation_completed boolean DEFAULT false,
-  dictation_attempts integer DEFAULT 0,
-  dictation_last_attempt_at timestamp with time zone,
-  last_progress_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT user_phrase_progress_pkey PRIMARY KEY (phrase_progress_id),
-  CONSTRAINT user_phrase_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
-  CONSTRAINT fk_user_phrase_progress_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT user_phrase_progress_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
-  CONSTRAINT user_phrase_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+phrase_progress_id integer NOT NULL DEFAULT nextval('user_phrase_progress_phrase_progress_id_seq'::regclass),
+profile_id uuid NOT NULL,
+lesson_id integer NOT NULL,
+phrase_id integer NOT NULL,
+language_code character varying NOT NULL,
+pronunciation_completed boolean DEFAULT false,
+pronunciation_attempts integer DEFAULT 0,
+pronunciation_last_attempt_at timestamp with time zone,
+dictation_completed boolean DEFAULT false,
+dictation_attempts integer DEFAULT 0,
+dictation_last_attempt_at timestamp with time zone,
+last_progress_at timestamp with time zone DEFAULT now(),
+CONSTRAINT user_phrase_progress_pkey PRIMARY KEY (phrase_progress_id),
+CONSTRAINT user_phrase_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT fk_user_phrase_progress_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_phrase_progress_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
+CONSTRAINT user_phrase_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_points_log (
-  log_id integer NOT NULL DEFAULT nextval('user_points_log_log_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  points_awarded integer NOT NULL,
-  reason_code character varying NOT NULL,
-  related_lesson_id integer,
-  related_phrase_id integer,
-  related_word_text character varying,
-  related_word_language_code character varying,
-  notes text,
-  created_at timestamp with time zone DEFAULT now(),
-  activity_type USER-DEFINED,
-  CONSTRAINT user_points_log_pkey PRIMARY KEY (log_id),
-  CONSTRAINT fk_user_points_log_related_word_lang FOREIGN KEY (related_word_language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id),
-  CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id),
-  CONSTRAINT user_points_log_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+log_id integer NOT NULL DEFAULT nextval('user_points_log_log_id_seq'::regclass),
+profile_id uuid NOT NULL,
+points_awarded integer NOT NULL,
+reason_code character varying NOT NULL,
+related_lesson_id integer,
+related_phrase_id integer,
+related_word_text character varying,
+related_word_language_code character varying,
+notes text,
+created_at timestamp with time zone DEFAULT now(),
+activity_type USER-DEFINED,
+CONSTRAINT user_points_log_pkey PRIMARY KEY (log_id),
+CONSTRAINT fk_user_points_log_related_word_lang FOREIGN KEY (related_word_language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id),
+CONSTRAINT user_points_log_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_word_pronunciation (
-  id integer NOT NULL DEFAULT nextval('user_word_pronunciation_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  word_text character varying NOT NULL,
-  language_code character varying NOT NULL,
-  total_attempts integer DEFAULT 0,
-  error_count integer DEFAULT 0,
-  sum_accuracy_score numeric DEFAULT 0,
-  average_accuracy_score numeric DEFAULT 0,
-  last_accuracy_score numeric,
-  last_error_type character varying,
-  last_attempt_at timestamp with time zone,
-  needs_practice boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT user_word_pronunciation_pkey PRIMARY KEY (id),
-  CONSTRAINT fk_user_word_pronunciation_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT user_word_pronunciation_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+id integer NOT NULL DEFAULT nextval('user_word_pronunciation_id_seq'::regclass),
+profile_id uuid NOT NULL,
+word_text character varying NOT NULL,
+language_code character varying NOT NULL,
+total_attempts integer DEFAULT 0,
+error_count integer DEFAULT 0,
+sum_accuracy_score numeric DEFAULT 0,
+average_accuracy_score numeric DEFAULT 0,
+last_accuracy_score numeric,
+last_error_type character varying,
+last_attempt_at timestamp with time zone,
+needs_practice boolean DEFAULT false,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT user_word_pronunciation_pkey PRIMARY KEY (id),
+CONSTRAINT fk_user_word_pronunciation_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_word_pronunciation_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_word_spelling (
-  id integer NOT NULL DEFAULT nextval('user_word_spelling_id_seq'::regclass),
-  profile_id uuid NOT NULL,
-  word_text character varying NOT NULL,
-  language_code character varying NOT NULL,
-  total_dictation_occurrences integer DEFAULT 0,
-  dictation_error_count integer DEFAULT 0,
-  sum_word_similarity_score numeric DEFAULT 0,
-  average_word_similarity_score numeric DEFAULT 0,
-  last_word_similarity_score numeric CHECK (last_word_similarity_score IS NULL OR last_word_similarity_score >= 0::numeric AND last_word_similarity_score <= 100::numeric),
-  last_dictation_attempt_at timestamp with time zone,
-  needs_spelling_practice boolean DEFAULT false,
-  last_reviewed_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT user_word_spelling_pkey PRIMARY KEY (id),
-  CONSTRAINT fk_user_word_spelling_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+id integer NOT NULL DEFAULT nextval('user_word_spelling_id_seq'::regclass),
+profile_id uuid NOT NULL,
+word_text character varying NOT NULL,
+language_code character varying NOT NULL,
+total_dictation_occurrences integer DEFAULT 0,
+dictation_error_count integer DEFAULT 0,
+sum_word_similarity_score numeric DEFAULT 0,
+average_word_similarity_score numeric DEFAULT 0,
+last_word_similarity_score numeric CHECK (last_word_similarity_score IS NULL OR last_word_similarity_score >= 0::numeric AND last_word_similarity_score <= 100::numeric),
+last_dictation_attempt_at timestamp with time zone,
+needs_spelling_practice boolean DEFAULT false,
+last_reviewed_at timestamp with time zone,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT user_word_spelling_pkey PRIMARY KEY (id),
+CONSTRAINT fk_user_word_spelling_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.vocabulary_phrases (
-  id integer NOT NULL DEFAULT nextval('vocabulary_phrases_id_seq'::regclass),
-  lesson_id integer NOT NULL,
-  phrase_order integer NOT NULL,
-  concept_description text,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT vocabulary_phrases_pkey PRIMARY KEY (id),
-  CONSTRAINT vocabulary_phrases_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+id integer NOT NULL DEFAULT nextval('vocabulary_phrases_id_seq'::regclass),
+lesson_id integer NOT NULL,
+phrase_order integer NOT NULL,
+concept_description text,
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT vocabulary_phrases_pkey PRIMARY KEY (id),
+CONSTRAINT vocabulary_phrases_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
 );
 
 # Database auth schema
@@ -800,20 +800,20 @@ RETURNS void
 LANGUAGE plpgsql
 AS $function$
 DECLARE
-    -- ### FIX: Changed variable type from TEXT to level_enum ###
-    v_level_code public.level_enum;
-    is_unit_now_completed BOOLEAN;
-    is_level_now_completed BOOLEAN;
+-- ### FIX: Changed variable type from TEXT to level_enum ###
+v_level_code public.level_enum;
+is_unit_now_completed BOOLEAN;
+is_level_now_completed BOOLEAN;
 BEGIN
-    -- Check if a UNIT_COMPLETION bonus was already given for any lesson within this unit.
-    IF EXISTS (
-        SELECT 1 FROM public.user_points_log
-        WHERE profile_id = profile_id_param
-        AND reason_code = 'UNIT_COMPLETION'
-        AND related_lesson_id IN (SELECT lesson_id FROM public.lessons WHERE unit_id = unit_id_param)
-    ) THEN
-        RETURN;
-    END IF;
+-- Check if a UNIT_COMPLETION bonus was already given for any lesson within this unit.
+IF EXISTS (
+SELECT 1 FROM public.user_points_log
+WHERE profile_id = profile_id_param
+AND reason_code = 'UNIT_COMPLETION'
+AND related_lesson_id IN (SELECT lesson_id FROM public.lessons WHERE unit_id = unit_id_param)
+) THEN
+RETURN;
+END IF;
 
     is_unit_now_completed := public.is_unit_complete(profile_id_param, unit_id_param);
 
@@ -853,6 +853,7 @@ BEGIN
             END IF;
         END IF;
     END IF;
+
 END;
 $function$;
 
@@ -1192,66 +1193,228 @@ $function$
 
 ## is_unit_complete
 
-### Description
-
-A boolean function that determines if a user has completed all the required activities (chat, pronunciation, dictation) for every lesson within a specific unit.
-
-### Parameters
-
-p_profile_id (uuid): The unique identifier for the user's profile.
-
-p_unit_id (integer): The ID of the unit to check for completion.
-
-### Returns
-
-boolean - true if all lessons and their activities within the unit are complete, otherwise false.
-
-### Definition
-
 CREATE OR REPLACE FUNCTION public.is_unit_complete(p_profile_id uuid, p_unit_id integer)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $function$
+SELECT
+-- A unit is complete if it has lessons and none of them are incomplete.
+(SELECT COUNT(_) FROM public.lessons WHERE unit_id = p_unit_id) > 0
+AND
+(
+SELECT COUNT(_)
+FROM public.lessons l
+WHERE l.unit_id = p_unit_id
+AND NOT public.is_lesson_complete(p_profile_id, l.lesson_id)
+) = 0;
+$function$;
+
+## is_lesson_complete
+
+-- NEW HELPER FUNCTION: is_lesson_complete
+-- Centralizes the logic for checking if a single lesson is complete.
+-- Used by `is_unit_complete`, `can_user_access_lesson`, and `get_user_progression_status`.
+CREATE OR REPLACE FUNCTION public.is_lesson_complete(p_profile_id uuid, p_lesson_id integer)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $function$
+SELECT EXISTS (
+SELECT 1
+FROM public.user_lesson_progress ulp
+JOIN public.user_lesson_activity_progress ulap ON ulap.user_lesson_progress_id = ulp.progress_id
+JOIN public.lessons l ON l.lesson_id = ulp.lesson_id
+WHERE ulp.profile_id = p_profile_id
+AND ulp.lesson_id = p_lesson_id
+GROUP BY l.lesson_id -- Group by lesson to count activities for that specific lesson
+HAVING COUNT(CASE WHEN ulap.status = 'completed' THEN 1 END) =
+(
+CASE WHEN l.has_chat THEN 1 ELSE 0 END +
+CASE WHEN l.has_pronunciation THEN 1 ELSE 0 END +
+CASE WHEN l.has_dictation THEN 1 ELSE 0 END
+)
+);
+$function$;
+
+## can_user_access_unit
+
+-- ========== CORE ACCESS-CONTROL FUNCTIONS (IMPROVED) ==========
+
+-- UPDATED FUNCTION: can_user_access_unit
+-- Added a robustness check to handle non-existent unit_id_param.
+CREATE OR REPLACE FUNCTION public.can_user_access_unit(profile_id_param uuid, unit_id_param integer)
 RETURNS boolean
 LANGUAGE plpgsql
 AS $function$
 DECLARE
-total_lessons_in_unit integer;
-completed_lessons_by_user integer;
+unit_level level_enum;
+previous_unit_id integer;
 BEGIN
--- Get the total number of lessons in the unit
-SELECT COUNT(\*)
-INTO total_lessons_in_unit
-FROM public.lessons
-WHERE unit_id = p_unit_id;
+-- Get the level of the requested unit
+SELECT u.level INTO unit_level FROM public.units u WHERE u.unit_id = unit_id_param;
 
-    -- If there are no lessons, the unit is not "completable"
-    IF total_lessons_in_unit = 0 THEN
+    -- Robustness: If the unit doesn't exist, access is denied.
+    IF NOT FOUND THEN
         RETURN FALSE;
     END IF;
 
-    -- Get the number of completed lessons by checking activity progress
-    WITH completed_lessons AS (
-        SELECT l.lesson_id
-        FROM public.lessons l
-        JOIN public.user_lesson_progress ulp ON l.lesson_id = ulp.lesson_id
-        JOIN public.user_lesson_activity_progress ulap ON ulap.user_lesson_progress_id = ulp.progress_id
-        WHERE l.unit_id = p_unit_id
-          AND ulp.profile_id = p_profile_id
-        GROUP BY l.lesson_id
-        HAVING COUNT(CASE WHEN ulap.status = 'completed' THEN 1 END) =
-               (
-                   CASE WHEN l.has_chat THEN 1 ELSE 0 END +
-                   CASE WHEN l.has_pronunciation THEN 1 ELSE 0 END +
-                   CASE WHEN l.has_dictation THEN 1 ELSE 0 END
-               )
-    )
-    SELECT COUNT(*)
-    INTO completed_lessons_by_user
-    FROM completed_lessons;
+    -- Check if user can access this level (Assuming can_user_access_level exists)
+    IF NOT public.can_user_access_level(profile_id_param, unit_level) THEN
+        RETURN FALSE;
+    END IF;
 
-    -- Return true if the counts match
-    RETURN total_lessons_in_unit = completed_lessons_by_user;
+    -- Find the previous unit in the same level (by unit_order)
+    SELECT u.unit_id INTO previous_unit_id
+    FROM public.units u
+    WHERE u.level = unit_level
+      AND u.unit_order < (SELECT u_inner.unit_order FROM public.units u_inner WHERE u_inner.unit_id = unit_id_param)
+    ORDER BY u.unit_order DESC
+    LIMIT 1;
+
+    -- If no previous unit, this is the first unit in the level (accessible)
+    IF previous_unit_id IS NULL THEN
+        RETURN TRUE;
+    END IF;
+
+    -- Check if the previous unit is completed
+    RETURN public.is_unit_complete(profile_id_param, previous_unit_id);
 
 END;
-$function$
+$function$;
+
+## can_user_access_lesson
+
+-- UPDATED FUNCTION: can_user_access_lesson
+-- Now uses the `is_lesson_complete` helper and has a robustness check.
+CREATE OR REPLACE FUNCTION public.can_user_access_lesson(profile_id_param uuid, lesson_id_param integer)
+RETURNS boolean
+LANGUAGE plpgsql
+AS $function$
+DECLARE
+lesson_unit_id integer;
+previous_lesson_id integer;
+BEGIN
+-- Get the unit of the requested lesson
+SELECT l.unit_id INTO lesson_unit_id FROM public.lessons l WHERE l.lesson_id = lesson_id_param;
+
+    -- Robustness: If the lesson doesn't exist, access is denied.
+    IF NOT FOUND THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Check if user can access the parent unit
+    IF NOT public.can_user_access_unit(profile_id_param, lesson_unit_id) THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Find the previous lesson in the same unit (by lesson_order)
+    SELECT l.lesson_id INTO previous_lesson_id
+    FROM public.lessons l
+    WHERE l.unit_id = lesson_unit_id
+      AND l.lesson_order < (SELECT l_inner.lesson_order FROM public.lessons l_inner WHERE l_inner.lesson_id = lesson_id_param)
+    ORDER BY l.lesson_order DESC
+    LIMIT 1;
+
+    -- If no previous lesson, this is the first lesson in the unit (accessible)
+    IF previous_lesson_id IS NULL THEN
+        RETURN TRUE;
+    END IF;
+
+    -- Check if previous lesson is completed using the helper function
+    RETURN public.is_lesson_complete(profile_id_param, previous_lesson_id);
+
+END;
+$function$;
+
+## get_user_progression_status
+
+-- ========== UI STATUS FUNCTION (PERFORMANCE OPTIMIZED) ==========
+
+-- REWRITTEN FUNCTION: get_user_progression_status
+-- This version avoids calling functions for every row, leading to a massive performance gain.
+-- It uses CTEs and Window Functions to calculate all statuses in a single pass.
+CREATE OR REPLACE FUNCTION public.get_user_progression_status(profile_id_param uuid)
+RETURNS TABLE(
+level_code level_enum,
+level_available boolean,
+unit_id integer,
+unit_available boolean,
+lesson_id integer,
+lesson_available boolean,
+lesson_completed boolean
+)
+LANGUAGE plpgsql
+AS $function$
+BEGIN
+RETURN QUERY
+WITH lesson_completion AS (
+-- Step 1: Determine the completion status for every lesson for the user.
+SELECT
+l.lesson_id,
+COALESCE(lc.is_completed, FALSE) AS is_completed
+FROM public.lessons l
+LEFT JOIN (
+SELECT
+ulp.lesson_id,
+(COUNT(CASE WHEN ulap.status = 'completed' THEN 1 END) =
+(CASE WHEN l_inner.has_chat THEN 1 ELSE 0 END +
+CASE WHEN l_inner.has_pronunciation THEN 1 ELSE 0 END +
+CASE WHEN l_inner.has_dictation THEN 1 ELSE 0 END)
+) AS is_completed
+FROM public.user_lesson_progress ulp
+JOIN public.user_lesson_activity_progress ulap ON ulap.user_lesson_progress_id = ulp.progress_id
+JOIN public.lessons l_inner ON l_inner.lesson_id = ulp.lesson_id
+WHERE ulp.profile_id = profile_id_param
+GROUP BY ulp.lesson_id, l_inner.has_chat, l_inner.has_pronunciation, l_inner.has_dictation
+) lc ON l.lesson_id = lc.lesson_id
+),
+unit_completion AS (
+-- Step 2: Determine the completion status for every unit based on its lessons.
+SELECT
+u.unit_id,
+(COUNT(l.lesson_id) > 0 AND bool_and(lc.is_completed)) as is_completed
+FROM public.units u
+JOIN public.lessons l ON u.unit_id = l.unit_id
+JOIN lesson_completion lc ON l.lesson_id = lc.lesson_id
+GROUP BY u.unit_id
+),
+progression_data AS (
+-- Step 3: Combine all data and use window functions to find previous item status.
+SELECT
+u.level,
+u.unit_id,
+u.unit_order,
+l.lesson_id,
+l.lesson_order,
+lc.is_completed AS lesson_is_completed,
+-- Check if the _previous_ lesson in the same unit was completed. Default to TRUE for the first lesson.
+LAG(lc.is_completed, 1, TRUE) OVER (PARTITION BY l.unit_id ORDER BY l.lesson_order) AS prev_lesson_completed,
+-- Check if the _previous_ unit in the same level was completed. Default to TRUE for the first unit.
+LAG(uc.is_completed, 1, TRUE) OVER (PARTITION BY u.level ORDER BY u.unit_order) AS prev_unit_completed
+FROM public.units u
+JOIN public.lessons l ON u.unit_id = l.unit_id
+LEFT JOIN lesson_completion lc ON l.lesson_id = lc.lesson_id
+LEFT JOIN unit_completion uc ON u.unit_id = uc.unit_id
+)
+-- Final Step: Calculate availability based on the chain of completion.
+SELECT
+pd.level,
+(pd.level IN (SELECT unnest(public.get_user_available_levels(profile_id_param)))) AS level_available,
+pd.unit_id,
+((pd.level IN (SELECT unnest(public.get_user_available_levels(profile_id_param)))) AND pd.prev_unit_completed) AS unit_available,
+pd.lesson_id,
+((pd.level IN (SELECT unnest(public.get_user_available_levels(profile_id_param)))) AND pd.prev_unit_completed AND pd.prev_lesson_completed) AS lesson_available,
+pd.lesson_is_completed
+FROM progression_data pd
+JOIN public.units u ON u.unit_id = pd.unit_id
+JOIN public.lessons l ON l.lesson_id = pd.lesson_id
+ORDER BY
+(SELECT sort_order FROM public.language_levels WHERE language_levels.level_code = u.level),
+u.unit_order,
+l.lesson_order;
+END;
+$function$;
 
 ## process_chat_completion
 
@@ -1337,9 +1500,11 @@ $function$
 ## process_user_activity
 
 ### Description
+
 A comprehensive function that acts as the main entry point for processing all user activity within a lesson. On the first user activity of the day, it calls the handle_user_streak function to award a daily streak bonus. It then handles different activity types ('pronunciation', 'dictation', 'chat'), records attempts, calculates and awards various points bonuses (first-try, accuracy, comeback), updates user progress at the word, phrase, and activity level, and triggers checks for unit completion.
 
 ### Parameters
+
 profile_id_param (uuid): The user's profile ID.
 
 lesson_id_param (integer): The lesson ID.
@@ -1373,6 +1538,7 @@ overall_similarity_score_param (numeric, optional): Similarity score for dictati
 word_level_feedback_param (jsonb, optional): Word-level feedback for dictation.
 
 ### Returns
+
 A table with the following column:
 
 points_awarded_total (integer): The total number of points awarded for the activity, including any streak bonuses.
@@ -1384,10 +1550,10 @@ RETURNS TABLE(points_awarded_total integer)
 LANGUAGE plpgsql
 AS $function$
 DECLARE
-    -- IDs and Metadata
-    v_lesson_progress_id INT;
-    v_activity_progress_id INT;
-    v_unit_id INT;
+-- IDs and Metadata
+v_lesson_progress_id INT;
+v_activity_progress_id INT;
+v_unit_id INT;
 
     -- Attempt & Progress Tracking
     next_attempt_number INT;
@@ -1406,13 +1572,14 @@ DECLARE
     v_word_text TEXT;
     v_accuracy_score NUMERIC;
     word_needs_practice BOOLEAN;
-    
+
     -- No longer need streak variables here
+
 BEGIN
-    -- --- ADDED ---
-    -- Step 1: Handle Daily Streak Bonus (now robust and centralized)
-    -- This function will only award points once per day on the first activity.
-    total_points_for_this_attempt := total_points_for_this_attempt + public.handle_user_streak(profile_id_param);
+-- --- ADDED ---
+-- Step 1: Handle Daily Streak Bonus (now robust and centralized)
+-- This function will only award points once per day on the first activity.
+total_points_for_this_attempt := total_points_for_this_attempt + public.handle_user_streak(profile_id_param);
 
     -- Step 2: Ensure user_lesson_progress exists for all activity types
     INSERT INTO public.user_lesson_progress (profile_id, lesson_id, last_progress_at)
@@ -1442,7 +1609,7 @@ BEGIN
     IF activity_type_param = 'chat' THEN
         -- The streak logic that was here is now handled at the start of the function.
         -- We only need to handle the final point update and return.
-        
+
         -- Update total points if any were awarded from the streak
         IF total_points_for_this_attempt > 0 THEN
             UPDATE public.student_profiles SET points = points + total_points_for_this_attempt
@@ -1530,7 +1697,7 @@ BEGIN
             PERFORM public.check_and_award_unit_completion_bonus(profile_id_param, v_unit_id, lesson_id_param);
         END IF;
     END IF;
-    
+
     -- --- REMOVED ---
     -- The old streak logic from Step 8 has been removed.
 
@@ -1548,36 +1715,40 @@ $function$;
 ## handle_user_streak
 
 ### Description
+
 A centralized and idempotent function to manage daily user streaks. It checks if a user has performed an activity for the day, continues or resets their streak accordingly, and awards a tiered points bonus. The points awarded increase based on the length of the streak, up to a maximum of 10 points per day. This function is designed to be called safely on every user activity but will only grant a bonus once per day.
 
 ### Parameters
+
 profile_id_param (uuid): The unique identifier for the user's profile.
 
 ### Returns
+
 integer: The total number of points awarded for the streak bonus. Returns 0 if a bonus has already been awarded for the current day.
 
 ### definition
+
 CREATE OR REPLACE FUNCTION public.handle_user_streak(profile_id_param uuid)
- RETURNS integer
- LANGUAGE plpgsql
+RETURNS integer
+LANGUAGE plpgsql
 AS $function$
 DECLARE
-    current_streak INT;
-    last_streak_date DATE;
-    new_streak INT;
-    points_for_streak INT := 0;
-    today DATE := current_date;
-    yesterday DATE := current_date - 1;
+current_streak INT;
+last_streak_date DATE;
+new_streak INT;
+points_for_streak INT := 0;
+today DATE := current_date;
+yesterday DATE := current_date - 1;
 BEGIN
-    -- Get the user's current streak information
-    SELECT 
-        p.current_streak_days, 
-        p.last_streak_date 
-    INTO 
-        current_streak, 
-        last_streak_date
-    FROM public.student_profiles p
-    WHERE p.profile_id = profile_id_param;
+-- Get the user's current streak information
+SELECT
+p.current_streak_days,
+p.last_streak_date
+INTO
+current_streak,
+last_streak_date
+FROM public.student_profiles p
+WHERE p.profile_id = profile_id_param;
 
     -- Only proceed if the user hasn't already performed an activity today
     IF last_streak_date IS NULL OR last_streak_date < today THEN
@@ -1595,8 +1766,8 @@ BEGIN
 
         -- Update the user's profile with the new streak information
         UPDATE public.student_profiles
-        SET 
-            current_streak_days = new_streak, 
+        SET
+            current_streak_days = new_streak,
             last_streak_date = today
         WHERE profile_id = profile_id_param;
 
@@ -1612,9 +1783,9 @@ BEGIN
 
     -- If a streak was already awarded today, return 0 points
     RETURN 0;
+
 END;
 $function$
-
 
 ## process_word_practice_attempt
 
@@ -1985,7 +2156,6 @@ RETURN TRUE;
 END;
 $function$
 
-
 ## get_user_available_levels
 
 CREATE OR REPLACE FUNCTION public.get_user_available_levels(profile_id_param uuid)
@@ -1993,17 +2163,17 @@ RETURNS level_enum[]
 LANGUAGE plpgsql
 AS $function$
 DECLARE
-    completed_levels level_enum[];
-    available_levels level_enum[];
-    next_level level_enum;
-    max_completed_order integer := 0;
+completed_levels level_enum[];
+available_levels level_enum[];
+next_level level_enum;
+max_completed_order integer := 0;
 BEGIN
-    -- Get completed levels ordered by language_levels.sort_order
-    SELECT ARRAY_AGG(ulc.level_code ORDER BY ll.sort_order)
-    INTO completed_levels
-    FROM public.user_level_completion ulc
-    JOIN public.language_levels ll ON ulc.level_code = ll.level_code
-    WHERE ulc.profile_id = profile_id_param;
+-- Get completed levels ordered by language_levels.sort_order
+SELECT ARRAY_AGG(ulc.level_code ORDER BY ll.sort_order)
+INTO completed_levels
+FROM public.user_level_completion ulc
+JOIN public.language_levels ll ON ulc.level_code = ll.level_code
+WHERE ulc.profile_id = profile_id_param;
 
     -- Start with A1 (always available)
     available_levels := ARRAY['A1'::level_enum];
@@ -2011,12 +2181,11 @@ BEGIN
     -- Add completed levels
     IF completed_levels IS NOT NULL THEN
         available_levels := available_levels || completed_levels;
-        
+
         -- Find highest completed level order using language_levels table
         SELECT MAX(ll.sort_order)
         INTO max_completed_order
         FROM unnest(completed_levels) AS level_code
-        -- FIX #1: Added explicit cast here
         JOIN public.language_levels ll ON ll.level_code = level_code::level_enum;
     END IF;
 
@@ -2029,23 +2198,29 @@ BEGIN
         available_levels := available_levels || ARRAY[next_level];
     END IF;
 
-    -- Remove duplicates and return, ensuring final order
-    SELECT ARRAY_AGG(DISTINCT level::level_enum ORDER BY ll.sort_order)
+    -- FIXED: Remove duplicates without ORDER BY in ARRAY_AGG DISTINCT
+    WITH ordered_levels AS (
+        SELECT DISTINCT level::level_enum as level_code, ll.sort_order
+        FROM unnest(available_levels) AS level
+        JOIN public.language_levels ll ON ll.level_code = level::level_enum
+        ORDER BY ll.sort_order
+    )
+    SELECT ARRAY_AGG(level_code)
     INTO available_levels
-    FROM unnest(available_levels) AS level
-    -- FIX #2: Added explicit cast here
-    JOIN public.language_levels ll ON ll.level_code = level::level_enum;
+    FROM ordered_levels;
 
     RETURN COALESCE(available_levels, ARRAY['A1'::level_enum]);
+
 END;
 $function$;
 
 ## can_user_access_level
+
 CREATE OR REPLACE FUNCTION public.can_user_access_level(profile_id_param uuid, level_code_param level_enum)
 RETURNS boolean
 LANGUAGE plpgsql
 AS $function$
 BEGIN
-    RETURN level_code_param = ANY(public.get_user_available_levels(profile_id_param));
+RETURN level_code_param = ANY(public.get_user_available_levels(profile_id_param));
 END;
 $function$;
