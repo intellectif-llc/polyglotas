@@ -56,17 +56,17 @@ function ErrorContent() {
 
         <div className="space-y-3">
           <a
-            href="/auth/signin"
+            href="/auth"
             className="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200"
           >
             Try Different Account
           </a>
 
           <a
-            href="/auth/signup"
+            href="/auth"
             className="w-full inline-flex justify-center items-center px-6 py-3 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
           >
-            Sign Up Normally
+            Continue to Polyglotas
           </a>
         </div>
       </div>

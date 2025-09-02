@@ -1,7 +1,7 @@
-import { createClient } from '@/lib/supabase/server';
-import { createServiceClient } from '@/lib/supabase/service';
-import { redirect } from 'next/navigation';
-import { InvitationRedemption } from '@/components/invitation/InvitationRedemption';
+import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { redirect } from "next/navigation";
+import { InvitationRedemption } from "@/components/invitation/InvitationRedemption";
 
 interface PageProps {
   params: Promise<{
@@ -11,23 +11,23 @@ interface PageProps {
 
 export default async function InvitePage({ params }: PageProps) {
   const { token } = await params;
-  
+
   const supabase = await createClient();
   const serviceSupabase = createServiceClient();
-  
+
   // Validate invitation token using service client to bypass RLS
   const { data: invitation } = await serviceSupabase
-    .from('partnership_invitations')
-    .select(`
+    .from("partnership_invitations")
+    .select(
+      `
       *,
       partnership:partnerships(*)
-    `)
-    .eq('token', token)
-    .eq('status', 'pending')
-    .gt('expires_at', new Date().toISOString())
+    `
+    )
+    .eq("token", token)
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
     .single();
-
-
 
   if (!invitation) {
     return (
@@ -41,7 +41,7 @@ export default async function InvitePage({ params }: PageProps) {
               This invitation link is either invalid or has expired.
             </p>
             <a
-              href="/auth/signup"
+              href="/auth"
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
             >
               Sign Up Normally
@@ -53,8 +53,10 @@ export default async function InvitePage({ params }: PageProps) {
   }
 
   // Check if user is already authenticated
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (user) {
     // User is logged in, redirect to redemption handler
     redirect(`/api/invite/redeem?token=${token}`);
@@ -62,8 +64,8 @@ export default async function InvitePage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <InvitationRedemption 
-        invitation={invitation} 
+      <InvitationRedemption
+        invitation={invitation}
         partnership={invitation.partnership}
         token={token}
       />

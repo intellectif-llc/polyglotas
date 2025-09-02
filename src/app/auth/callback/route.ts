@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (error) {
     // Redirect to an error page or show an error message
     return NextResponse.redirect(
-      `${siteUrl}/auth/signin?error=OAuth+authentication+failed&error_description=${encodeURIComponent(
+      `${siteUrl}/auth?error=OAuth+authentication+failed&error_description=${encodeURIComponent(
         errorDescription || error
       )}`
     );
@@ -27,16 +27,16 @@ export async function GET(request: NextRequest) {
         await supabase.auth.exchangeCodeForSession(code);
       if (exchangeError) {
         return NextResponse.redirect(
-          `${siteUrl}/auth/auth-code-error?message=${encodeURIComponent(
+          `${siteUrl}/auth?error=${encodeURIComponent(
             exchangeError.message
-          )}&status=${exchangeError.status || "unknown"}`
+          )}`
         );
       }
     } catch (catchError: unknown) {
       const errorMessage =
         catchError instanceof Error ? catchError.message : "Unknown error";
       return NextResponse.redirect(
-        `${siteUrl}/auth/auth-code-error?message=Internal Server Error during code exchange: ${encodeURIComponent(
+        `${siteUrl}/auth?error=Internal Server Error during code exchange: ${encodeURIComponent(
           errorMessage
         )}`
       );
@@ -58,6 +58,6 @@ export async function GET(request: NextRequest) {
 
   // Fallback redirect if no code or error
   return NextResponse.redirect(
-    `${siteUrl}/auth/auth-code-error?message=Authorization code not found.`
+    `${siteUrl}/auth?error=Authorization code not found.`
   );
 }

@@ -71,8 +71,8 @@ export function InvitationRedemption({ invitation, partnership, token }: Invitat
   };
 
   const handleSignIn = () => {
-    // Redirect to existing sign in page
-    window.location.href = '/auth/signin';
+    // Redirect to unified auth page
+    window.location.href = '/auth';
   };
 
   return (

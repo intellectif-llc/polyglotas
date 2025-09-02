@@ -105,7 +105,10 @@ export default function FeaturesSection() {
               Join thousands of learners who have already improved their
               speaking confidence with Polyglotas.
             </p>
-            <Link href="/auth/signin" className="inline-block px-8 py-4 bg-brand-gradient hover:shadow-2xl hover:shadow-purple-500/25 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 border border-white/10 shadow-lg cursor-pointer">
+            <Link
+              href="/auth"
+              className="inline-block px-8 py-4 bg-brand-gradient hover:shadow-2xl hover:shadow-purple-500/25 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 border border-white/10 shadow-lg cursor-pointer"
+            >
               Try it for free
             </Link>
           </div>
