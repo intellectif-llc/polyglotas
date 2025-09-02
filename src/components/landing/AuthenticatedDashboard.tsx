@@ -15,6 +15,7 @@ import {
   useRecentActivity,
 } from "@/hooks/useDashboardStats";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useContinueLearning } from "@/hooks/useContinueLearning";
 
 interface AuthenticatedDashboardProps {
   user: User;
@@ -28,6 +29,7 @@ export default function AuthenticatedDashboard({
   const { data: profile } = useUserProfile();
   const { data: stats } = useDashboardStats();
   const { data: activity } = useRecentActivity();
+  const { data: continueData } = useContinueLearning();
 
   const isPaidTier =
     profile?.subscription_tier === "starter" ||
@@ -134,34 +136,22 @@ export default function AuthenticatedDashboard({
           </div>
 
           {/* Main Actions */}
-          <div className="grid md:grid-cols-2 gap-8 mb-12">
+          <div className="max-w-2xl mx-auto mb-12">
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
               <h3 className="text-2xl font-bold text-white mb-4">
                 Continue Learning
               </h3>
               <p className="text-gray-300 mb-6">
-                Pick up where you left off with your personalized pronunciation
-                lessons.
+                {continueData?.hasProgress 
+                  ? `Pick up where you left off: ${continueData.lessonTitle}`
+                  : "Start your personalized pronunciation learning journey."}
               </p>
               <button
-                onClick={() => router.push("/learn")}
+                onClick={() => router.push(continueData?.href || "/learn")}
                 className="group w-full px-6 py-4 bg-brand-gradient hover:shadow-2xl hover:shadow-purple-500/25 rounded-xl text-white font-semibold transition-all duration-300 flex items-center justify-center space-x-3 transform hover:scale-105 cursor-pointer border border-white/10 shadow-lg"
               >
-                <span>Start Learning</span>
+                <span>{continueData?.hasProgress ? "Continue Learning" : "Start Learning"}</span>
                 <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
-              <h3 className="text-2xl font-bold text-white mb-4">
-                Practice Session
-              </h3>
-              <p className="text-gray-300 mb-6">
-                Quick 5-minute pronunciation practice with instant AI feedback.
-              </p>
-              <button className="w-full px-6 py-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-semibold transition-all duration-300 flex items-center justify-center space-x-3 cursor-pointer">
-                <span>Quick Practice</span>
-                <ArrowRightIcon className="w-5 h-5" />
               </button>
             </div>
           </div>
