@@ -20,6 +20,10 @@ export function clearInvitationToken() {
 }
 
 export function getOAuthRedirectUrl(): string {
+  if (typeof window === 'undefined') {
+    return `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
+  }
+  
   const token = getInvitationToken();
   const baseUrl = `${window.location.origin}/auth/callback`;
   
