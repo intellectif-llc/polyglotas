@@ -2,9 +2,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
-import { useUserStats } from "@/hooks/useUserProfile";
+import { LockClosedIcon } from "@heroicons/react/24/solid";
+import { useUserStats, useUserProfile } from "@/hooks/useUserProfile";
 import { useLanguageLevels } from "@/hooks/useLanguageLevels";
 import { useLevelSelection } from "@/hooks/useLevelSelection";
+import { useCanAccessLevel } from "@/hooks/useProgression";
 
 interface LevelSelectorProps {
   isCollapsed: boolean;
@@ -16,6 +18,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { data: userStats } = useUserStats();
+  const { data: profile } = useUserProfile();
   const { data: levels = [] } = useLanguageLevels();
   const { selectedLevel, selectLevel } = useLevelSelection();
 
@@ -31,6 +34,8 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
   }, []);
 
   const currentLevel = selectedLevel;
+
+  if (!profile) return null;
 
   if (isCollapsed) {
     return (
@@ -74,32 +79,55 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
               <div className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 mb-1">
                 Available Levels
               </div>
-              {levels.map((level) => (
-                <button
-                  key={level.level_code}
-                  onClick={() => {
-                    selectLevel(level.level_code);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full flex items-center space-x-3 px-2 py-2 rounded-md text-sm transition-colors ${
-                    level.level_code === currentLevel
-                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
-                >
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    level.level_code === currentLevel
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
-                  }`}>
-                    {level.level_code}
-                  </div>
-                  <span>Level {level.level_code}</span>
-                  {level.level_code === currentLevel && (
-                    <span className="ml-auto text-xs text-blue-500">Current</span>
-                  )}
-                </button>
-              ))}
+              {levels.map((level) => {
+                const LevelButton = () => {
+                  const { data: canAccess } = useCanAccessLevel(profile?.profile_id || '', level.level_code);
+                  const isAccessible = canAccess ?? false;
+                  const isCurrent = level.level_code === currentLevel;
+                  
+                  return (
+                    <button
+                      onClick={() => {
+                        if (isAccessible) {
+                          selectLevel(level.level_code);
+                          setIsOpen(false);
+                        }
+                      }}
+                      disabled={!isAccessible}
+                      className={`w-full flex items-center space-x-3 px-2 py-2 rounded-md text-sm transition-colors ${
+                        !isAccessible
+                          ? "text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                          : isCurrent
+                          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold relative ${
+                        !isAccessible
+                          ? "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                          : isCurrent
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
+                      }`}>
+                        {!isAccessible ? (
+                          <LockClosedIcon className="w-3 h-3" />
+                        ) : (
+                          level.level_code
+                        )}
+                      </div>
+                      <span>Level {level.level_code}</span>
+                      {!isAccessible && (
+                        <span className="ml-auto text-xs text-gray-400">Locked</span>
+                      )}
+                      {isCurrent && isAccessible && (
+                        <span className="ml-auto text-xs text-blue-500">Current</span>
+                      )}
+                    </button>
+                  );
+                };
+                
+                return <LevelButton key={level.level_code} />;
+              })}
             </div>
           </div>
         )}

@@ -16,9 +16,9 @@ CREATE TABLE public.conversation_messages (
   feedback_language_code character varying,
   suggested_answer jsonb,
   CONSTRAINT conversation_messages_pkey PRIMARY KEY (message_id),
-  CONSTRAINT fk_conversation_messages_msg_lang FOREIGN KEY (message_language_code) REFERENCES public.languages(language_code),
   CONSTRAINT conversation_messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id),
   CONSTRAINT conversation_messages_related_prompt_id_fkey FOREIGN KEY (related_prompt_id) REFERENCES public.conversation_starters(id),
+  CONSTRAINT fk_conversation_messages_msg_lang FOREIGN KEY (message_language_code) REFERENCES public.languages(language_code),
   CONSTRAINT fk_conversation_messages_fb_lang FOREIGN KEY (feedback_language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.conversation_prompt_status (
@@ -28,9 +28,9 @@ CREATE TABLE public.conversation_prompt_status (
   first_addressed_message_id bigint,
   addressed_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT conversation_prompt_status_pkey PRIMARY KEY (prompt_status_id),
+  CONSTRAINT conversation_prompt_status_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id),
   CONSTRAINT conversation_prompt_status_first_addressed_message_id_fkey FOREIGN KEY (first_addressed_message_id) REFERENCES public.conversation_messages(message_id),
-  CONSTRAINT conversation_prompt_status_prompt_id_fkey FOREIGN KEY (prompt_id) REFERENCES public.conversation_starters(id),
-  CONSTRAINT conversation_prompt_status_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.lesson_chat_conversations(conversation_id)
+  CONSTRAINT conversation_prompt_status_prompt_id_fkey FOREIGN KEY (prompt_id) REFERENCES public.conversation_starters(id)
 );
 CREATE TABLE public.conversation_starter_translations (
   starter_translation_id integer NOT NULL DEFAULT nextval('conversation_starter_translations_starter_translation_id_seq'::regclass),
@@ -64,9 +64,9 @@ CREATE TABLE public.dictation_attempts (
   word_level_feedback jsonb,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT dictation_attempts_pkey PRIMARY KEY (attempt_id),
-  CONSTRAINT dictation_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
   CONSTRAINT dictation_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
   CONSTRAINT fk_dictation_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+  CONSTRAINT dictation_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
   CONSTRAINT dictation_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id)
 );
 CREATE TABLE public.invoices (
@@ -116,8 +116,8 @@ CREATE TABLE public.learning_outcome_translations (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT learning_outcome_translations_pkey PRIMARY KEY (outcome_translation_id),
-  CONSTRAINT fk_learning_outcome_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT learning_outcome_translations_outcome_id_fkey FOREIGN KEY (outcome_id) REFERENCES public.learning_outcomes(outcome_id)
+  CONSTRAINT learning_outcome_translations_outcome_id_fkey FOREIGN KEY (outcome_id) REFERENCES public.learning_outcomes(outcome_id),
+  CONSTRAINT fk_learning_outcome_translations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.learning_outcomes (
   outcome_id integer NOT NULL DEFAULT nextval('learning_outcomes_outcome_id_seq'::regclass),
@@ -135,9 +135,9 @@ CREATE TABLE public.lesson_chat_conversations (
   all_prompts_addressed_at timestamp with time zone,
   last_message_at timestamp with time zone,
   CONSTRAINT lesson_chat_conversations_pkey PRIMARY KEY (conversation_id),
+  CONSTRAINT lesson_chat_conversations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
   CONSTRAINT fk_lesson_chat_conversations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT lesson_chat_conversations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-  CONSTRAINT lesson_chat_conversations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+  CONSTRAINT lesson_chat_conversations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.lesson_translations (
   lesson_translation_id integer NOT NULL DEFAULT nextval('lesson_translations_lesson_translation_id_seq'::regclass),
@@ -175,8 +175,8 @@ CREATE TABLE public.partnership_invitations (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   status USER-DEFINED NOT NULL DEFAULT 'pending'::partnership_invitation_status,
   CONSTRAINT partnership_invitations_pkey PRIMARY KEY (id),
-  CONSTRAINT partnership_invitations_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
-  CONSTRAINT partnership_invitations_redeemed_by_profile_id_fkey FOREIGN KEY (redeemed_by_profile_id) REFERENCES public.student_profiles(profile_id)
+  CONSTRAINT partnership_invitations_redeemed_by_profile_id_fkey FOREIGN KEY (redeemed_by_profile_id) REFERENCES public.student_profiles(profile_id),
+  CONSTRAINT partnership_invitations_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id)
 );
 CREATE TABLE public.partnerships (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -263,9 +263,9 @@ CREATE TABLE public.speech_attempts (
   phonetic_data jsonb,
   CONSTRAINT speech_attempts_pkey PRIMARY KEY (attempt_id),
   CONSTRAINT fk_speech_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT speech_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
+  CONSTRAINT speech_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
   CONSTRAINT speech_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-  CONSTRAINT speech_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+  CONSTRAINT speech_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id)
 );
 CREATE TABLE public.student_profiles (
   profile_id uuid NOT NULL,
@@ -285,11 +285,11 @@ CREATE TABLE public.student_profiles (
   partnership_id bigint,
   selected_level_code USER-DEFINED,
   CONSTRAINT student_profiles_pkey PRIMARY KEY (profile_id),
-  CONSTRAINT fk_student_profiles_selected_level FOREIGN KEY (selected_level_code) REFERENCES public.language_levels(level_code),
-  CONSTRAINT student_profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
   CONSTRAINT student_profiles_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
+  CONSTRAINT student_profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
   CONSTRAINT fk_student_profiles_target_lang FOREIGN KEY (current_target_language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT fk_student_profiles_native_lang FOREIGN KEY (native_language_code) REFERENCES public.languages(language_code)
+  CONSTRAINT fk_student_profiles_native_lang FOREIGN KEY (native_language_code) REFERENCES public.languages(language_code),
+  CONSTRAINT fk_student_profiles_selected_level FOREIGN KEY (selected_level_code) REFERENCES public.language_levels(level_code)
 );
 CREATE TABLE public.student_subscriptions (
   id integer NOT NULL DEFAULT nextval('student_subscriptions_id_seq'::regclass),
@@ -318,8 +318,13 @@ CREATE TABLE public.student_target_languages (
   language_code character varying NOT NULL,
   added_at timestamp with time zone DEFAULT now(),
   CONSTRAINT student_target_languages_pkey PRIMARY KEY (profile_id, language_code),
-  CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+  CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+  CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+);
+CREATE TABLE public.test_table (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  name text,
+  CONSTRAINT test_table_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.tour_steps (
   step_id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -329,7 +334,7 @@ CREATE TABLE public.tour_steps (
   target_selector text NOT NULL,
   title text NOT NULL,
   content text NOT NULL,
-  joyride_props jsonb,
+  tour_props jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT tour_steps_pkey PRIMARY KEY (step_id),
@@ -391,8 +396,8 @@ CREATE TABLE public.user_level_completion (
   completed_at timestamp with time zone NOT NULL DEFAULT now(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT user_level_completion_pkey PRIMARY KEY (profile_id, level_code),
-  CONSTRAINT user_level_completion_level_code_fkey FOREIGN KEY (level_code) REFERENCES public.language_levels(level_code),
-  CONSTRAINT user_level_completion_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+  CONSTRAINT user_level_completion_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+  CONSTRAINT user_level_completion_level_code_fkey FOREIGN KEY (level_code) REFERENCES public.language_levels(level_code)
 );
 CREATE TABLE public.user_phrase_progress (
   phrase_progress_id integer NOT NULL DEFAULT nextval('user_phrase_progress_phrase_progress_id_seq'::regclass),
@@ -408,8 +413,8 @@ CREATE TABLE public.user_phrase_progress (
   dictation_last_attempt_at timestamp with time zone,
   last_progress_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_phrase_progress_pkey PRIMARY KEY (phrase_progress_id),
-  CONSTRAINT user_phrase_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
   CONSTRAINT fk_user_phrase_progress_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+  CONSTRAINT user_phrase_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
   CONSTRAINT user_phrase_progress_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
   CONSTRAINT user_phrase_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
@@ -426,10 +431,10 @@ CREATE TABLE public.user_points_log (
   created_at timestamp with time zone DEFAULT now(),
   activity_type USER-DEFINED,
   CONSTRAINT user_points_log_pkey PRIMARY KEY (log_id),
-  CONSTRAINT user_points_log_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
   CONSTRAINT fk_user_points_log_related_word_lang FOREIGN KEY (related_word_language_code) REFERENCES public.languages(language_code),
-  CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id),
-  CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id)
+  CONSTRAINT user_points_log_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+  CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id),
+  CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id)
 );
 CREATE TABLE public.user_tour_progress (
   profile_id uuid NOT NULL,
@@ -439,8 +444,8 @@ CREATE TABLE public.user_tour_progress (
   completed_at timestamp with time zone,
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT user_tour_progress_pkey PRIMARY KEY (profile_id, tour_id),
-  CONSTRAINT user_tour_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-  CONSTRAINT user_tour_progress_tour_id_fkey FOREIGN KEY (tour_id) REFERENCES public.tours(tour_id)
+  CONSTRAINT user_tour_progress_tour_id_fkey FOREIGN KEY (tour_id) REFERENCES public.tours(tour_id),
+  CONSTRAINT user_tour_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_word_pronunciation (
   id integer NOT NULL DEFAULT nextval('user_word_pronunciation_id_seq'::regclass),
@@ -458,8 +463,8 @@ CREATE TABLE public.user_word_pronunciation (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_word_pronunciation_pkey PRIMARY KEY (id),
-  CONSTRAINT user_word_pronunciation_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-  CONSTRAINT fk_user_word_pronunciation_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
+  CONSTRAINT fk_user_word_pronunciation_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+  CONSTRAINT user_word_pronunciation_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_word_spelling (
   id integer NOT NULL DEFAULT nextval('user_word_spelling_id_seq'::regclass),

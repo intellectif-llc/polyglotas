@@ -60,3 +60,20 @@ export const useCanAccessUnit = (profileId: string, unitId: number) => {
     enabled: !!profileId && !!unitId && unitId > 0,
   });
 };
+
+export const useCanAccessLevel = (profileId: string, levelCode: string) => {
+  return useQuery({
+    queryKey: ['canAccessLevel', profileId, levelCode],
+    queryFn: async (): Promise<boolean> => {
+      const supabase = createSupabaseBrowserClient();
+      const { data, error } = await supabase.rpc('can_user_access_level', {
+        profile_id_param: profileId,
+        level_code_param: levelCode
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profileId && !!levelCode,
+  });
+};

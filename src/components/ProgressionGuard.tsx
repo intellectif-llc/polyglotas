@@ -1,13 +1,14 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { useCanAccessLesson, useCanAccessUnit } from '@/hooks/useProgression';
+import { useCanAccessLesson, useCanAccessUnit, useCanAccessLevel } from '@/hooks/useProgression';
 
 interface ProgressionGuardProps {
   children: ReactNode;
   profileId: string;
   lessonId?: number;
   unitId?: number;
+  levelCode?: string;
   fallback?: ReactNode;
 }
 
@@ -16,6 +17,7 @@ export const ProgressionGuard = ({
   profileId, 
   lessonId, 
   unitId, 
+  levelCode,
   fallback 
 }: ProgressionGuardProps) => {
   const { data: canAccessLesson, isLoading: lessonLoading } = useCanAccessLesson(
@@ -26,12 +28,18 @@ export const ProgressionGuard = ({
     profileId, 
     unitId || 0
   );
+  const { data: canAccessLevel, isLoading: levelLoading } = useCanAccessLevel(
+    profileId, 
+    levelCode || ''
+  );
 
-  if (lessonLoading || unitLoading) {
+  if (lessonLoading || unitLoading || levelLoading) {
     return <div className="animate-pulse bg-gray-200 rounded h-20" />;
   }
 
-  const hasAccess = lessonId && lessonId > 0 ? canAccessLesson : unitId && unitId > 0 ? canAccessUnit : true;
+  const hasAccess = lessonId && lessonId > 0 ? canAccessLesson : 
+                   unitId && unitId > 0 ? canAccessUnit : 
+                   levelCode ? canAccessLevel : true;
 
   if (!hasAccess) {
     return fallback || (
