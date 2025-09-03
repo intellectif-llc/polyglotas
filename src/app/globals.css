@@ -1,15 +1,130 @@
 @import "tailwindcss";
+@import "shepherd.js/dist/css/shepherd.css";
+
+/* Shepherd.js Brand Customization */
+.shepherd-modal-overlay-container {
+  z-index: 9998;
+}
+
+.shepherd-element {
+  z-index: 9999;
+  max-width: 400px;
+}
+
+.shepherd-content {
+  background: white;
+  border: 2px solid var(--brand-primary);
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 0;
+}
+
+.shepherd-header {
+  background: var(--brand-gradient) !important;
+  color: white !important;
+  padding: 16px 20px 12px;
+  border-radius: 10px 10px 0 0;
+  margin: 0;
+}
+
+.shepherd-title {
+  color: white !important;
+  font-weight: 600;
+  font-size: 1.125rem;
+  margin: 0;
+}
+
+.shepherd-text {
+  color: #374151;
+  line-height: 1.6;
+  padding: 16px 20px;
+  margin: 0;
+}
+
+.shepherd-footer {
+  padding: 12px 20px 16px;
+  text-align: right;
+  border-top: 1px solid #f3f4f6;
+}
+
+.shepherd-button {
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  padding: 8px 16px;
+  margin-left: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.shepherd-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+.shepherd-button.shepherd-button-secondary {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #6b7280;
+}
+
+.shepherd-button.shepherd-button-secondary:hover {
+  background: #f9fafb;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .shepherd-element {
+    max-width: calc(100vw - 32px);
+    margin: 16px;
+  }
+
+  .shepherd-element[data-popper-placement^="bottom"] {
+    position: fixed !important;
+    bottom: 20px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    top: auto !important;
+  }
+
+  .shepherd-arrow {
+    display: none !important;
+  }
+
+  .shepherd-text {
+    font-size: 0.95rem;
+  }
+
+  .shepherd-footer {
+    text-align: center;
+  }
+
+  .shepherd-button {
+    margin: 4px;
+    min-width: 80px;
+  }
+}
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  
+
   /* Polyglotas Brand Colors */
   --brand-primary: #a855f7;
   --brand-secondary: #ec4899;
   --brand-accent: #6366f1;
   --brand-gradient: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
-  --brand-hero-gradient: linear-gradient(135deg, #1e1b4b 0%, #581c87 50%, #be185d 100%);
+  --brand-hero-gradient: linear-gradient(
+    135deg,
+    #1e1b4b 0%,
+    #581c87 50%,
+    #be185d 100%
+  );
 }
 
 @theme inline {

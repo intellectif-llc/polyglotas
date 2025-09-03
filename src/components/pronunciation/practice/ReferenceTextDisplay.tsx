@@ -164,6 +164,7 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
         ref={messageContentRef}
         className="text-3xl font-bold text-gray-800 mb-2 inline-block align-middle mr-3 select-text cursor-text px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
         style={{ userSelect: "text" }}
+        data-tour="reference-text"
       >
         {text}
       </div>
@@ -192,6 +193,7 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
                 isPlayingNormal ? "Pause normal speed audio" : "Play normal speed audio"
               }
               title="Listen at normal speed"
+              data-tour="normal-audio"
             >
               <Volume2 className="h-6 w-6" />
             </button>
@@ -221,6 +223,7 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
                 isPlayingSlow ? "Pause slow speed audio" : "Play slow speed audio"
               }
               title="Listen at slow speed"
+              data-tour="slow-audio"
             >
               <Turtle className="h-5 w-5" />
               <span className="absolute -bottom-1 -right-1 text-xs font-bold bg-orange-600 text-white rounded-full w-4 h-4 flex items-center justify-center">

@@ -504,7 +504,7 @@ export default function ImprovedChatInput({
                 type="button"
                 onClick={handleVoiceToggle}
                 disabled={disabled}
-                className={`relative p-4 rounded-full transition-all duration-300 transform hover:scale-105 ${
+                className={`relative p-4 rounded-full transition-all duration-300 transform hover:scale-105 cursor-pointer ${
                   isListening
                     ? "bg-red-600 text-white hover:bg-red-700 shadow-lg"
                     : isVoiceMode

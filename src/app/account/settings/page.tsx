@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Settings, Globe } from "lucide-react";
 import LanguageManagement from "@/components/settings/LanguageManagement";
+import RestartTours from "@/components/settings/RestartTours";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 export default function SettingsPage() {
@@ -69,21 +70,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Notifications */}
-          {/*           <div>
-            <div className="flex items-center space-x-3 mb-4">
-              <Bell className="text-green-600" size={24} />
-              <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-gray-600 mb-4">
-                Configure your learning reminders and progress notifications.
-              </p>
-              <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                Notification Settings
-              </button>
-            </div>
-          </div> */}
+          {/* Tours & Guides */}
+          <RestartTours />
 
           {/* Privacy & Security */}
           {/*           <div>

@@ -1,8 +1,17 @@
 "use client";
 
-import React from "react";
 import LessonPracticeView from "@/components/pronunciation/practice/LessonPracticeView";
+import TourTrigger from "@/components/tours/TourTrigger";
 
 export default function LessonPracticePage() {
-  return <LessonPracticeView />;
+  return (
+    <>
+      <TourTrigger 
+        tourKey="pronunciation-practice-intro" 
+        route="/learn/1/lesson/1/practice" 
+        autoStart
+      />
+      <LessonPracticeView />
+    </>
+  );
 }

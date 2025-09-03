@@ -44,6 +44,7 @@ function AudioRecorderUI({
           <button
             onClick={onStartRecording}
             className="cursor-pointer flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-150 ease-in-out disabled:opacity-50"
+            data-tour="start-recording"
           >
             <FaMicrophone className="mr-2" />
             Start Recording
