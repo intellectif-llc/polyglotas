@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Volume2, Turtle } from "lucide-react";
+import { Volume2, Turtle, Lightbulb } from "lucide-react";
 
 interface DictationInterfaceProps {
   audioUrlNormal?: string;
@@ -10,6 +10,7 @@ interface DictationInterfaceProps {
   onTextChange: (text: string) => void;
   onSubmit: () => void;
   isSubmitting: boolean;
+  referenceText?: string;
 }
 
 export default function DictationInterface({
@@ -19,23 +20,28 @@ export default function DictationInterface({
   onTextChange,
   onSubmit,
   isSubmitting,
+  referenceText,
 }: DictationInterfaceProps) {
   const [isPlayingNormal, setIsPlayingNormal] = useState(false);
   const [isPlayingSlow, setIsPlayingSlow] = useState(false);
+  const [hintsRevealed, setHintsRevealed] = useState(0);
   const audioNormalRef = useRef<HTMLAudioElement>(null);
   const audioSlowRef = useRef<HTMLAudioElement>(null);
+
+  const referenceWords = referenceText?.split(" ") || [];
+  const maxHints = referenceWords.length;
 
   useEffect(() => {
     const audioNormal = audioNormalRef.current;
     const audioSlow = audioSlowRef.current;
-    
+
     if (audioNormal) {
       audioNormal.onended = () => setIsPlayingNormal(false);
     }
     if (audioSlow) {
       audioSlow.onended = () => setIsPlayingSlow(false);
     }
-    
+
     return () => {
       if (audioNormal) {
         audioNormal.onended = null;
@@ -60,7 +66,9 @@ export default function DictationInterface({
       audio.pause();
       setIsPlayingNormal(false);
     } else {
-      audio.play().catch((e) => console.error("Error playing normal audio:", e));
+      audio
+        .play()
+        .catch((e) => console.error("Error playing normal audio:", e));
       setIsPlayingNormal(true);
     }
   }, [isPlayingNormal, isPlayingSlow]);
@@ -84,6 +92,21 @@ export default function DictationInterface({
     }
   }, [isPlayingSlow, isPlayingNormal]);
 
+  const handleShowHint = useCallback(() => {
+    if (hintsRevealed < maxHints) {
+      setHintsRevealed((prev) => prev + 1);
+    }
+  }, [hintsRevealed, maxHints]);
+
+  const resetHints = useCallback(() => {
+    setHintsRevealed(0);
+  }, []);
+
+  // Reset hints when reference text changes
+  useEffect(() => {
+    resetHints();
+  }, [referenceText, resetHints]);
+
   return (
     <div className="flex flex-col items-center space-y-6">
       {/* Instructions */}
@@ -97,7 +120,7 @@ export default function DictationInterface({
       </div>
 
       {/* Audio Controls */}
-      <div className="flex items-center justify-center gap-3 my-3">
+      <div className="flex items-center justify-center gap-3 my-2">
         {audioUrlNormal && (
           <>
             <audio ref={audioNormalRef} src={audioUrlNormal} preload="auto" />
@@ -105,9 +128,10 @@ export default function DictationInterface({
               onClick={toggleNormalPlayback}
               className={`
                 cursor-pointer p-3 rounded-full 
-                ${isPlayingNormal 
-                  ? 'bg-blue-100 text-blue-700 border-blue-300' 
-                  : 'bg-blue-50 text-blue-600 border-blue-200'
+                ${
+                  isPlayingNormal
+                    ? "bg-blue-100 text-blue-700 border-blue-300"
+                    : "bg-blue-50 text-blue-600 border-blue-200"
                 }
                 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300
                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
@@ -117,7 +141,9 @@ export default function DictationInterface({
                 w-12 h-12
               `}
               aria-label={
-                isPlayingNormal ? "Pause normal speed audio" : "Play normal speed audio"
+                isPlayingNormal
+                  ? "Pause normal speed audio"
+                  : "Play normal speed audio"
               }
               title="Listen at normal speed"
             >
@@ -125,7 +151,7 @@ export default function DictationInterface({
             </button>
           </>
         )}
-        
+
         {audioUrlSlow && (
           <>
             <audio ref={audioSlowRef} src={audioUrlSlow} preload="auto" />
@@ -133,9 +159,10 @@ export default function DictationInterface({
               onClick={toggleSlowPlayback}
               className={`
                 cursor-pointer p-3 rounded-full 
-                ${isPlayingSlow 
-                  ? 'bg-orange-100 text-orange-700 border-orange-300' 
-                  : 'bg-orange-50 text-orange-600 border-orange-200'
+                ${
+                  isPlayingSlow
+                    ? "bg-orange-100 text-orange-700 border-orange-300"
+                    : "bg-orange-50 text-orange-600 border-orange-200"
                 }
                 hover:bg-orange-100 hover:text-orange-700 hover:border-orange-300
                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 
@@ -145,7 +172,9 @@ export default function DictationInterface({
                 w-12 h-12 relative
               `}
               aria-label={
-                isPlayingSlow ? "Pause slow speed audio" : "Play slow speed audio"
+                isPlayingSlow
+                  ? "Pause slow speed audio"
+                  : "Play slow speed audio"
               }
               title="Listen at slow speed"
             >
@@ -158,13 +187,50 @@ export default function DictationInterface({
         )}
       </div>
 
+      {/* Hint Section */}
+      {referenceText && (
+        <div className="w-full max-w-2xl px-4 mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={handleShowHint}
+              disabled={hintsRevealed >= maxHints || isSubmitting}
+              className="flex items-center gap-2 px-3 py-2 text-sm bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-lg hover:bg-yellow-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Lightbulb className="h-4 w-4" />
+              <span>
+                Hint ({hintsRevealed}/{maxHints})
+              </span>
+            </button>
+            {hintsRevealed > 0 && (
+              <button
+                onClick={resetHints}
+                disabled={isSubmitting}
+                className="text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Reset hints
+              </button>
+            )}
+          </div>
+          {hintsRevealed > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="text-base text-yellow-900">
+                {referenceWords.slice(0, hintsRevealed).join(" ")}
+                {hintsRevealed < maxHints && (
+                  <span className="text-yellow-600 ml-1">...</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Text Input */}
       <div className="w-full max-w-2xl px-4">
         <textarea
           value={userText}
           onChange={(e) => onTextChange(e.target.value)}
           placeholder="Type what you hear..."
-          className="w-full h-32 sm:h-36 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base sm:text-lg touch-manipulation placeholder:text-gray-600"
+          className="w-full h-24 sm:h-28 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base sm:text-lg touch-manipulation placeholder:text-gray-600"
           disabled={isSubmitting}
         />
       </div>

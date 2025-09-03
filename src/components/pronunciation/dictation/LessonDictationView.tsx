@@ -193,6 +193,7 @@ export default function LessonDictationView() {
                   onTextChange={setUserText}
                   onSubmit={handleSubmitDictation}
                   isSubmitting={isSubmitting}
+                  referenceText={currentPhrase.phrase_text}
                 />
               ) : (
                 <DictationResults
