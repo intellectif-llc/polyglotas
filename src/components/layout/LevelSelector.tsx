@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { LockClosedIcon } from "@heroicons/react/24/solid";
-import { useUserStats, useUserProfile } from "@/hooks/useUserProfile";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { useLanguageLevels } from "@/hooks/useLanguageLevels";
 import { useLevelSelection } from "@/hooks/useLevelSelection";
 import { useCanAccessLevel } from "@/hooks/useProgression";
@@ -12,19 +12,20 @@ interface LevelSelectorProps {
   isCollapsed: boolean;
 }
 
-
-
 const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { data: userStats } = useUserStats();
+
   const { data: profile } = useUserProfile();
   const { data: levels = [] } = useLanguageLevels();
   const { selectedLevel, selectLevel } = useLevelSelection();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -48,7 +49,10 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
   }
 
   return (
-    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700" ref={dropdownRef}>
+    <div
+      className="px-4 py-3 border-b border-gray-200 dark:border-gray-700"
+      ref={dropdownRef}
+    >
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -62,14 +66,16 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
               <div className="text-sm font-medium text-gray-900 dark:text-white">
                 Level {currentLevel}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              {/*               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {userStats?.completedUnits || 0}/{userStats?.totalUnits || 0} units
-              </div>
+              </div> */}
             </div>
           </div>
-          <ChevronDown 
-            size={16} 
-            className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          <ChevronDown
+            size={16}
+            className={`text-gray-400 transition-transform ${
+              isOpen ? "rotate-180" : ""
+            }`}
           />
         </button>
 
@@ -81,10 +87,13 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
               </div>
               {levels.map((level) => {
                 const LevelButton = () => {
-                  const { data: canAccess } = useCanAccessLevel(profile?.profile_id || '', level.level_code);
+                  const { data: canAccess } = useCanAccessLevel(
+                    profile?.profile_id || "",
+                    level.level_code
+                  );
                   const isAccessible = canAccess ?? false;
                   const isCurrent = level.level_code === currentLevel;
-                  
+
                   return (
                     <button
                       onClick={() => {
@@ -102,13 +111,15 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
                           : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                       }`}
                     >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold relative ${
-                        !isAccessible
-                          ? "bg-gray-200 dark:bg-gray-700 text-gray-400"
-                          : isCurrent
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
-                      }`}>
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold relative ${
+                          !isAccessible
+                            ? "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                            : isCurrent
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
+                        }`}
+                      >
                         {!isAccessible ? (
                           <LockClosedIcon className="w-3 h-3" />
                         ) : (
@@ -117,15 +128,19 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
                       </div>
                       <span>Level {level.level_code}</span>
                       {!isAccessible && (
-                        <span className="ml-auto text-xs text-gray-400">Locked</span>
+                        <span className="ml-auto text-xs text-gray-400">
+                          Locked
+                        </span>
                       )}
                       {isCurrent && isAccessible && (
-                        <span className="ml-auto text-xs text-blue-500">Current</span>
+                        <span className="ml-auto text-xs text-blue-500">
+                          Current
+                        </span>
                       )}
                     </button>
                   );
                 };
-                
+
                 return <LevelButton key={level.level_code} />;
               })}
             </div>
