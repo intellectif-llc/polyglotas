@@ -2,6 +2,7 @@
 
 import React from "react";
 import LessonChatView from "@/components/pronunciation/chat/LessonChatView";
+import TourTrigger from "@/components/tours/TourTrigger";
 
 interface ChatPageProps {
   params: Promise<{
@@ -12,5 +13,14 @@ interface ChatPageProps {
 
 export default function LessonChatPage({ params }: ChatPageProps) {
   const { unitId, lessonId } = React.use(params);
-  return <LessonChatView unitId={unitId} lessonId={lessonId} />;
+  return (
+    <>
+      <TourTrigger 
+        tourKey="chat-activity-intro" 
+        route={`/learn/${unitId}/lesson/${lessonId}/chat`} 
+        autoStart
+      />
+      <LessonChatView unitId={unitId} lessonId={lessonId} />
+    </>
+  );
 }

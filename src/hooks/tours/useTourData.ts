@@ -10,7 +10,7 @@ interface TourStep {
   target_selector: string;
   title: string;
   content: string;
-  joyride_props: { placement?: string } | null;
+  tour_props: { placement?: string } | null;
 }
 
 interface ShepherdStep {
@@ -38,7 +38,7 @@ async function fetchTourData(tourKey: string): Promise<TourData> {
         target_selector,
         title,
         content,
-        joyride_props
+        tour_props
       )
     `)
     .eq("tour_key", tourKey)
@@ -53,7 +53,7 @@ async function fetchTourData(tourKey: string): Promise<TourData> {
       target: step.target_selector,
       title: step.title,
       content: step.content,
-      placement: step.joyride_props?.placement || "bottom",
+      placement: step.tour_props?.placement || "bottom",
     }));
 
   return { steps };

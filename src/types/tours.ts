@@ -15,7 +15,7 @@ export interface TourStep {
   target_selector: string;
   title: string;
   content: string;
-  joyride_props: { placement?: string } | null;
+  tour_props: { placement?: string } | null;
   created_at: string;
   updated_at: string;
 }
