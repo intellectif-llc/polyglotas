@@ -109,10 +109,7 @@ export const AnimatedStats: React.FC<AnimatedStatsProps> = ({
       <div className="flex justify-between items-center">
         <span className="text-gray-600 dark:text-gray-400">Streak</span>
         <div className="flex items-center">
-          <span className="font-medium text-orange-600 dark:text-orange-400 mr-1">
-            {displayStreak} days
-          </span>
-          <div className="w-6 h-6">
+          <div className="w-6 h-6 mr-1">
             {flameAnimation && (
               <Lottie
                 lottieRef={flameRef}
@@ -123,6 +120,9 @@ export const AnimatedStats: React.FC<AnimatedStatsProps> = ({
               />
             )}
           </div>
+          <span className="font-medium text-orange-600 dark:text-orange-400">
+            {displayStreak} days
+          </span>
         </div>
       </div>
 
@@ -130,10 +130,7 @@ export const AnimatedStats: React.FC<AnimatedStatsProps> = ({
       <div className="flex justify-between items-center">
         <span className="text-gray-600 dark:text-gray-400">Points</span>
         <div className="flex items-center">
-          <span className="font-medium text-blue-600 dark:text-blue-400 mr-1">
-            {displayPoints.toLocaleString()}
-          </span>
-          <div className="w-6 h-6">
+          <div className="w-6 h-6 mr-1">
             {coinsAnimation && (
               <Lottie
                 lottieRef={coinsRef}
@@ -144,6 +141,9 @@ export const AnimatedStats: React.FC<AnimatedStatsProps> = ({
               />
             )}
           </div>
+          <span className="font-medium text-blue-600 dark:text-blue-400">
+            {displayPoints.toLocaleString()}
+          </span>
         </div>
       </div>
     </>
