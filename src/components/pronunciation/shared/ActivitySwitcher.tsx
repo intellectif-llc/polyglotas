@@ -57,8 +57,8 @@ export default function ActivitySwitcher({
   }
 
   return (
-    <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-      {activities.map((activity) => {
+    <div className="flex gap-1 mb-6">
+      {activities.map((activity, index) => {
         const isActive = activity.key === currentActivity;
         const canAccess = activity.canAccess;
 
@@ -68,19 +68,26 @@ export default function ActivitySwitcher({
             onClick={() => handleActivityClick(activity)}
             disabled={!canAccess}
             className={`
-              flex items-center justify-center px-4 py-3 rounded-md text-sm font-medium 
-              transition-colors flex-1 min-h-[44px] touch-manipulation cursor-pointer
+              flex items-center justify-center px-4 py-3 rounded-lg text-sm font-medium 
+              transition-all duration-200 flex-1 min-h-[44px] touch-manipulation 
+              border shadow-sm
               ${
                 isActive
-                  ? "bg-white text-blue-600 shadow-sm"
+                  ? "bg-white shadow-md border-gray-200"
                   : canAccess
-                  ? "text-gray-600 hover:text-gray-900"
-                  : "text-gray-400 cursor-not-allowed"
+                  ? "bg-gray-50 border-gray-200 text-gray-600 hover:bg-white hover:shadow-md cursor-pointer"
+                  : "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
               }
             `}
             title={!canAccess ? "Upgrade to access this activity" : undefined}
           >
-            <span className="pointer-events-none flex items-center gap-1">
+            <span
+              className={`pointer-events-none flex items-center gap-1 ${
+                isActive
+                  ? "bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent font-semibold"
+                  : ""
+              }`}
+            >
               {activity.label}
               {!canAccess && <Lock size={14} />}
             </span>
