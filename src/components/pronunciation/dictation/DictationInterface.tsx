@@ -164,7 +164,7 @@ export default function DictationInterface({
           value={userText}
           onChange={(e) => onTextChange(e.target.value)}
           placeholder="Type what you hear..."
-          className="w-full h-32 sm:h-36 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base sm:text-lg touch-manipulation"
+          className="w-full h-32 sm:h-36 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base sm:text-lg touch-manipulation placeholder:text-gray-600"
           disabled={isSubmitting}
         />
       </div>

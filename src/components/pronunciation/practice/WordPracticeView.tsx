@@ -89,9 +89,6 @@ export default function WordPracticeView() {
       );
 
       // Submit word practice attempt
-      console.log(
-        `💾 Submitting word practice attempt for "${currentWord.word_text}" with score: ${results.accuracyScore}%`
-      );
       wordPracticeAttempt.mutate(
         {
           wordText: currentWord.word_text,
@@ -99,25 +96,13 @@ export default function WordPracticeView() {
         },
         {
           onSuccess: (response) => {
-            console.log(
-              `✅ Word practice attempt saved successfully:`,
-              response
-            );
             if (response.wordCompleted) {
               setCompletedWords(
                 (prev) => new Set([...prev, currentWord.word_text])
               );
-              console.log(
-                `✅ Word "${currentWord.word_text}" completed! Average score: ${response.newAverageScore}%`
-              );
-            } else {
-              console.log(
-                `🔄 Word "${currentWord.word_text}" still needs practice. Average score: ${response.newAverageScore}%`
-              );
             }
           },
-          onError: (error) => {
-            console.error("❌ Failed to save word practice attempt:", error);
+          onError: () => {
             setErrorMessages((prev) => [
               ...prev,
               "Failed to save your attempt. Please try again.",

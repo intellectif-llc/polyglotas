@@ -10,7 +10,6 @@ import ResultsDisplay from "@/components/speech/ResultsDisplay";
 import { useRecognitionState } from "@/hooks/speech/useRecognitionState";
 import { useSpeechRecognition } from "@/hooks/speech/useSpeechRecognition";
 import { useLastSpeechAttempt } from "@/hooks/speech/useLastSpeechAttempt";
-import { AssessmentResults } from "@/hooks/speech/useRecognitionState";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import ActivitySwitcher from "../shared/ActivitySwitcher";
 import { useAdvancedNavigation } from "@/hooks/useAdvancedNavigation";
@@ -72,13 +71,9 @@ export default function LessonPracticeView() {
 
   // Auto-save attempt completion callback
   const handleRecognitionComplete = useCallback(
-    (results: AssessmentResults) => {
-      console.log("🎯 Recognition completed, auto-saving attempt...", results);
+    () => {
       // Note: Auto-saving is handled by useSpeechRecognition hook
-      // This callback is just for UI updates and logging
-      console.log(
-        "✅ Recognition completed, results will be auto-saved by hook"
-      );
+      // This callback is just for UI updates
     },
     []
   );

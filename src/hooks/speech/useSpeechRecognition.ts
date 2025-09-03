@@ -53,8 +53,6 @@ export const useSpeechRecognition = ({
 
   // --- Cleanup Function ---
   const cleanupRecognizer = useCallback(async () => {
-    console.log("🧹 Cleaning up speech recognizer resources...");
-
     // Clear failsafe timeout first
     if (failSafeTimeoutRef.current) {
       clearTimeout(failSafeTimeoutRef.current);
@@ -74,7 +72,6 @@ export const useSpeechRecognition = ({
         // Close the recognizer
         recognizerRef.current.close();
         recognizerRef.current = null;
-        console.log("✅ Recognizer closed successfully");
       } catch (err) {
         console.error("❌ Error closing recognizer:", err);
         recognizerRef.current = null;
@@ -102,8 +99,6 @@ export const useSpeechRecognition = ({
 
   // Function to forcefully clean up resources
   const forceCleanupResources = useCallback(() => {
-    console.log("🚨 Force cleanup initiated");
-
     // Force close recognizer
     if (recognizerRef.current) {
       try {
@@ -162,7 +157,6 @@ export const useSpeechRecognition = ({
   }, []);
 
   const startRecording = useCallback(async () => {
-    console.log("🎤 Starting recording for reference text:", referenceText);
     setUiState(UIState.RequestingPermissions);
     setAssessmentResults(null);
     setErrorMessages([]);
@@ -200,14 +194,12 @@ export const useSpeechRecognition = ({
       // Reset stopping flag
       isStoppingRef.current = false;
 
-      console.log("🔊 Starting speech recognition...");
       setUiState(UIState.Listening);
 
       // Set a failsafe timeout to prevent hanging in Listening state
       failSafeTimeoutRef.current = setTimeout(() => {
         console.warn("⚠️ Failsafe timeout triggered");
         if (recognizerRef.current && !isStoppingRef.current) {
-          console.log("🛑 Auto-stopping recognition due to timeout");
           forceCleanupResources();
           setErrorMessages((prev) => [
             ...prev,
@@ -220,8 +212,6 @@ export const useSpeechRecognition = ({
       // Start recognition
       recognizerRef.current.recognizeOnceAsync(
         async (result) => {
-          console.log("🎯 Recognition completed, processing result...", result);
-
           // Clear the failsafe timeout if recognition completes normally
           if (failSafeTimeoutRef.current) {
             clearTimeout(failSafeTimeoutRef.current);
@@ -240,8 +230,6 @@ export const useSpeechRecognition = ({
           );
 
           if (assessmentResults) {
-            console.log("📊 Assessment results:", assessmentResults);
-
             // Store results for later use
             latestAssessmentResultsRef.current = assessmentResults;
             setAssessmentResults(assessmentResults);
@@ -249,21 +237,18 @@ export const useSpeechRecognition = ({
 
             // Call the completion callback FIRST, before any async operations
             if (onRecognitionComplete) {
-              console.log("📞 Calling onRecognitionComplete callback with results:", assessmentResults);
               onRecognitionComplete(assessmentResults);
             }
 
             // Auto-save the attempt if lessonId and phraseId are provided
             if (lessonId && phraseId) {
               try {
-                console.log("💾 Auto-saving speech attempt...");
                 await submitSpeechAttempt(
                   lessonId,
                   phraseId,
                   referenceText,
                   assessmentResults
                 );
-                console.log("✅ Speech attempt saved successfully");
 
                 // Invalidate relevant queries
                 queryClient.invalidateQueries({
@@ -345,8 +330,6 @@ export const useSpeechRecognition = ({
   ]);
 
   const stopRecording = useCallback(() => {
-    console.log("🛑 Manual stop recording requested");
-
     // For recognizeOnceAsync, the recognition will stop automatically after one utterance,
     // but we still need to handle the case where the user wants to stop recording manually
     if (recognizerRef.current && !isStoppingRef.current) {

@@ -58,7 +58,7 @@ export default function ActivitySwitcher({
 
   return (
     <div className="flex gap-1 mb-6">
-      {activities.map((activity, index) => {
+      {activities.map((activity) => {
         const isActive = activity.key === currentActivity;
         const canAccess = activity.canAccess;
 

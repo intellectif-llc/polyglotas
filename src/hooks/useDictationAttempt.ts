@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 
 interface DictationAttemptRequest {
   lesson_id: number;
@@ -27,22 +27,21 @@ export const useDictationAttempt = () => {
 
   return useMutation<DictationAttemptResponse, Error, DictationAttemptRequest>({
     mutationFn: async (data) => {
-      const response = await axios.post('/api/dictation/attempt', data);
+      const response = await axios.post("/api/dictation/attempt", data);
       return response.data;
     },
     onSuccess: (data, variables) => {
       // Invalidate user stats queries to trigger real-time updates
-      queryClient.invalidateQueries({ queryKey: ['userStats'] });
-      queryClient.invalidateQueries({ queryKey: ['userProfile'] });
-      
+      queryClient.invalidateQueries({ queryKey: ["userStats"] });
+      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+
       // Invalidate lesson phrases to update PhraseStepper completion status
-      queryClient.invalidateQueries({ queryKey: ['lessonPhrases', variables.lesson_id.toString()] });
-      
-      // The real-time subscription will handle the UI updates
-      console.log(`🎉 Dictation attempt completed! Points awarded: ${data.points_awarded}`);
+      queryClient.invalidateQueries({
+        queryKey: ["lessonPhrases", variables.lesson_id.toString()],
+      });
     },
     onError: (error) => {
-      console.error('Dictation attempt failed:', error);
+      console.error("Dictation attempt failed:", error);
     },
   });
 };

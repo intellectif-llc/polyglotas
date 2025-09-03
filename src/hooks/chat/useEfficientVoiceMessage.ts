@@ -56,10 +56,6 @@ export function useEfficientVoiceMessage() {
     audioBlob: Blob,
     options: EfficientVoiceMessageOptions
   ): Promise<EfficientVoiceMessageResponse> => {
-    console.log('🚀 [useEfficientVoiceMessage] Starting efficient voice message processing');
-    console.log('🚀 [useEfficientVoiceMessage] Options:', options);
-    console.log('🚀 [useEfficientVoiceMessage] Audio size:', audioBlob.size, 'type:', audioBlob.type);
-
     setIsProcessing(true);
     setError(null);
 
@@ -69,25 +65,16 @@ export function useEfficientVoiceMessage() {
       formData.append('audio', audioBlob, 'audio.webm');
       formData.append('options', JSON.stringify(options));
 
-      console.log('🟡 [useEfficientVoiceMessage] Sending single multimodal request to /api/chat/voice-message');
-      
       const response = await axios.post('/api/chat/voice-message', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      console.log('✅ [useEfficientVoiceMessage] Efficient processing complete:', {
-        transcript: response.data.transcription_info.transcript,
-        aiResponseLength: response.data.ai_message.message_text.length,
-        provider: response.data.transcription_info.provider
-      });
-
       return response.data as EfficientVoiceMessageResponse;
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error during voice message processing';
-      console.error('❌ [useEfficientVoiceMessage] Error:', errorMessage);
       setError(errorMessage);
       throw err;
     } finally {

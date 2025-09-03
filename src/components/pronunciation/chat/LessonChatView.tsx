@@ -95,26 +95,16 @@ export default function LessonChatView({
   }, [messages]);
 
   const handleSendMessage = async () => {
-    console.log("🚀 handleSendMessage called with inputText:", inputText);
-    console.log("🚀 Current state:", {
-      inputText: inputText.trim(),
-      isSendingMessage,
-    });
-
     if (!inputText.trim() || isSendingMessage) {
-      console.log("❌ handleSendMessage blocked - no text or already sending");
       return;
     }
 
     const messageText = inputText.trim();
-    console.log("🚀 Sending message to chat hook:", messageText);
     setInputText("");
 
     try {
       await sendMessage(messageText);
-      console.log("✅ Message sent successfully via chat hook");
-    } catch (error) {
-      console.error("❌ Failed to send message:", error);
+    } catch {
       // Restore input text on error
       setInputText(messageText);
     }
@@ -123,7 +113,6 @@ export default function LessonChatView({
   const handleEfficientVoiceMessage = (
     result: EfficientVoiceMessageResponse
   ) => {
-    console.log("✨ Efficient voice message result received:", result);
     // The efficient endpoint handles everything, just refresh the UI
     invalidateQueries();
 

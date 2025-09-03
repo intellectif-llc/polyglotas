@@ -77,12 +77,9 @@ export const getTokenOrRefresh = async (): Promise<{
     const tokenAge = now - parseInt(cachedTime);
     // Tokens are valid for 10 minutes, refresh if older than 8 minutes
     if (tokenAge < 8 * 60 * 1000) {
-      console.log("🔑 Using cached speech token");
       return { authToken: cachedToken, region: cachedRegion };
     }
   }
-
-  console.log("🔑 Fetching new speech token from backend...");
   try {
     const response = await fetch("/api/speech/token");
     if (!response.ok) {
@@ -97,7 +94,6 @@ export const getTokenOrRefresh = async (): Promise<{
 
     return { authToken: data.authToken, region: data.region };
   } catch (error) {
-    console.error("❌ Error fetching speech token:", error);
     throw error;
   }
 };
@@ -114,8 +110,6 @@ export const initializeRecognizer = async (
   setUiState: (state: UIStateType) => void,
   UIState: Record<string, UIStateType>
 ): Promise<RecognizerConfig | { success: false }> => {
-  console.log("🔧 Initializing recognizer for text:", referenceText);
-
   setErrorMessages([]); // Clear previous errors
   setUiState(UIState.RequestingPermissions);
 
@@ -136,15 +130,13 @@ export const initializeRecognizer = async (
       SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs,
       "3500"
     );
-    console.log("🔧 Set Speech_SegmentationSilenceTimeoutMs: 3500ms");
 
     // Create audio config from default microphone - exactly like sample project
     let audioConfig;
     if (mediaStream) {
       try {
         audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-      } catch (err) {
-        console.error("Error creating AudioConfig from stream:", err);
+      } catch {
         audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       }
     } else {
@@ -161,15 +153,6 @@ export const initializeRecognizer = async (
     assessmentConfig.enableProsodyAssessment = true; // Enable prosody
     assessmentConfig.phonemeAlphabet = "IPA"; // Set phoneme alphabet to IPA
 
-    console.log("🎯 Assessment config:", {
-      referenceText,
-      gradingSystem: "HundredMark",
-      granularity: "Phoneme",
-      enableMiscue: true,
-      enableProsodyAssessment: true,
-      phonemeAlphabet: "IPA",
-    });
-
     // Create recognizer
     const recognizer = new SpeechSDK.SpeechRecognizer(
       speechConfig,
@@ -179,8 +162,6 @@ export const initializeRecognizer = async (
     // Apply assessment config
     assessmentConfig.applyTo(recognizer);
 
-    console.log("✅ Recognizer initialized successfully");
-
     return {
       success: true,
       speechConfig,
@@ -189,7 +170,6 @@ export const initializeRecognizer = async (
       assessmentConfig,
     };
   } catch (error) {
-    console.error("❌ Error initializing recognizer:", error);
     setErrorMessages((prev: string[]) => [
       ...prev,
       `Initialization failed: ${error}`,
@@ -213,116 +193,34 @@ export const processRecognitionResult = (
 ): AssessmentResults | null => {
   // Ignore trivial results - exactly like sample project
   if (!result.text || result.text.trim() === "." || result.text.trim() === "") {
-    console.log("⚠️ Ignoring trivial result:", result.text);
     return null;
   }
 
   setUiState(UIState.Processing); // Show processing state briefly
 
   if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-    console.log("🎯 Processing recognized speech:", result.text);
 
     let processedResult: AssessmentResults | null = null;
     let overallScores: Record<string, number> = {};
     let wordsArray: WordResult[] = [];
 
-    // Log the ENTIRE result object by stringifying it - exactly like sample project
-    try {
-      // Try to stringify the entire result object to get ALL properties
-      const resultCopy: Record<string, unknown> = {};
-      // Copy all enumerable properties
-      for (const prop in result) {
-        try {
-          resultCopy[prop] = (result as unknown as Record<string, unknown>)[
-            prop
-          ];
-        } catch (err) {
-          resultCopy[prop] = `[Error accessing: ${(err as Error).message}]`;
-        }
-      }
-    } catch (stringifyErr) {
-      console.log("Error stringifying complete result:", stringifyErr);
-      // Fallback to logging directly
-      console.log("DIRECT RESULT OBJECT:", result);
-    }
 
-    // Log ALL properties of the result object including non-enumerable ones
-    try {
-      const allProps = Object.getOwnPropertyNames(result);
-      allProps.forEach((prop) => {
-        try {
-          Object.getOwnPropertyDescriptor(result, prop);
-        } catch (propErr) {
-          console.log(`- ${prop}: [Error: ${(propErr as Error).message}]`);
-        }
-      });
-    } catch {
-      // Ignore property enumeration errors
-    }
 
-    try {
-      // Save the raw result to window object for debugging
-      if (typeof window !== "undefined") {
-        (window as unknown as Record<string, unknown>).__lastSpeechResult =
-          result;
-        console.log("🔍 Raw result saved to window.__lastSpeechResult");
-      }
-    } catch (err) {
-      console.log("⚠️ Error saving result to window:", err);
-    }
-
-    // Get ALL properties from the Speech SDK PropertyId - exactly like sample project
-    const allSDKProperties: Record<string, string> = {};
-    for (const propName in SpeechSDK.PropertyId) {
-      try {
-        const propId = (
-          SpeechSDK.PropertyId as unknown as Record<string, string>
-        )[propName];
-        const value = result.properties.getProperty(propId);
-        if (value) {
-          allSDKProperties[propName] = value;
-        }
-      } catch (err) {
-        console.log(`⚠️ Error getting SDK Property ${propName}:`, err);
-      }
-    }
-
-    console.log("📊 All SDK Properties:", allSDKProperties);
-
-    // Get the raw JSON result and log it completely - exactly like sample project
+    // Get the raw JSON result
     let resultJson: string | null = null;
     try {
       resultJson = result.properties.getProperty(
         SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult
       );
-
-      // Save the raw JSON to window object for debugging
-      if (typeof window !== "undefined") {
-        (window as unknown as Record<string, unknown>).__lastSpeechResponse =
-          resultJson;
-        console.log("🔍 Raw response saved to window.__lastSpeechResponse");
-      }
-    } catch (jsonErr) {
-      console.log("❌ Error getting raw JSON result:", jsonErr);
+    } catch {
+      // Handle error silently
     }
 
-    // Attempt to parse and log with extra detail - exactly like sample project
+    // Attempt to parse the JSON result
     let parsedJsonResult: Record<string, unknown> | null = null;
     if (resultJson) {
       try {
         parsedJsonResult = JSON.parse(resultJson);
-        console.log(
-          "📋 COMPLETE PARSED JSON RESULT:",
-          JSON.stringify(parsedJsonResult, null, 2)
-        );
-
-        // Log top level structure
-        if (parsedJsonResult) {
-          console.log(
-            "📋 Top-level properties:",
-            Object.keys(parsedJsonResult)
-          );
-        }
 
         if (
           parsedJsonResult &&
@@ -331,17 +229,12 @@ export const processRecognitionResult = (
           parsedJsonResult.NBest.length > 0
         ) {
           const nBest = parsedJsonResult.NBest[0] as Record<string, unknown>;
-          console.log("📋 NBest[0] structure:", Object.keys(nBest));
 
           if (nBest.PronunciationAssessment) {
             const pronunciation = nBest.PronunciationAssessment as Record<
               string,
               unknown
             >;
-            console.log(
-              "🎯 PRONUNCIATION ASSESSMENT:",
-              JSON.stringify(pronunciation, null, 2)
-            );
 
             // Extract overall scores
             overallScores = {
@@ -352,8 +245,6 @@ export const processRecognitionResult = (
               prosodyScore: (pronunciation.ProsodyScore as number) || 0,
               pronScore: (pronunciation.PronScore as number) || 0,
             };
-
-            console.log("📊 Overall Scores:", overallScores);
 
             if (nBest.Words && Array.isArray(nBest.Words)) {
               wordsArray = (nBest.Words as Record<string, unknown>[]).map(
@@ -412,8 +303,6 @@ export const processRecognitionResult = (
                   };
                 }
               );
-
-              console.log("📝 Words Array:", wordsArray);
             }
 
             // IMPROVED OMISSION DETECTION - exactly like sample project:
@@ -438,10 +327,7 @@ export const processRecognitionResult = (
                   (refWord) => !recognizedWords.includes(refWord)
                 );
 
-                // Log omissions for debugging
-                if (omittedWords.length > 0) {
-                  console.log("DETECTED OMISSIONS:", omittedWords);
-                }
+
 
                 // Add the omitted words to the result
                 processedResult = {
@@ -470,8 +356,7 @@ export const processRecognitionResult = (
                   isScripted: false,
                 };
               }
-            } catch (omissionErr) {
-              console.warn("Error in manual omission detection:", omissionErr);
+            } catch {
               // Fallback without omission detection
               processedResult = {
                 accuracyScore: overallScores.accuracyScore || 0,
@@ -486,50 +371,39 @@ export const processRecognitionResult = (
               };
             }
 
-            // Set the final assessment results - exactly like sample project
-            console.log("✅ Final processed result:", processedResult);
+            // Set the final assessment results
             return processedResult;
           } else {
-            console.error(
-              "❌ No PronunciationAssessment found in NBest result"
-            );
             setErrorMessages((prev: string[]) => [
               ...prev,
               "Could not find pronunciation assessment data in the results",
             ]);
           }
         } else {
-          console.error("❌ No NBest results found");
           setErrorMessages((prev: string[]) => [
             ...prev,
             "No recognition results were found",
           ]);
         }
       } catch (processingErr) {
-        console.error("❌ Error processing pronunciation data:", processingErr);
         setErrorMessages((prev: string[]) => [
           ...prev,
           `Failed to process results: ${processingErr}`,
         ]);
       }
     } else {
-      console.error("❌ No JSON result found");
       setErrorMessages((prev: string[]) => [
         ...prev,
         "No detailed results were returned from the speech service",
       ]);
     }
   } else if (result.reason === SpeechSDK.ResultReason.NoMatch) {
-    console.log("❌ NOMATCH: Speech could not be recognized.");
     setErrorMessages((prev: string[]) => [
       ...prev,
       "No speech was recognized. Please try again.",
     ]);
   } else if (result.reason === SpeechSDK.ResultReason.Canceled) {
-    console.log(`❌ CANCELED: Reason=${result.reason}`);
     const cancelDetails = SpeechSDK.CancellationDetails.fromResult(result);
-    console.log(`❌ CANCELED: ErrorCode=${cancelDetails.ErrorCode}`);
-    console.log(`❌ CANCELED: ErrorDetails=${cancelDetails.errorDetails}`);
     setErrorMessages((prev: string[]) => [
       ...prev,
       `Recognition canceled: ${cancelDetails.errorDetails || "Unknown error"}`,
