@@ -42,7 +42,7 @@ export default function LearnLayoutClient({
         />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header user={user} toggleMobileSidebar={toggleMobileSidebar} />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+          <main className="flex-1 overflow-y-auto p-2 md:p-6">{children}</main>
         </div>
       </div>
     </OnboardingWrapper>
