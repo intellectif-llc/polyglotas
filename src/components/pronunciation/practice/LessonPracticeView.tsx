@@ -195,10 +195,10 @@ export default function LessonPracticeView() {
             Back to Lessons
           </button>
           <h1 className="text-2xl font-bold text-gray-900 mt-2">
-            {data.lesson?.lesson_title || "Lesson"} - Practice
+            {data.lesson?.lesson_title || "Lesson"}
           </h1>
           <div className="text-sm text-gray-500 mt-1">
-            Unit {data.lesson?.unit_title || unitId} •{" "}
+            Unit: {data.lesson?.unit_title || unitId} •{" "}
             {data.lesson?.level || ""}
           </div>
         </div>

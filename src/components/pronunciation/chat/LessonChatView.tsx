@@ -174,10 +174,10 @@ export default function LessonChatView({
             <span className="pointer-events-none">Back to Lessons</span>
           </button>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            {lessonData?.lesson?.lesson_title || "Lesson"} - Chat
+            {lessonData?.lesson?.lesson_title || "Lesson"}
           </h1>
           <div className="text-sm text-gray-500 mt-1">
-            Unit {lessonData?.lesson?.unit_title || unitId} •{" "}
+            Unit: {lessonData?.lesson?.unit_title || unitId} •{" "}
             {lessonData?.lesson?.level || ""}
           </div>
         </div>

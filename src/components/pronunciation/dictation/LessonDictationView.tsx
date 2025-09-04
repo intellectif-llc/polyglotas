@@ -148,10 +148,10 @@ export default function LessonDictationView() {
             <span className="pointer-events-none">Back to Lessons</span>
           </button>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            {data.lesson?.lesson_title || "Lesson"} - Dictation
+            {data.lesson?.lesson_title || "Lesson"}
           </h1>
           <div className="text-sm text-gray-500 mt-1">
-            Unit {data.lesson?.unit_title || unitId} •{" "}
+            Unit: {data.lesson?.unit_title || unitId} •{" "}
             {data.lesson?.level || ""}
           </div>
         </div>
