@@ -30,7 +30,9 @@ function LevelSelector() {
                   {level.level_code}
                 </button>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <LockClosedIcon className="w-4 h-4 text-gray-500" />
+                  <div className="bg-white/80 rounded-full p-1">
+                    <div className="text-lg">🔒</div>
+                  </div>
                 </div>
               </div>
             }

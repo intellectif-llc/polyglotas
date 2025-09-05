@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
-import { LockClosedIcon } from "@heroicons/react/24/solid";
+
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useLanguageLevels } from "@/hooks/useLanguageLevels";
 import { useLevelSelection } from "@/hooks/useLevelSelection";
@@ -121,7 +121,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({ isCollapsed }) => {
                         }`}
                       >
                         {!isAccessible ? (
-                          <LockClosedIcon className="w-3 h-3" />
+                          "🔒"
                         ) : (
                           level.level_code
                         )}
