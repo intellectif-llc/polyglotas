@@ -10,8 +10,9 @@ import ResultsDisplay from "@/components/speech/ResultsDisplay";
 import { useRecognitionState } from "@/hooks/speech/useRecognitionState";
 import { useSpeechRecognition } from "@/hooks/speech/useSpeechRecognition";
 import { useLastSpeechAttempt } from "@/hooks/speech/useLastSpeechAttempt";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import ActivitySwitcher from "../shared/ActivitySwitcher";
+import LessonHeader from "@/components/shared/LessonHeader";
 import { useAdvancedNavigation } from "@/hooks/useAdvancedNavigation";
 
 export default function LessonPracticeView() {
@@ -184,25 +185,14 @@ export default function LessonPracticeView() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <button
-            onClick={() => router.push(`/learn/${unitId}`)}
-            className="flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-          >
-            <ArrowLeft size={20} className="mr-2" />
-            Back to Lessons
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900 mt-2">
-            {data.lesson?.lesson_title || "Lesson"}
-          </h1>
-          <div className="text-sm text-gray-500 mt-1">
-            Unit: {data.lesson?.unit_title || unitId} •{" "}
-            {data.lesson?.level || ""}
-          </div>
-        </div>
-      </div>
+      <LessonHeader
+        title={data.lesson?.lesson_title || "Lesson"}
+        unitTitle={data.lesson?.unit_title || unitId}
+        level={data.lesson?.level}
+        onBack={() => router.push(`/learn/${unitId}`)}
+        activity="practice"
+        collapsible
+      />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">

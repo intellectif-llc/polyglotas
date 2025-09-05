@@ -13,11 +13,11 @@ import { useRecognitionState } from "@/hooks/speech/useRecognitionState";
 import { useSpeechRecognition } from "@/hooks/speech/useSpeechRecognition";
 import { AssessmentResults } from "@/hooks/speech/useRecognitionState";
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   CheckCircle,
 } from "lucide-react";
+import LessonHeader from "@/components/shared/LessonHeader";
 
 export default function WordPracticeView() {
   const router = useRouter();
@@ -277,32 +277,12 @@ export default function WordPracticeView() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <button
-            onClick={handleBackToLearn}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft size={20} className="mr-2" />
-            Back to Learning
-          </button>
-          <div className="flex items-center justify-between mt-2">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Word Practice
-              </h1>
-              <div className="text-sm text-gray-500 mt-1">
-                Improve pronunciation of challenging words
-              </div>
-            </div>
-            <div className="text-xs text-gray-400 text-right">
-              <div>← → Navigate words</div>
-              <div>Esc Back to learning</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <LessonHeader
+        title="Word Practice"
+        onBack={handleBackToLearn}
+        activity="word-practice"
+        collapsible
+      />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">

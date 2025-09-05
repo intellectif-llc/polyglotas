@@ -9,8 +9,9 @@ import PhraseStepper from "../practice/PhraseStepper";
 import DictationInterface from "./DictationInterface";
 import DictationResults from "./DictationResults";
 import { DictationAttempt } from "@/types/pronunciation";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import ActivitySwitcher from "../shared/ActivitySwitcher";
+import LessonHeader from "@/components/shared/LessonHeader";
 import { useAdvancedNavigation } from "@/hooks/useAdvancedNavigation";
 
 export default function LessonDictationView() {
@@ -137,25 +138,14 @@ export default function LessonDictationView() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <button
-            onClick={() => router.push(`/learn/${unitId}`)}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-3 min-h-[44px] touch-manipulation"
-          >
-            <ArrowLeft size={20} className="mr-2 pointer-events-none" />
-            <span className="pointer-events-none">Back to Lessons</span>
-          </button>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            {data.lesson?.lesson_title || "Lesson"}
-          </h1>
-          <div className="text-sm text-gray-500 mt-1">
-            Unit: {data.lesson?.unit_title || unitId} •{" "}
-            {data.lesson?.level || ""}
-          </div>
-        </div>
-      </div>
+      <LessonHeader
+        title={data.lesson?.lesson_title || "Lesson"}
+        unitTitle={data.lesson?.unit_title || unitId}
+        level={data.lesson?.level}
+        onBack={() => router.push(`/learn/${unitId}`)}
+        activity="dictation"
+        collapsible
+      />
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">

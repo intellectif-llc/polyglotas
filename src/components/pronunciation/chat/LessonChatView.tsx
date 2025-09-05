@@ -4,8 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useLessonPhrases } from "@/hooks/pronunciation/usePronunciationData";
 import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import ActivitySwitcher from "../shared/ActivitySwitcher";
+import LessonHeader from "@/components/shared/LessonHeader";
 import { useAdvancedNavigation } from "@/hooks/useAdvancedNavigation";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import MessageBubble from "./MessageBubble";
@@ -163,25 +164,14 @@ export default function LessonChatView({
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <button
-            onClick={() => router.push(`/learn/${unitId}`)}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-3 min-h-[44px] touch-manipulation"
-          >
-            <ArrowLeft size={20} className="mr-2 pointer-events-none" />
-            <span className="pointer-events-none">Back to Lessons</span>
-          </button>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            {lessonData?.lesson?.lesson_title || "Lesson"}
-          </h1>
-          <div className="text-sm text-gray-500 mt-1">
-            Unit: {lessonData?.lesson?.unit_title || unitId} •{" "}
-            {lessonData?.lesson?.level || ""}
-          </div>
-        </div>
-      </div>
+      <LessonHeader
+        title={lessonData?.lesson?.lesson_title || "Lesson"}
+        unitTitle={lessonData?.lesson?.unit_title || unitId}
+        level={lessonData?.lesson?.level}
+        onBack={() => router.push(`/learn/${unitId}`)}
+        activity="chat"
+        collapsible
+      />
 
       {/* Main Content */}
       <div
