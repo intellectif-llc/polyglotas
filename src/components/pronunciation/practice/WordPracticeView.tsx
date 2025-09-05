@@ -12,11 +12,7 @@ import ResultsDisplay from "@/components/speech/ResultsDisplay";
 import { useRecognitionState } from "@/hooks/speech/useRecognitionState";
 import { useSpeechRecognition } from "@/hooks/speech/useSpeechRecognition";
 import { AssessmentResults } from "@/hooks/speech/useRecognitionState";
-import {
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
 import LessonHeader from "@/components/shared/LessonHeader";
 
 export default function WordPracticeView() {
@@ -368,11 +364,21 @@ export default function WordPracticeView() {
             onStartRecording={startRecording}
             onStopRecording={stopRecording}
             assessmentResults={assessmentResults}
-            className="mb-6"
+            className="mb-4"
           />
+
+          {/* Guidance text below recording button */}
+          <div className="text-center mb-12">
+            <p className="text-xs text-gray-500">
+              {assessmentResults
+                ? "Practice completed!"
+                : "Press the button to practice"}
+            </p>
+          </div>
 
           {/* Navigation Buttons */}
           <div className="absolute bottom-6 left-6 right-6">
+
             <div className="flex justify-between items-center">
               <button
                 onClick={handlePrevious}
@@ -386,19 +392,6 @@ export default function WordPracticeView() {
                 <ChevronLeft className="-ml-1 mr-2 h-5 w-5" />
                 Previous
               </button>
-
-              {/* Center guidance text */}
-              <div className="text-center px-4">
-                <p className="text-xs text-gray-500">
-                  {uiState === UIState.Listening
-                    ? "Listening..."
-                    : uiState === UIState.Processing
-                    ? "Processing..."
-                    : assessmentResults
-                    ? "Practice completed!"
-                    : "Press record to practice pronunciation"}
-                </p>
-              </div>
 
               {currentWordIndex >= totalWords - 1 ? (
                 <button

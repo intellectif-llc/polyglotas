@@ -23,8 +23,10 @@ export default function LessonHeader({
   activity,
 }: LessonHeaderProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
 
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
+  const toggleInfo = () => setShowInfo(!showInfo);
 
   // Activity-based color themes
   const getActivityTheme = () => {
@@ -99,12 +101,14 @@ export default function LessonHeader({
             {(unitTitle || level) && (
               <div className="relative group">
                 <button
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={toggleInfo}
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors sm:pointer-events-auto"
                   aria-label="Lesson information"
                 >
                   <Info size={16} />
                 </button>
-                <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                {/* Desktop hover tooltip */}
+                <div className="hidden sm:block absolute right-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   {unitTitle && (
                     <div className="mb-1">
                       <span className="text-gray-300">Unit:</span> {unitTitle}
@@ -117,6 +121,27 @@ export default function LessonHeader({
                   )}
                   <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 rotate-45"></div>
                 </div>
+                {/* Mobile elegant popover */}
+                {showInfo && (
+                  <>
+                    <div className="fixed inset-0 backdrop-blur-sm bg-white/30 z-40 sm:hidden" onClick={toggleInfo} />
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white/95 backdrop-blur-md border border-white/20 shadow-2xl rounded-2xl p-4 z-50 sm:hidden">
+                      {unitTitle && (
+                        <div className="py-2 border-b border-gray-100 last:border-0">
+                          <div className="text-gray-600 text-xs mb-1">Unit</div>
+                          <div className="font-medium text-gray-900">{unitTitle}</div>
+                        </div>
+                      )}
+                      {level && (
+                        <div className="py-2">
+                          <div className="text-gray-600 text-xs mb-1">Level</div>
+                          <div className="font-medium text-gray-900">{level}</div>
+                        </div>
+                      )}
+                      <div className="absolute -top-2 right-4 w-4 h-4 bg-white/95 backdrop-blur-md border-l border-t border-white/20 rotate-45"></div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
