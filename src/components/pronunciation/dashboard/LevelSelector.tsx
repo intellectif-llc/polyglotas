@@ -3,7 +3,6 @@ import { useLanguageLevels } from "@/hooks/useLanguageLevels";
 import { useLevelSelection } from "@/hooks/useLevelSelection";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { ProgressionGuard } from "@/components/ProgressionGuard";
-import { LockClosedIcon } from "@heroicons/react/24/solid";
 
 function LevelSelector() {
   const { data: levels = [] } = useLanguageLevels();

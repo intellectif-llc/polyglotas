@@ -94,7 +94,7 @@ const renderTextWithFeedback = (referenceText: string, userText: string) => {
       result.unshift(
         <span
           key={`ins-${j}`}
-          className="text-orange-600"
+          className="text-purple-600"
           title={`Extra: "${normalizedUser[j - 1]}"`}
         >
           {normalizedUser[j - 1]}
@@ -161,7 +161,7 @@ export default function CharacterLevelFeedback({
             <span>Wrong/Missing (• = missing)</span>
           </div>
           <div className="flex items-center">
-            <span className="text-orange-600 font-semibold mr-2">Orange</span>
+            <span className="text-purple-600 font-semibold mr-2">Purple</span>
             <span>Extra</span>
           </div>
         </div>
