@@ -78,7 +78,9 @@ export default function LessonHeader({
         <div className="flex items-center justify-between">
           <button
             onClick={onBack}
-            className={`flex items-center ${theme.accent} ${theme.hover} transition-colors min-h-[44px] touch-manipulation group`}
+            className={`flex items-center ${theme.accent} ${theme.hover} transition-all duration-300 min-h-[44px] touch-manipulation group ${
+              isCollapsed ? 'translate-y-0' : 'translate-y-12 sm:translate-y-0'
+            }`}
             aria-label="Go back"
           >
             <ArrowLeft 
@@ -88,8 +90,20 @@ export default function LessonHeader({
             <span className="pointer-events-none hidden sm:inline">Back</span>
           </button>
 
+          {/* Title takes back button's place when expanded */}
+          <div className={`absolute left-4 transition-all duration-300 flex items-center min-h-[44px] ${
+            isCollapsed ? 'opacity-0 -translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'
+          } sm:hidden`}>
+            <div className="w-4"></div>
+            <h1 className={`text-lg font-semibold ${theme.accent} truncate`} title={title}>
+              {title}
+            </h1>
+          </div>
+
           {/* Compact title for mobile when collapsed */}
-          <div className={`flex-1 mx-4 min-w-0 transition-all duration-300 ${isCollapsed ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'}`}>
+          <div className={`flex-1 mx-4 min-w-0 transition-all duration-300 sm:hidden ${
+            isCollapsed ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'
+          }`}>
             <h1 className={`text-lg font-semibold ${theme.accent} truncate`} title={title}>
               {title}
             </h1>
@@ -162,9 +176,11 @@ export default function LessonHeader({
         <div className={`transition-all duration-300 overflow-hidden ${
           isCollapsed ? 'max-h-0 opacity-0 -translate-y-2' : 'max-h-96 opacity-100 translate-y-0'
         }`}>
-          <div className="pt-3">
-            {/* Main title */}
-            <h1 className={`text-xl sm:text-2xl font-bold ${theme.accent} mb-1 break-words`} title={title}>
+          <div className={`transition-all duration-300 ${
+            isCollapsed ? 'pt-3' : 'sm:pt-3 pt-8'
+          }`}>
+            {/* Main title - hidden on mobile when expanded */}
+            <h1 className={`text-xl sm:text-2xl font-bold ${theme.accent} mb-1 break-words ${isCollapsed ? '' : 'hidden sm:block'}`} title={title}>
               {title}
             </h1>
 
