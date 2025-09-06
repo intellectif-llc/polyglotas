@@ -68,7 +68,7 @@ export default function Dictionary() {
 
           {/* Modal */}
           <div
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-bottom-full md:bottom-4 md:right-4 md:left-auto md:w-96 md:rounded-2xl md:animate-in md:slide-in-from-bottom-4"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-bottom-full h-[70vh] flex flex-col md:h-auto md:bottom-4 md:right-4 md:left-auto md:w-96 md:rounded-2xl md:animate-in md:slide-in-from-bottom-4"
             onKeyDown={handleKeyDown}
           >
             {/* Header */}
@@ -98,7 +98,7 @@ export default function Dictionary() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder="Search for a word..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 />
                 <Search
                   size={18}
@@ -108,7 +108,7 @@ export default function Dictionary() {
             </form>
 
             {/* Content */}
-            <div className="p-4 max-h-96 overflow-y-auto">
+            <div className="p-4 flex-1 overflow-y-auto">
               {isLoading && (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
