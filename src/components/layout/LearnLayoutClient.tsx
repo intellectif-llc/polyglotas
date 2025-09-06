@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import OnboardingWrapper from "@/components/onboarding/OnboardingWrapper";
+import Dictionary from "@/components/shared/Dictionary";
 
 interface LearnLayoutClientProps {
   user: User | null;
@@ -43,6 +44,7 @@ export default function LearnLayoutClient({
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header user={user} toggleMobileSidebar={toggleMobileSidebar} />
           <main className="flex-1 overflow-y-auto p-2 md:p-6">{children}</main>
+          <Dictionary />
         </div>
       </div>
     </OnboardingWrapper>
