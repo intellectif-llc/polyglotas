@@ -44,12 +44,20 @@ export async function GET(request: NextRequest) {
 
     // Check if there's an invitation token to redeem
     const invitationToken = requestUrl.searchParams.get("invitation_token");
+    console.log('[AUTH_CALLBACK] Checking for invitation token', { 
+      hasToken: !!invitationToken, 
+      token: invitationToken,
+      fullUrl: requestUrl.toString()
+    });
 
     if (invitationToken) {
+      console.log('[AUTH_CALLBACK] Redirecting to invitation redemption', { token: invitationToken });
       return NextResponse.redirect(
         `${siteUrl}/api/invite/redeem?token=${invitationToken}`
       );
     }
+
+    console.log('[AUTH_CALLBACK] No invitation token found, proceeding to learn page');
 
     // On successful authentication, redirect to the learn page or dashboard
     // The user session is now set by Supabase

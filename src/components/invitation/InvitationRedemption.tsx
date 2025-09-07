@@ -41,7 +41,16 @@ export function InvitationRedemption({
 
   // Store invitation token in localStorage for later redemption
   useEffect(() => {
+    console.log('[INVITATION_COMPONENT] Storing invitation token', { token });
     storeInvitationToken(token);
+    
+    // Verify token was stored
+    const storedToken = localStorage.getItem('invitation_token');
+    console.log('[INVITATION_COMPONENT] Token storage verification', { 
+      originalToken: token,
+      storedToken,
+      storageSuccess: storedToken === token
+    });
   }, [token]);
 
   const handleSuccess = (message: string) => {
@@ -119,7 +128,11 @@ export function InvitationRedemption({
           <AuthForm
             onSuccess={handleSuccess}
             onError={handleError}
-            redirectUrl={getOAuthRedirectUrl()}
+            redirectUrl={(() => {
+              const redirectUrl = getOAuthRedirectUrl();
+              console.log('[INVITATION_COMPONENT] OAuth redirect URL generated', { redirectUrl });
+              return redirectUrl;
+            })()}
           />
 
           <div className="mt-6 text-center">
