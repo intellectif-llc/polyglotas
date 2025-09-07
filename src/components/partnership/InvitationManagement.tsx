@@ -34,9 +34,10 @@ export function InvitationManagement() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'records' | 'send'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'send' | 'activation'>('records');
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedInvitations, setSelectedInvitations] = useState<number[]>([]);
+  const [selectedRedeemedInvitations, setSelectedRedeemedInvitations] = useState<number[]>([]);
   const [sending, setSending] = useState(false);
   
   // Form states
@@ -206,8 +207,38 @@ export function InvitationManagement() {
     }
   };
 
+  const sendActivationConfirmations = async () => {
+    if (selectedRedeemedInvitations.length === 0) return;
+    
+    setSending(true);
+    try {
+      const response = await fetch('/api/partnership/invitations/activation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitationIds: selectedRedeemedInvitations }),
+      });
+
+      if (!response.ok) throw new Error('Failed to send activation confirmations');
+      alert(`${selectedRedeemedInvitations.length} activation confirmations sent successfully!`);
+      setSelectedRedeemedInvitations([]);
+    } catch (error) {
+      console.error('Error sending activation confirmations:', error);
+      alert('Failed to send activation confirmations');
+    } finally {
+      setSending(false);
+    }
+  };
+
   const toggleInvitationSelection = (id: number) => {
     setSelectedInvitations(prev => 
+      prev.includes(id) 
+        ? prev.filter(i => i !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleRedeemedInvitationSelection = (id: number) => {
+    setSelectedRedeemedInvitations(prev => 
       prev.includes(id) 
         ? prev.filter(i => i !== id)
         : [...prev, id]
@@ -219,6 +250,13 @@ export function InvitationManagement() {
       .filter(inv => inv.status === 'pending')
       .map(inv => inv.id);
     setSelectedInvitations(pendingInvitations);
+  };
+
+  const selectAllRedeemedInvitations = () => {
+    const redeemedInvitations = invitations
+      .filter(inv => inv.status === 'redeemed')
+      .map(inv => inv.id);
+    setSelectedRedeemedInvitations(redeemedInvitations);
   };
 
   if (loading) {
@@ -282,6 +320,16 @@ export function InvitationManagement() {
             }`}
           >
             Send Invitations
+          </button>
+          <button
+            onClick={() => setActiveTab('activation')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'activation'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Send Activation Confirmation
           </button>
         </nav>
       </div>
@@ -360,7 +408,15 @@ export function InvitationManagement() {
                   <th className="px-6 py-3 text-left">
                     <input
                       type="checkbox"
-                      onChange={(e) => e.target.checked ? selectAllInvitations() : setSelectedInvitations([])}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          selectAllInvitations();
+                          selectAllRedeemedInvitations();
+                        } else {
+                          setSelectedInvitations([]);
+                          setSelectedRedeemedInvitations([]);
+                        }
+                      }}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </th>
@@ -391,6 +447,14 @@ export function InvitationManagement() {
                           checked={selectedInvitations.includes(invitation.id)}
                           onChange={() => toggleInvitationSelection(invitation.id)}
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      )}
+                      {invitation.status === 'redeemed' && (
+                        <input
+                          type="checkbox"
+                          checked={selectedRedeemedInvitations.includes(invitation.id)}
+                          onChange={() => toggleRedeemedInvitationSelection(invitation.id)}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                         />
                       )}
                     </td>
@@ -466,6 +530,43 @@ export function InvitationManagement() {
             </p>
             <p className="text-sm text-gray-500">
               Currently selected: <strong>{selectedInvitations.length}</strong> invitations
+            </p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'activation' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Send Activation Confirmation</h3>
+            <button
+              onClick={sendActivationConfirmations}
+              disabled={selectedRedeemedInvitations.length === 0 || sending}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+            >
+              <Send size={16} className="mr-2" />
+              Send Confirmations ({selectedRedeemedInvitations.length})
+            </button>
+          </div>
+
+          <div className="bg-green-50 rounded-lg p-6 mb-6">
+            <h4 className="text-sm font-medium text-green-900 mb-2">Activation Confirmation Emails</h4>
+            <p className="text-green-800 mb-4">
+              Send confirmation emails to users whose benefits have been manually activated. 
+              This notifies them that their Pro features (dictation, pronunciation, and chat) are now available.
+            </p>
+            <p className="text-sm text-green-700">
+              Select redeemed invitations from the &quot;Invitation Records&quot; tab to send activation confirmations.
+            </p>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-6">
+            <p className="text-gray-600 mb-4">
+              Use this feature when the normal invitation flow didn&apos;t complete properly and you&apos;ve manually 
+              activated the user&apos;s benefits using the SQL script.
+            </p>
+            <p className="text-sm text-gray-500">
+              Currently selected redeemed invitations: <strong>{selectedRedeemedInvitations.length}</strong>
             </p>
           </div>
         </div>
