@@ -10,6 +10,7 @@ interface TourStep {
   target_selector: string;
   title: string;
   content: string;
+  media_url?: string;
   tour_props: { placement?: string } | null;
 }
 
@@ -18,6 +19,13 @@ interface ShepherdStep {
   title: string;
   content: string;
   placement?: string;
+  mediaUrl?: string;
+  tourProps?: {
+    placement?: string;
+    fallbackPlacement?: string;
+    autoPosition?: boolean;
+    minSpaceRequired?: number;
+  } | null;
 }
 
 interface TourData {
@@ -38,6 +46,7 @@ async function fetchTourData(tourKey: string): Promise<TourData> {
         target_selector,
         title,
         content,
+        media_url,
         tour_props
       )
     `)
@@ -54,6 +63,8 @@ async function fetchTourData(tourKey: string): Promise<TourData> {
       title: step.title,
       content: step.content,
       placement: step.tour_props?.placement || "bottom",
+      mediaUrl: step.media_url,
+      tourProps: step.tour_props,
     }));
 
   return { steps };

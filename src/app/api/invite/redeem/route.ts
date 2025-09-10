@@ -67,6 +67,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/invite/error?error=wrong_email', process.env.NEXT_PUBLIC_SITE_URL));
     }
 
+    // Verify user has a student profile before proceeding
+    console.log('[INVITE_REDEEM] Verifying student profile exists', { userId: user.id });
+    const { data: studentProfile, error: profileCheckError } = await serviceSupabase
+      .from('student_profiles')
+      .select('profile_id')
+      .eq('profile_id', user.id)
+      .single();
+    
+    if (profileCheckError || !studentProfile) {
+      console.log('[INVITE_REDEEM] ERROR: Student profile not found', { error: profileCheckError });
+      return NextResponse.json({ error: 'User profile not properly initialized' }, { status: 500 });
+    }
+
     // Mark invitation as redeemed
     console.log('[INVITE_REDEEM] Marking invitation as redeemed', { invitationId: invitation.id, userId: user.id });
     const { error: redeemError } = await serviceSupabase
@@ -79,6 +92,11 @@ export async function GET(request: NextRequest) {
       .eq('id', invitation.id);
     
     console.log('[INVITE_REDEEM] Invitation redemption result', { success: !redeemError, error: redeemError });
+    
+    if (redeemError) {
+      console.error('[INVITE_REDEEM] ERROR: Failed to mark invitation as redeemed:', redeemError);
+      return NextResponse.json({ error: 'Failed to redeem invitation' }, { status: 500 });
+    }
 
     // Update user's profile with partnership benefits
     console.log('[INVITE_REDEEM] Updating user profile with partnership', { userId: user.id, partnershipId: invitation.partnership_id });

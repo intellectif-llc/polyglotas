@@ -38,12 +38,12 @@
 .shepherd-text {
   color: #374151;
   line-height: 1.6;
-  padding: 16px 20px;
+  padding: 4px 12px;
   margin: 0;
 }
 
 .shepherd-footer {
-  padding: 12px 20px 16px;
+  padding: 6px 20px 6px;
   text-align: right;
   border-top: 1px solid #f3f4f6;
 }

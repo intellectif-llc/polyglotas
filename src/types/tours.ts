@@ -15,7 +15,13 @@ export interface TourStep {
   target_selector: string;
   title: string;
   content: string;
-  tour_props: { placement?: string } | null;
+  media_url?: string;
+  tour_props: { 
+    placement?: string;
+    fallbackPlacement?: string;
+    autoPosition?: boolean;
+    minSpaceRequired?: number;
+  } | null;
   created_at: string;
   updated_at: string;
 }
