@@ -84,10 +84,6 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
           selectedText: selectedText,
           triggerElement: trigger,
         });
-      } else {
-        if (tooltipConfig.visible) {
-          closeTooltip();
-        }
       }
     };
 

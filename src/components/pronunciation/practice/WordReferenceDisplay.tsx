@@ -83,10 +83,6 @@ const WordReferenceDisplay: React.FC<WordReferenceDisplayProps> = ({
           selectedText: selectedText,
           triggerElement: trigger,
         });
-      } else {
-        if (tooltipConfig.visible) {
-          closeTooltip();
-        }
       }
     };
 
