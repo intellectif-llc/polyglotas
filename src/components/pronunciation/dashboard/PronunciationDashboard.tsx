@@ -27,7 +27,9 @@ const PronunciationDashboard = () => {
   return (
     <div className="font-sans bg-gray-100 min-h-screen">
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-5 text-center relative shadow-lg">
-        <h2 className="text-xl font-semibold mt-6 text-white">Welcome back, {firstName || "User"}</h2>
+        <h2 className="text-xl font-semibold text-white">
+          Welcome back, {firstName || "User"}
+        </h2>
       </div>
       <div className="bg-white p-4 sm:p-5 mb-5 shadow-sm">
         <LevelSelector />
