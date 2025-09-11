@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import WordTooltip from "@/components/speech/WordTooltip";
 
 interface CharacterLevelFeedbackProps {
   referenceText: string;
@@ -112,6 +113,70 @@ export default function CharacterLevelFeedback({
   userText,
 }: CharacterLevelFeedbackProps) {
   const [showSolution, setShowSolution] = useState(false);
+  const [tooltipConfig, setTooltipConfig] = useState<{
+    visible: boolean;
+    selectedText: string;
+    triggerElement: HTMLElement | null;
+  }>({
+    visible: false,
+    selectedText: "",
+    triggerElement: null,
+  });
+  
+  const solutionRef = useRef<HTMLDivElement>(null);
+
+  const closeTooltip = useCallback(() => {
+    setTooltipConfig({
+      visible: false,
+      selectedText: "",
+      triggerElement: null,
+    });
+  }, []);
+
+  useEffect(() => {
+    closeTooltip();
+  }, [referenceText, closeTooltip]);
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      const selection = window.getSelection();
+      const selectedText = selection?.toString().trim();
+
+      if (
+        selectedText &&
+        selection &&
+        selection.anchorNode &&
+        solutionRef.current?.contains(selection.anchorNode)
+      ) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        const trigger = document.createElement("div");
+        trigger.style.position = "absolute";
+        trigger.style.left = `${rect.left + window.scrollX}px`;
+        trigger.style.top = `${rect.top + window.scrollY}px`;
+        trigger.style.width = `${rect.width}px`;
+        trigger.style.height = `${rect.height}px`;
+        trigger.style.pointerEvents = "none";
+        trigger.style.zIndex = "1";
+
+        setTooltipConfig({
+          visible: true,
+          selectedText: selectedText,
+          triggerElement: trigger,
+        });
+      } else {
+        if (tooltipConfig.visible) {
+          closeTooltip();
+        }
+      }
+    };
+
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [tooltipConfig.visible, closeTooltip]);
 
   return (
     <div className="w-full max-w-2xl">
@@ -143,7 +208,11 @@ export default function CharacterLevelFeedback({
 
         {showSolution && (
           <div className="p-4 bg-blue-50 rounded-lg mt-2">
-            <div className="text-lg leading-relaxed text-gray-800">
+            <div 
+              ref={solutionRef}
+              className="text-lg leading-relaxed text-gray-800 select-text cursor-text hover:bg-blue-100 transition-colors rounded px-2 py-1"
+              style={{ userSelect: "text" }}
+            >
               {referenceText}
             </div>
           </div>
@@ -166,6 +235,14 @@ export default function CharacterLevelFeedback({
           </div>
         </div>
       </div>
+
+      {tooltipConfig.visible && (
+        <WordTooltip
+          selectedText={tooltipConfig.selectedText}
+          onClose={closeTooltip}
+          triggerElement={tooltipConfig.triggerElement}
+        />
+      )}
     </div>
   );
 }
