@@ -198,16 +198,15 @@ export const useSpeechRecognition = ({
 
       // Set a failsafe timeout to prevent hanging in Listening state
       failSafeTimeoutRef.current = setTimeout(() => {
-        console.warn("⚠️ Failsafe timeout triggered");
         if (recognizerRef.current && !isStoppingRef.current) {
           forceCleanupResources();
           setErrorMessages((prev) => [
             ...prev,
-            "Recognition timed out after 30 seconds",
+            "Recognition timed out. Please check your microphone and try again.",
           ]);
           setUiState(UIState.Error);
         }
-      }, 30000); // 30 second timeout
+      }, 20000); // 20 second timeout
 
       // Start recognition
       recognizerRef.current.recognizeOnceAsync(
@@ -287,14 +286,19 @@ export const useSpeechRecognition = ({
                 ]);
               }
             }
+          } else {
+            // Handle trivial results - likely background noise/music
+            setErrorMessages((prev) => [
+              ...prev,
+              "No clear speech detected. Please reduce background noise or turn off the music and try again.",
+            ]);
+            setUiState(UIState.Error);
           }
 
           // Clean up AFTER setting state and calling callback
           cleanupRecognizer();
         },
         (err) => {
-          console.error("❌ Recognition error:", err);
-
           // Clear the failsafe timeout if recognition fails
           if (failSafeTimeoutRef.current) {
             clearTimeout(failSafeTimeoutRef.current);
