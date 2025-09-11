@@ -95,7 +95,7 @@ const ReferenceTextDisplay: React.FC<ReferenceTextDisplayProps> = ({
     return () => {
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [tooltipConfig.visible, closeTooltip]);
+  }, []);
 
   useEffect(() => {
     const audioNormal = audioNormalRef.current;

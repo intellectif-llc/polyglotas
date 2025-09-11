@@ -165,10 +165,6 @@ export default function CharacterLevelFeedback({
           selectedText: selectedText,
           triggerElement: trigger,
         });
-      } else {
-        if (tooltipConfig.visible) {
-          closeTooltip();
-        }
       }
     };
 
@@ -176,7 +172,7 @@ export default function CharacterLevelFeedback({
     return () => {
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [tooltipConfig.visible, closeTooltip]);
+  }, []);
 
   return (
     <div className="w-full max-w-2xl">

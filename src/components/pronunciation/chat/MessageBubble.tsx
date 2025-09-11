@@ -236,14 +236,12 @@ export default function MessageBubble({
             triggerElement,
           });
         }
-      } else {
-        closeTooltip();
       }
     };
 
     document.addEventListener("mouseup", handleMouseUp);
     return () => document.removeEventListener("mouseup", handleMouseUp);
-  }, [isAI, isUser, closeTooltip]);
+  }, [isAI, isUser]);
 
   return (
     <div

@@ -94,7 +94,7 @@ const WordReferenceDisplay: React.FC<WordReferenceDisplayProps> = ({
     return () => {
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [tooltipConfig.visible, closeTooltip]);
+  }, []);
 
   // Speech synthesis playback
   const togglePlayback = useCallback(() => {
