@@ -14,6 +14,7 @@ import {
   Shield,
   Users,
   PlayCircle,
+  Headphones,
 } from "lucide-react";
 import { useContinueLearning } from "@/hooks/useContinueLearning";
 import { useUserStats } from "@/hooks/useUserProfile";
@@ -97,6 +98,12 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
           label: "Progress",
           icon: BarChart3,
           isActive: pathname === "/learn/progress",
+        },
+        {
+          href: "/audiobooks",
+          label: "Audiobooks",
+          icon: Headphones,
+          isActive: pathname.startsWith("/audiobooks"),
         },
       ],
     },
