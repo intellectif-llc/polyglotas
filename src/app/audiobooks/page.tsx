@@ -3,8 +3,13 @@
 import { useState, useEffect } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { Book, Coins, DollarSign, Play, Lock } from 'lucide-react';
+import { Book, Coins, DollarSign, Play, Lock, Edit, Plus } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
+import dynamic from 'next/dynamic';
+
+const CreateAudiobookForm = dynamic(() => import('@/components/admin/audiobooks/CreateAudiobookForm'), {
+  ssr: false
+});
 
 interface Audiobook {
   book_id: number;
@@ -27,6 +32,8 @@ export default function AudiobooksPage() {
   const [audiobooks, setAudiobooks] = useState<Audiobook[]>([]);
   const [loading, setLoading] = useState(true);
   const [userPoints, setUserPoints] = useState(0);
+  const [editMode, setEditMode] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
   const { role: userRole } = useUserRole();
@@ -172,7 +179,32 @@ export default function AudiobooksPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 relative">
+          {userRole === 'admin' && (
+            <div className="absolute top-0 right-0 flex items-center gap-2">
+              <button
+                onClick={() => setEditMode(!editMode)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                  editMode 
+                    ? 'bg-indigo-600 text-white' 
+                    : 'bg-white text-gray-700 border border-gray-300'
+                }`}
+              >
+                <Edit className="h-4 w-4" />
+                {editMode ? 'Exit Edit' : 'Edit Mode'}
+              </button>
+              {editMode && (
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Book
+                </button>
+              )}
+            </div>
+          )}
+          
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Audiobook Library</h1>
           <p className="text-lg text-gray-600 mb-4">
             Enhance your language learning with immersive audiobooks
@@ -288,6 +320,15 @@ export default function AudiobooksPage() {
           </div>
         )}
       </div>
+      
+      {showCreateForm && (
+        <CreateAudiobookForm
+          onClose={() => setShowCreateForm(false)}
+          onSuccess={() => {
+            fetchAudiobooks();
+          }}
+        />
+      )}
     </div>
   );
 }

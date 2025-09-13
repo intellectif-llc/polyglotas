@@ -3,8 +3,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter, useParams } from 'next/navigation';
-import { Play, Pause, SkipBack, SkipForward, BookOpen, Eye, EyeOff, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, BookOpen, Eye, EyeOff, ArrowLeft, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
+import dynamic from 'next/dynamic';
+
+const AudioGenerationPanel = dynamic(() => import('@/components/admin/audiobooks/AudioGenerationPanel'), {
+  ssr: false
+});
+const AlignmentPanel = dynamic(() => import('@/components/admin/audiobooks/AlignmentPanel'), {
+  ssr: false
+});
 
 interface AudiobookData {
   book_id: number;
@@ -60,6 +68,8 @@ export default function ChapterPlayerPage() {
   const [duration, setDuration] = useState(0);
   const [showText, setShowText] = useState(true);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
+  const [editMode, setEditMode] = useState(false);
+  const [chapterScript, setChapterScript] = useState('');
   
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -68,12 +78,7 @@ export default function ChapterPlayerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId, chapterId]);
 
-  useEffect(() => {
-    if (alignment && currentTime > 0) {
-      updateHighlighting();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTime, alignment]);
+  // Highlighting is now handled directly in handleTimeUpdate
 
   const fetchChapterData = async () => {
     try {
@@ -148,25 +153,44 @@ export default function ChapterPlayerPage() {
         .single();
 
       if (alignmentData) {
+        console.log('✅ ALIGNMENT DATA LOADED');
+        console.log('📄 Words data length:', alignmentData.words_data?.length);
+        console.log('📄 First 5 words with timing:', alignmentData.words_data?.slice(0, 5).map(w => ({
+          text: w.text,
+          start: w.start,
+          end: w.end
+        })));
+        
         setAlignment({
           full_text: alignmentData.full_text,
           characters_data: alignmentData.characters_data,
           words_data: alignmentData.words_data
         });
+        
+        // Clean the text by removing quotes and normalizing newlines
+        const cleanText = alignmentData.full_text
+          .replace(/^"|"$/g, '') // Remove leading/trailing quotes
+          .replace(/\\n/g, '\n') // Convert \n to actual newlines
+          .replace(/\\"/g, '"'); // Convert \" to actual quotes
+        
+        setChapterScript(cleanText);
+      } else {
+        console.log('❌ NO ALIGNMENT DATA FOUND');
       }
 
       // Get user progress for this chapter
-      const { data: progress } = await supabase
+      const { data: progressData } = await supabase
         .from('user_audiobook_progress')
         .select('*')
         .eq('profile_id', user.id)
         .eq('book_id', parseInt(bookId))
-        .eq('current_chapter_id', parseInt(chapterId))
-        .single();
+        .eq('current_chapter_id', parseInt(chapterId));
 
+      const progress = progressData?.[0];
       if (progress) {
         setUserProgress(progress);
         setCurrentTime(progress.current_position_seconds);
+        console.log('📍 Restored progress to:', progress.current_position_seconds, 'seconds');
       }
 
     } catch (error) {
@@ -177,13 +201,20 @@ export default function ChapterPlayerPage() {
   };
 
   const updateHighlighting = () => {
-    if (!alignment) return;
+    if (!alignment || !alignment.words_data) {
+      console.log('❌ No alignment data available');
+      return;
+    }
 
+    // Find the current word based on audio time
     const wordIndex = alignment.words_data.findIndex(word => 
       currentTime >= word.start && currentTime <= word.end
     );
     
-    if (wordIndex !== -1) {
+    console.log(`🎯 Current time: ${currentTime.toFixed(2)}s, Found word index: ${wordIndex}`);
+    
+    if (wordIndex !== -1 && wordIndex !== currentWordIndex) {
+      console.log(`📍 Highlighting word ${wordIndex}: "${alignment.words_data[wordIndex].text}"`);
       setCurrentWordIndex(wordIndex);
     }
   };
@@ -192,6 +223,11 @@ export default function ChapterPlayerPage() {
     if (audioRef.current) {
       const time = audioRef.current.currentTime;
       setCurrentTime(time);
+      
+      // Update highlighting immediately when time changes
+      if (alignment && alignment.words_data) {
+        updateHighlighting();
+      }
       
       if (Math.floor(time) % 5 === 0) {
         saveProgress(time);
@@ -204,15 +240,29 @@ export default function ChapterPlayerPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      await supabase
+      // First try to update existing progress
+      const { error: updateError } = await supabase
         .from('user_audiobook_progress')
-        .upsert({
-          profile_id: user.id,
-          book_id: parseInt(bookId),
-          current_chapter_id: parseInt(chapterId),
+        .update({
           current_position_seconds: time,
           last_read_at: new Date().toISOString()
-        });
+        })
+        .eq('profile_id', user.id)
+        .eq('book_id', parseInt(bookId))
+        .eq('current_chapter_id', parseInt(chapterId));
+
+      // If no rows were updated, insert new progress
+      if (updateError?.code === 'PGRST116') {
+        await supabase
+          .from('user_audiobook_progress')
+          .insert({
+            profile_id: user.id,
+            book_id: parseInt(bookId),
+            current_chapter_id: parseInt(chapterId),
+            current_position_seconds: time,
+            last_read_at: new Date().toISOString()
+          });
+      }
     } catch (error) {
       console.error('Error saving progress:', error);
     }
@@ -270,24 +320,82 @@ export default function ChapterPlayerPage() {
   };
 
   const renderTextWithHighlighting = () => {
-    if (!alignment || !showText) return null;
+    if (!alignment || !showText || !chapterScript) {
+      console.log('❌ Missing data for highlighting:', { 
+        hasAlignment: !!alignment, 
+        showText, 
+        hasScript: !!chapterScript 
+      });
+      return null;
+    }
 
+    console.log('🔍 RENDERING WITH HIGHLIGHTING:');
+    console.log('- currentWordIndex:', currentWordIndex);
+    console.log('- currentTime:', currentTime);
+    console.log('- alignment words count:', alignment.words_data?.length);
+
+    // Simple approach: render each word from alignment data directly
     return (
-      <div className="text-lg leading-relaxed">
-        {alignment.words_data.map((word, index) => (
-          <span
-            key={index}
-            className={`transition-all duration-200 ${
-              index === currentWordIndex 
-                ? 'bg-yellow-300 text-black' 
-                : index < currentWordIndex 
-                  ? 'text-gray-600' 
-                  : 'text-gray-900'
-            }`}
-          >
-            {word.text}
-          </span>
-        ))}
+      <div className="text-lg leading-relaxed space-y-4">
+        {alignment.words_data.map((word, index) => {
+          // Determine highlighting state
+          const isCurrentWord = index === currentWordIndex;
+          const isPastWord = index < currentWordIndex;
+          
+          // Clean word text for display
+          const displayText = word.text
+            .replace(/\\n/g, '\n')
+            .replace(/\\'/g, "'")
+            .replace(/\\"/g, '"');
+          
+          // Handle line breaks
+          if (displayText.includes('\n')) {
+            return (
+              <span key={index}>
+                {displayText.split('\n').map((part, partIndex) => (
+                  <span key={`${index}-${partIndex}`}>
+                    {partIndex > 0 && <br />}
+                    <span
+                      className={`transition-all duration-200 ${
+                        isCurrentWord 
+                          ? 'bg-yellow-300 text-black font-medium' 
+                          : isPastWord 
+                            ? 'text-gray-500' 
+                            : 'text-gray-900'
+                      }`}
+                    >
+                      {part}
+                    </span>
+                  </span>
+                ))}
+                {' '}
+              </span>
+            );
+          }
+          
+          return (
+            <span
+              key={index}
+              className={`transition-all duration-200 ${
+                isCurrentWord 
+                  ? 'bg-yellow-300 text-black font-medium' 
+                  : isPastWord 
+                    ? 'text-gray-500' 
+                    : 'text-gray-900'
+              }`}
+            >
+              {displayText}{' '}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderFormattedText = (text: string) => {
+    return (
+      <div className="text-lg leading-relaxed whitespace-pre-line text-gray-800">
+        {text}
       </div>
     );
   };
@@ -321,17 +429,33 @@ export default function ChapterPlayerPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => router.push(`/audiobooks/${bookId}`)}
-            className="p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{chapter.chapter_title}</h1>
-            <p className="text-lg text-gray-600">{audiobook.title} by {audiobook.author}</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push(`/audiobooks/${bookId}`)}
+              className="p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{chapter.chapter_title}</h1>
+              <p className="text-lg text-gray-600">{audiobook.title} by {audiobook.author}</p>
+            </div>
           </div>
+          
+          {userRole === 'admin' && (
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                editMode 
+                  ? 'bg-indigo-600 text-white' 
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }`}
+            >
+              <Settings className="h-4 w-4" />
+              {editMode ? 'Exit Admin' : 'Admin Tools'}
+            </button>
+          )}
         </div>
 
         {/* Chapter Navigation */}
@@ -444,6 +568,44 @@ export default function ChapterPlayerPage() {
           </div>
         </div>
 
+        {/* Admin Tools */}
+        {editMode && userRole === 'admin' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <AudioGenerationPanel
+              bookId={bookId}
+              chapterId={chapterId}
+              script={chapterScript}
+              onSuccess={() => {
+                fetchChapterData();
+                alert('Audio generated successfully!');
+              }}
+            />
+            <AlignmentPanel
+              bookId={bookId}
+              chapterId={chapterId}
+              script={chapterScript}
+              hasAudio={!!chapter?.audio_url}
+              onSuccess={() => {
+                fetchChapterData();
+                alert('Alignment generated successfully!');
+              }}
+            />
+          </div>
+        )}
+
+        {/* Script Editor for Admin */}
+        {editMode && userRole === 'admin' && (
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold mb-4">Chapter Script</h3>
+            <textarea
+              value={chapterScript}
+              onChange={(e) => setChapterScript(e.target.value)}
+              className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Enter or edit the chapter script here..."
+            />
+          </div>
+        )}
+
         {/* Text Display */}
         {showText && (
           <div className="bg-white rounded-xl shadow-lg p-8">
@@ -457,7 +619,15 @@ export default function ChapterPlayerPage() {
             </div>
             
             <div className="prose max-w-none">
-              {renderTextWithHighlighting()}
+              {alignment && chapterScript ? (
+                renderTextWithHighlighting()
+              ) : chapterScript ? (
+                <div className="text-lg leading-relaxed whitespace-pre-line text-gray-800">
+                  {chapterScript}
+                </div>
+              ) : (
+                <p className="text-gray-500 italic">No text available</p>
+              )}
             </div>
           </div>
         )}

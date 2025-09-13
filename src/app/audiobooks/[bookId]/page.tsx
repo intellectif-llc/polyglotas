@@ -3,8 +3,13 @@
 import { useState, useEffect } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Play, Lock, Clock, BookOpen } from 'lucide-react';
+import { ArrowLeft, Play, Lock, Clock, BookOpen, Edit, Plus } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
+import dynamic from 'next/dynamic';
+
+const CreateChapterForm = dynamic(() => import('@/components/admin/audiobooks/CreateChapterForm'), {
+  ssr: false
+});
 
 interface AudiobookData {
   book_id: number;
@@ -42,6 +47,8 @@ export default function AudiobookOverviewPage() {
   const [audiobook, setAudiobook] = useState<AudiobookData | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [showCreateChapterForm, setShowCreateChapterForm] = useState(false);
 
   useEffect(() => {
     fetchAudiobookData();
@@ -177,17 +184,44 @@ export default function AudiobookOverviewPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => router.push('/audiobooks')}
-            className="p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{audiobook.title}</h1>
-            <p className="text-lg text-gray-600">by {audiobook.author}</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push('/audiobooks')}
+              className="p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{audiobook.title}</h1>
+              <p className="text-lg text-gray-600">by {audiobook.author}</p>
+            </div>
           </div>
+          
+          {userRole === 'admin' && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setEditMode(!editMode)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                  editMode 
+                    ? 'bg-indigo-600 text-white' 
+                    : 'bg-white text-gray-700 border border-gray-300'
+                }`}
+              >
+                <Edit className="h-4 w-4" />
+                {editMode ? 'Exit Edit' : 'Edit Mode'}
+              </button>
+              {editMode && (
+                <button
+                  onClick={() => setShowCreateChapterForm(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Chapter
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -315,6 +349,17 @@ export default function AudiobookOverviewPage() {
           </div>
         </div>
       </div>
+      
+      {showCreateChapterForm && (
+        <CreateChapterForm
+          bookId={bookId}
+          onClose={() => setShowCreateChapterForm(false)}
+          onSuccess={() => {
+            fetchAudiobookData();
+            setShowCreateChapterForm(false);
+          }}
+        />
+      )}
     </div>
   );
 }
