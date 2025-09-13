@@ -68,8 +68,10 @@ export default function ChapterPlayerPage() {
   const [duration, setDuration] = useState(0);
   const [showText, setShowText] = useState(true);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
+  const [nextWordIndex, setNextWordIndex] = useState(-1);
   const [editMode, setEditMode] = useState(false);
   const [chapterScript, setChapterScript] = useState('');
+  const [highlightOffset, setHighlightOffset] = useState(0.15); // 150ms predictive highlighting
   
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -78,7 +80,14 @@ export default function ChapterPlayerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId, chapterId]);
 
-  // Highlighting is now handled directly in handleTimeUpdate
+
+
+  // Update highlighting when time changes
+  useEffect(() => {
+    if (alignment && alignment.words_data) {
+      updateHighlighting();
+    }
+  }, [currentTime, alignment]);
 
   const fetchChapterData = async () => {
     try {
@@ -167,13 +176,22 @@ export default function ChapterPlayerPage() {
           words_data: alignmentData.words_data
         });
         
-        // Clean the text by removing quotes and normalizing newlines
-        const cleanText = alignmentData.full_text
-          .replace(/^"|"$/g, '') // Remove leading/trailing quotes
-          .replace(/\\n/g, '\n') // Convert \n to actual newlines
-          .replace(/\\"/g, '"'); // Convert \" to actual quotes
+        // Set the script from full_text for admin editing
+        let cleanText = alignmentData.full_text;
+        
+        // Remove surrounding quotes if present
+        if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
+          cleanText = cleanText.slice(1, -1);
+        }
+        
+        // Convert escaped characters
+        cleanText = cleanText
+          .replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"')
+          .replace(/\\'/g, "'");
         
         setChapterScript(cleanText);
+        console.log('✅ Alignment loaded with', alignmentData.words_data?.length, 'words');
       } else {
         console.log('❌ NO ALIGNMENT DATA FOUND');
       }
@@ -201,21 +219,34 @@ export default function ChapterPlayerPage() {
   };
 
   const updateHighlighting = () => {
-    if (!alignment || !alignment.words_data) {
-      console.log('❌ No alignment data available');
-      return;
-    }
+    if (!alignment || !alignment.words_data || !audioRef.current) return;
 
-    // Find the current word based on audio time
-    const wordIndex = alignment.words_data.findIndex(word => 
-      currentTime >= word.start && currentTime <= word.end
+    const audioTime = audioRef.current.currentTime;
+    
+    // Find current word based on force alignment timestamps
+    const currentIndex = alignment.words_data.findIndex(word => 
+      audioTime >= word.start && audioTime <= word.end
     );
     
-    console.log(`🎯 Current time: ${currentTime.toFixed(2)}s, Found word index: ${wordIndex}`);
+    if (currentIndex !== -1 && currentIndex !== currentWordIndex) {
+      setCurrentWordIndex(currentIndex);
+    }
     
-    if (wordIndex !== -1 && wordIndex !== currentWordIndex) {
-      console.log(`📍 Highlighting word ${wordIndex}: "${alignment.words_data[wordIndex].text}"`);
-      setCurrentWordIndex(wordIndex);
+    // Find next word for anticipation (highlight upcoming word within 0.3 seconds)
+    let nextIndex = -1;
+    if (currentIndex >= 0) {
+      // Look for next word that starts within anticipation window
+      for (let i = currentIndex + 1; i < alignment.words_data.length; i++) {
+        const nextWord = alignment.words_data[i];
+        if (nextWord.start - audioTime <= 0.3 && nextWord.start > audioTime) {
+          nextIndex = i;
+          break;
+        }
+      }
+    }
+      
+    if (nextIndex !== nextWordIndex) {
+      setNextWordIndex(nextIndex);
     }
   };
 
@@ -223,11 +254,6 @@ export default function ChapterPlayerPage() {
     if (audioRef.current) {
       const time = audioRef.current.currentTime;
       setCurrentTime(time);
-      
-      // Update highlighting immediately when time changes
-      if (alignment && alignment.words_data) {
-        updateHighlighting();
-      }
       
       if (Math.floor(time) % 5 === 0) {
         saveProgress(time);
@@ -285,7 +311,10 @@ export default function ChapterPlayerPage() {
 
   const skipTime = (seconds: number) => {
     if (audioRef.current) {
-      audioRef.current.currentTime = Math.max(0, Math.min(duration, currentTime + seconds));
+      const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
+      audioRef.current.currentTime = newTime;
+      // Immediately update highlighting after seeking
+      updateHighlighting();
     }
   };
 
@@ -320,74 +349,76 @@ export default function ChapterPlayerPage() {
   };
 
   const renderTextWithHighlighting = () => {
-    if (!alignment || !showText || !chapterScript) {
-      console.log('❌ Missing data for highlighting:', { 
-        hasAlignment: !!alignment, 
-        showText, 
-        hasScript: !!chapterScript 
-      });
-      return null;
-    }
+    if (!alignment || !showText) return null;
 
-    console.log('🔍 RENDERING WITH HIGHLIGHTING:');
-    console.log('- currentWordIndex:', currentWordIndex);
-    console.log('- currentTime:', currentTime);
-    console.log('- alignment words count:', alignment.words_data?.length);
-
-    // Simple approach: render each word from alignment data directly
-    return (
-      <div className="text-lg leading-relaxed space-y-4">
-        {alignment.words_data.map((word, index) => {
-          // Determine highlighting state
-          const isCurrentWord = index === currentWordIndex;
-          const isPastWord = index < currentWordIndex;
-          
-          // Clean word text for display
-          const displayText = word.text
-            .replace(/\\n/g, '\n')
-            .replace(/\\'/g, "'")
-            .replace(/\\"/g, '"');
-          
-          // Handle line breaks
-          if (displayText.includes('\n')) {
-            return (
-              <span key={index}>
-                {displayText.split('\n').map((part, partIndex) => (
-                  <span key={`${index}-${partIndex}`}>
-                    {partIndex > 0 && <br />}
-                    <span
-                      className={`transition-all duration-200 ${
-                        isCurrentWord 
-                          ? 'bg-yellow-300 text-black font-medium' 
-                          : isPastWord 
-                            ? 'text-gray-500' 
-                            : 'text-gray-900'
-                      }`}
-                    >
-                      {part}
-                    </span>
-                  </span>
-                ))}
-                {' '}
+    const elements = [];
+    
+    alignment.words_data.forEach((word, index) => {
+      const isCurrentWord = index === currentWordIndex;
+      const isNextWord = index === nextWordIndex;
+      const isPastWord = index < currentWordIndex;
+      
+      // Clean word text for display and handle paragraph breaks
+      let displayText = word.text
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"');
+      
+      // Handle paragraph breaks (\n\n becomes double <br>)
+      if (displayText.includes('\n\n')) {
+        const parts = displayText.split('\n\n');
+        parts.forEach((part, partIndex) => {
+          if (partIndex > 0) {
+            elements.push(<br key={`br1-${index}-${partIndex}`} />);
+            elements.push(<br key={`br2-${index}-${partIndex}`} />);
+          }
+          if (part.trim()) {
+            elements.push(
+              <span
+                key={`${index}-${partIndex}`}
+                className={`transition-all duration-200 ${
+                  isCurrentWord 
+                    ? 'bg-yellow-300 text-black font-medium' 
+                    : isNextWord
+                      ? 'bg-yellow-100 text-gray-800'
+                      : isPastWord 
+                        ? 'text-gray-500' 
+                        : 'text-gray-900'
+                }`}
+              >
+                {part.trim()}
               </span>
             );
           }
-          
-          return (
-            <span
-              key={index}
-              className={`transition-all duration-200 ${
-                isCurrentWord 
-                  ? 'bg-yellow-300 text-black font-medium' 
+        });
+      } else {
+        // Regular word without paragraph breaks
+        elements.push(
+          <span
+            key={index}
+            className={`transition-all duration-200 ${
+              isCurrentWord 
+                ? 'bg-yellow-300 text-black font-medium' 
+                : isNextWord
+                  ? 'bg-yellow-100 text-gray-800'
                   : isPastWord 
                     ? 'text-gray-500' 
                     : 'text-gray-900'
-              }`}
-            >
-              {displayText}{' '}
-            </span>
-          );
-        })}
+            }`}
+          >
+            {displayText}
+          </span>
+        );
+      }
+      
+      // Add space after word (except for punctuation and paragraph breaks)
+      if (!displayText.includes('\n\n') && !displayText.match(/[.!?]$/)) {
+        elements.push(' ');
+      }
+    });
+
+    return (
+      <div className="text-lg leading-relaxed">
+        {elements}
       </div>
     );
   };
@@ -526,6 +557,8 @@ export default function ChapterPlayerPage() {
                   const percentage = clickX / rect.width;
                   const newTime = percentage * duration;
                   audioRef.current.currentTime = Math.max(0, Math.min(duration, newTime));
+                  // Immediately update highlighting after seeking
+                  updateHighlighting();
                 }
               }}
             >
@@ -619,7 +652,7 @@ export default function ChapterPlayerPage() {
             </div>
             
             <div className="prose max-w-none">
-              {alignment && chapterScript ? (
+              {alignment ? (
                 renderTextWithHighlighting()
               ) : chapterScript ? (
                 <div className="text-lg leading-relaxed whitespace-pre-line text-gray-800">

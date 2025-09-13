@@ -14,11 +14,8 @@ interface ForceAlignmentResponse {
 }
 
 function preprocessTextForAlignment(text: string): string {
-  return text
-    .replace(/\n\n+/g, ' ') // Replace multiple newlines with single space
-    .replace(/\n/g, ' ') // Replace single newlines with space
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim();
+  // Only trim whitespace from the start and end of the script
+  return text.trim();
 }
 
 export async function generateForceAlignment(
@@ -33,7 +30,7 @@ export async function generateForceAlignment(
   
   const formData = new FormData();
   formData.append('file', audioFile);
-  formData.append('text', JSON.stringify(processedText));
+  formData.append('text', processedText);
 
   const response = await fetch('https://api.elevenlabs.io/v1/forced-alignment', {
     method: 'POST',
