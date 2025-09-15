@@ -17,6 +17,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
+import WordTooltip from "@/components/speech/WordTooltip";
 import dynamic from "next/dynamic";
 
 const AudioGenerationPanel = dynamic(
@@ -92,8 +93,18 @@ export default function ChapterPlayerPage() {
   const [nextWordIndex, setNextWordIndex] = useState(-1);
   const [editMode, setEditMode] = useState(false);
   const [chapterScript, setChapterScript] = useState("");
+  const [tooltipConfig, setTooltipConfig] = useState<{
+    visible: boolean;
+    selectedText: string;
+    triggerElement: HTMLElement | null;
+  }>({
+    visible: false,
+    selectedText: "",
+    triggerElement: null,
+  });
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  const textDisplayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchChapterData();
@@ -141,6 +152,57 @@ export default function ChapterPlayerPage() {
       updateHighlighting();
     }
   }, [currentTime, alignment, updateHighlighting]);
+
+  const closeTooltip = useCallback(() => {
+    setTooltipConfig({
+      visible: false,
+      selectedText: "",
+      triggerElement: null,
+    });
+  }, []);
+
+  // Handle text selection for tooltip
+  useEffect(() => {
+    const handleMouseUp = () => {
+      const selection = window.getSelection();
+      const selectedText = selection?.toString().trim();
+
+      if (
+        selectedText &&
+        selection &&
+        selection.anchorNode &&
+        textDisplayRef.current?.contains(selection.anchorNode)
+      ) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        const trigger = document.createElement("div");
+        trigger.style.position = "absolute";
+        trigger.style.left = `${rect.left + window.scrollX}px`;
+        trigger.style.top = `${rect.top + window.scrollY}px`;
+        trigger.style.width = `${rect.width}px`;
+        trigger.style.height = `${rect.height}px`;
+        trigger.style.pointerEvents = "none";
+        trigger.style.zIndex = "1";
+
+        setTooltipConfig({
+          visible: true,
+          selectedText: selectedText,
+          triggerElement: trigger,
+        });
+      }
+    };
+
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  // Close tooltip when alignment changes
+  useEffect(() => {
+    closeTooltip();
+  }, [alignment, closeTooltip]);
 
   const fetchChapterData = async () => {
     try {
@@ -718,7 +780,7 @@ export default function ChapterPlayerPage() {
               </h3>
             </div>
 
-            <div className="prose max-w-none">
+            <div className="prose max-w-none" ref={textDisplayRef} style={{ userSelect: "text" }}>
               {alignment ? (
                 renderTextWithHighlighting()
               ) : chapterScript ? (
@@ -729,6 +791,14 @@ export default function ChapterPlayerPage() {
                 <p className="text-gray-500 italic">No text available</p>
               )}
             </div>
+            
+            {tooltipConfig.visible && (
+              <WordTooltip
+                selectedText={tooltipConfig.selectedText}
+                onClose={closeTooltip}
+                triggerElement={tooltipConfig.triggerElement}
+              />
+            )}
           </div>
         )}
       </div>
