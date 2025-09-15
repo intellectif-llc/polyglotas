@@ -176,21 +176,24 @@ export default function ChapterPlayerPage() {
           words_data: alignmentData.words_data
         });
         
-        // Set the script from full_text for admin editing
-        let cleanText = alignmentData.full_text;
-        
-        // Remove surrounding quotes if present
-        if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
-          cleanText = cleanText.slice(1, -1);
+        // Set the script from full_text for admin editing only
+        if (alignmentData.full_text) {
+          let cleanText = alignmentData.full_text;
+          
+          // Remove surrounding quotes if present
+          if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
+            cleanText = cleanText.slice(1, -1);
+          }
+          
+          // Convert escaped characters
+          cleanText = cleanText
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\'/g, "'");
+          
+          setChapterScript(cleanText);
         }
         
-        // Convert escaped characters
-        cleanText = cleanText
-          .replace(/\\n/g, '\n')
-          .replace(/\\"/g, '"')
-          .replace(/\\'/g, "'");
-        
-        setChapterScript(cleanText);
         console.log('✅ Alignment loaded with', alignmentData.words_data?.length, 'words');
       } else {
         console.log('❌ NO ALIGNMENT DATA FOUND');
@@ -351,74 +354,65 @@ export default function ChapterPlayerPage() {
   const renderTextWithHighlighting = () => {
     if (!alignment || !showText) return null;
 
-    const elements = [];
+    const paragraphs = [];
+    let currentParagraph = [];
     
     alignment.words_data.forEach((word, index) => {
       const isCurrentWord = index === currentWordIndex;
       const isNextWord = index === nextWordIndex;
       const isPastWord = index < currentWordIndex;
       
-      // Clean word text for display and handle paragraph breaks
+      // Check if this is a paragraph break marker
+      if (word.text === '\r' || word.text === '\n') {
+        // End current paragraph if it has content
+        if (currentParagraph.length > 0) {
+          paragraphs.push([...currentParagraph]);
+          currentParagraph = [];
+        }
+        return;
+      }
+      
+      // Clean word text for display
       let displayText = word.text
         .replace(/\\'/g, "'")
         .replace(/\\"/g, '"');
       
-      // Handle paragraph breaks (\n\n becomes double <br>)
-      if (displayText.includes('\n\n')) {
-        const parts = displayText.split('\n\n');
-        parts.forEach((part, partIndex) => {
-          if (partIndex > 0) {
-            elements.push(<br key={`br1-${index}-${partIndex}`} />);
-            elements.push(<br key={`br2-${index}-${partIndex}`} />);
-          }
-          if (part.trim()) {
-            elements.push(
-              <span
-                key={`${index}-${partIndex}`}
-                className={`transition-all duration-200 ${
-                  isCurrentWord 
-                    ? 'bg-yellow-300 text-black font-medium' 
-                    : isNextWord
-                      ? 'bg-yellow-100 text-gray-800'
-                      : isPastWord 
-                        ? 'text-gray-500' 
-                        : 'text-gray-900'
-                }`}
-              >
-                {part.trim()}
-              </span>
-            );
-          }
-        });
-      } else {
-        // Regular word without paragraph breaks
-        elements.push(
-          <span
-            key={index}
-            className={`transition-all duration-200 ${
-              isCurrentWord 
-                ? 'bg-yellow-300 text-black font-medium' 
-                : isNextWord
-                  ? 'bg-yellow-100 text-gray-800'
-                  : isPastWord 
-                    ? 'text-gray-500' 
-                    : 'text-gray-900'
-            }`}
-          >
-            {displayText}
-          </span>
-        );
-      }
+      // Add word span to current paragraph
+      currentParagraph.push(
+        <span
+          key={index}
+          className={`transition-all duration-200 ${
+            isCurrentWord 
+              ? 'bg-yellow-300 text-black font-medium' 
+              : isNextWord
+                ? 'bg-yellow-100 text-gray-800'
+                : isPastWord 
+                  ? 'text-gray-500' 
+                  : 'text-gray-900'
+          }`}
+        >
+          {displayText}
+        </span>
+      );
       
-      // Add space after word (except for punctuation and paragraph breaks)
-      if (!displayText.includes('\n\n') && !displayText.match(/[.!?]$/)) {
-        elements.push(' ');
+      // Add space after word (except for punctuation)
+      if (!displayText.match(/[.!?]$/)) {
+        currentParagraph.push(' ');
       }
     });
+    
+    // Add final paragraph if it has content
+    if (currentParagraph.length > 0) {
+      paragraphs.push(currentParagraph);
+    }
 
     return (
-      <div className="text-lg leading-relaxed">
-        {elements}
+      <div className="text-lg leading-relaxed space-y-4">
+        {paragraphs.map((paragraph, pIndex) => (
+          <p key={pIndex} className="mb-4">
+            {paragraph}
+          </p>
+        ))}
       </div>
     );
   };
