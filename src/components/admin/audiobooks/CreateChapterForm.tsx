@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface CreateChapterFormProps {
   bookId: string;
@@ -11,21 +12,43 @@ interface CreateChapterFormProps {
 
 interface ChapterFormData {
   chapter_title: string;
-  script: string;
   duration_seconds: number;
   is_free_sample: boolean;
   chapter_order: number;
 }
 
 export default function CreateChapterForm({ bookId, onClose, onSuccess }: CreateChapterFormProps) {
+  const router = useRouter();
   const [formData, setFormData] = useState<ChapterFormData>({
     chapter_title: '',
-    script: '',
     duration_seconds: 0,
     is_free_sample: false,
     chapter_order: 1,
   });
   const [loading, setLoading] = useState(false);
+  const [loadingSuggestedOrder, setLoadingSuggestedOrder] = useState(true);
+
+  // Fetch suggested chapter order on mount
+  useEffect(() => {
+    const fetchSuggestedOrder = async () => {
+      try {
+        const response = await fetch(`/api/admin/audiobooks/${bookId}/chapters`);
+        if (response.ok) {
+          const chapters = await response.json();
+          const maxOrder = chapters.reduce((max: number, chapter: any) => 
+            Math.max(max, chapter.chapter_order || 0), 0
+          );
+          setFormData(prev => ({ ...prev, chapter_order: maxOrder + 1 }));
+        }
+      } catch (error) {
+        console.error('Error fetching chapters:', error);
+      } finally {
+        setLoadingSuggestedOrder(false);
+      }
+    };
+
+    fetchSuggestedOrder();
+  }, [bookId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,8 +65,12 @@ export default function CreateChapterForm({ bookId, onClose, onSuccess }: Create
         throw new Error('Failed to create chapter');
       }
 
+      const newChapter = await response.json();
       onSuccess();
       onClose();
+      
+      // Auto-redirect to the new chapter page
+      router.push(`/audiobooks/${bookId}/${newChapter.chapter_id}`);
     } catch (error) {
       console.error('Error creating chapter:', error);
       alert('Failed to create chapter');
@@ -77,21 +104,14 @@ export default function CreateChapterForm({ bookId, onClose, onSuccess }: Create
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Script</label>
-            <textarea
-              required
-              value={formData.script}
-              onChange={(e) => setFormData({ ...formData, script: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              rows={10}
-              placeholder="Enter the chapter script here..."
-            />
-          </div>
+
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Chapter Order</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Chapter Order
+                {loadingSuggestedOrder && <span className="text-xs text-gray-500 ml-1">(loading...)</span>}
+              </label>
               <input
                 type="number"
                 min="1"
@@ -99,6 +119,7 @@ export default function CreateChapterForm({ bookId, onClose, onSuccess }: Create
                 value={formData.chapter_order}
                 onChange={(e) => setFormData({ ...formData, chapter_order: parseInt(e.target.value) || 1 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                disabled={loadingSuggestedOrder}
               />
             </div>
 
