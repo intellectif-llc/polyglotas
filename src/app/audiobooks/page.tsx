@@ -216,19 +216,19 @@ export default function AudiobooksPage() {
         </div>
 
         {/* Audiobooks Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
           {audiobooks.map((book) => (
             <div
               key={book.book_id}
-              className={`bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300 ${
+              className={`group rounded-xl shadow-lg overflow-hidden transition-all duration-300 ${
                 book.is_purchased || userRole === 'admin'
                   ? 'hover:shadow-xl cursor-pointer transform hover:-translate-y-1' 
                   : 'opacity-90'
               }`}
               onClick={() => handleBookClick(book)}
             >
-              {/* Cover Image */}
-              <div className="h-48 bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center relative">
+              {/* Cover Image - Pure 3:4 Aspect Ratio */}
+              <div className="aspect-[3/4] bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center relative">
                 {book.cover_image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img 
@@ -239,72 +239,78 @@ export default function AudiobooksPage() {
                 ) : (
                   <Book className="h-16 w-16 text-white" />
                 )}
-                {book.is_purchased && (
-                  <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                    Owned
-                  </div>
-                )}
-              </div>
-
-              {/* Book Info */}
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{book.title}</h3>
-                <p className="text-gray-600 mb-2">by {book.author}</p>
-                <p className="text-sm text-gray-500 mb-4 line-clamp-3">{book.description}</p>
                 
-                {/* Metadata */}
-                <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                {/* Top Left Badges */}
+                <div className="absolute top-2 left-2 flex flex-col gap-1">
+                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded font-medium">
                     {book.level_code}
                   </span>
-                  <span>{formatDuration(book.duration_seconds)}</span>
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                    {book.total_chapters} chapters
+                  <span className="bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                    {formatDuration(book.duration_seconds)}
                   </span>
-                  {book.free_chapters > 0 && (
-                    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                      {book.free_chapters} free
+                </div>
+                
+                <div className="absolute top-2 right-2 flex gap-1">
+                  {book.is_purchased && (
+                    <span className="bg-green-500 text-white text-xs px-2 py-1 rounded font-medium">
+                      Owned
                     </span>
                   )}
+                  {(book.is_purchased || userRole === 'admin') && (
+                    <div className="bg-green-600 text-white p-1 rounded-full">
+                      <Play className="h-3 w-3" />
+                    </div>
+                  )}
                 </div>
-
-                {/* Purchase Options */}
-                {book.is_purchased || userRole === 'admin' ? (
-                  <button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-                    <Play className="h-4 w-4" />
-                    Listen Now
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    {/* Points Purchase */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePurchase(book, 'points');
-                      }}
-                      disabled={!canAffordWithPoints(book)}
-                      className={`w-full font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 ${
-                        canAffordWithPoints(book)
-                          ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      }`}
-                    >
-                      <Coins className="h-4 w-4" />
-                      {book.points_cost} points
-                      {!canAffordWithPoints(book) && <Lock className="h-4 w-4" />}
-                    </button>
-
-                    {/* Money Purchase */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePurchase(book, 'money');
-                      }}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                    >
-                      <DollarSign className="h-4 w-4" />
-                      {formatPrice(book.price_cents)}
-                    </button>
+                
+                {/* Bottom Info Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                  <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1">
+                    {book.title}
+                  </h3>
+                  <p className="text-gray-200 text-xs mb-2">
+                    by {book.author}
+                  </p>
+                  
+                  {/* Purchase Options for Non-Owned Books */}
+                  {!(book.is_purchased || userRole === 'admin') && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePurchase(book, 'points');
+                        }}
+                        disabled={!canAffordWithPoints(book)}
+                        className={`flex-1 text-xs font-semibold py-1 px-2 rounded transition-colors flex items-center justify-center gap-1 ${
+                          canAffordWithPoints(book)
+                            ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        <Coins className="h-3 w-3" />
+                        {book.points_cost}
+                        {!canAffordWithPoints(book) && <Lock className="h-3 w-3" />}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePurchase(book, 'money');
+                        }}
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-1 px-2 rounded transition-colors flex items-center justify-center gap-1"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                        {formatPrice(book.price_cents)}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Free Chapters Badge */}
+                {book.free_chapters > 0 && (
+                  <div className="absolute top-16 left-2">
+                    <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded font-medium">
+                      {book.free_chapters} Free
+                    </span>
                   </div>
                 )}
               </div>

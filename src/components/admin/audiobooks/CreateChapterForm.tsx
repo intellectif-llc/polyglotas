@@ -17,6 +17,12 @@ interface ChapterFormData {
   chapter_order: number;
 }
 
+interface Chapter {
+  chapter_id: number;
+  chapter_title: string;
+  chapter_order: number;
+}
+
 export default function CreateChapterForm({ bookId, onClose, onSuccess }: CreateChapterFormProps) {
   const router = useRouter();
   const [formData, setFormData] = useState<ChapterFormData>({
@@ -35,7 +41,7 @@ export default function CreateChapterForm({ bookId, onClose, onSuccess }: Create
         const response = await fetch(`/api/admin/audiobooks/${bookId}/chapters`);
         if (response.ok) {
           const chapters = await response.json();
-          const maxOrder = chapters.reduce((max: number, chapter: any) => 
+          const maxOrder = chapters.reduce((max: number, chapter: Chapter) => 
             Math.max(max, chapter.chapter_order || 0), 0
           );
           setFormData(prev => ({ ...prev, chapter_order: maxOrder + 1 }));
