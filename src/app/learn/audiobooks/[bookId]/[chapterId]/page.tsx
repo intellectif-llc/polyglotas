@@ -231,7 +231,7 @@ export default function ChapterPlayerPage() {
         .single();
 
       if (!chapterData) {
-        router.push(`/audiobooks/${bookId}`);
+        router.push(`/learn/audiobooks/${bookId}`);
         return;
       }
 
@@ -245,7 +245,7 @@ export default function ChapterPlayerPage() {
           .single();
 
         if (!purchase) {
-          router.push(`/audiobooks/${bookId}`);
+          router.push(`/learn/audiobooks/${bookId}`);
           return;
         }
       }
@@ -419,7 +419,7 @@ export default function ChapterPlayerPage() {
   };
 
   const navigateToChapter = (targetChapterId: number) => {
-    router.push(`/audiobooks/${bookId}/${targetChapterId}`);
+    router.push(`/learn/audiobooks/${bookId}/${targetChapterId}`);
   };
 
   const getCurrentChapterIndex = () => {
@@ -550,7 +550,7 @@ export default function ChapterPlayerPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push(`/audiobooks/${bookId}`)}
+              onClick={() => router.push(`/learn/audiobooks/${bookId}`)}
               className="p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
             >
               <ArrowLeft className="h-5 w-5" />

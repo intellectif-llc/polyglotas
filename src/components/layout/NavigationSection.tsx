@@ -100,10 +100,10 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
           isActive: pathname === "/learn/progress",
         },
         {
-          href: "/audiobooks",
+          href: "/learn/audiobooks",
           label: "Audiobooks",
           icon: Headphones,
-          isActive: pathname.startsWith("/audiobooks"),
+          isActive: pathname.startsWith("/learn/audiobooks"),
         },
       ],
     },

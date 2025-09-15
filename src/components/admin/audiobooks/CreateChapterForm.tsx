@@ -76,7 +76,7 @@ export default function CreateChapterForm({ bookId, onClose, onSuccess }: Create
       onClose();
       
       // Auto-redirect to the new chapter page
-      router.push(`/audiobooks/${bookId}/${newChapter.chapter_id}`);
+      router.push(`/learn/audiobooks/${bookId}/${newChapter.chapter_id}`);
     } catch (error) {
       console.error('Error creating chapter:', error);
       alert('Failed to create chapter');

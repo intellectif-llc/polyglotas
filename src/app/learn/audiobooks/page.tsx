@@ -68,6 +68,7 @@ export default function AudiobooksPage() {
           user_audiobook_purchases!left(purchase_id)
         `)
         .eq('is_active', true)
+        .eq('user_audiobook_purchases.profile_id', user.id)
         .order('created_at', { ascending: false });
 
       // Get chapter counts for each book
@@ -122,7 +123,7 @@ export default function AudiobooksPage() {
 
   const handleBookClick = (book: Audiobook) => {
     if (book.is_purchased || userRole === 'admin') {
-      router.push(`/audiobooks/${book.book_id}`);
+      router.push(`/learn/audiobooks/${book.book_id}`);
     }
   };
 

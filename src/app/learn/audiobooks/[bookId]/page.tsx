@@ -71,10 +71,11 @@ export default function AudiobookOverviewPage() {
           user_audiobook_purchases!left(purchase_id)
         `)
         .eq('book_id', parseInt(bookId))
+        .eq('user_audiobook_purchases.profile_id', user.id)
         .single();
 
       if (!book) {
-        router.push('/audiobooks');
+        router.push('/learn/audiobooks');
         return;
       }
 
@@ -141,7 +142,7 @@ export default function AudiobookOverviewPage() {
 
   const handleChapterClick = (chapter: Chapter) => {
     if (canAccessChapter(chapter)) {
-      router.push(`/audiobooks/${bookId}/${chapter.chapter_id}`);
+      router.push(`/learn/audiobooks/${bookId}/${chapter.chapter_id}`);
     }
   };
 
@@ -187,7 +188,7 @@ export default function AudiobookOverviewPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push('/audiobooks')}
+              onClick={() => router.push('/learn/audiobooks')}
               className="p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
             >
               <ArrowLeft className="h-5 w-5" />
