@@ -1,139 +1,61 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { Book, Coins, DollarSign, Play, Lock, Edit, Plus } from 'lucide-react';
+import { Book, Coins, Edit, Plus } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAudiobookData } from '@/hooks/audiobooks/useAudiobookData';
+import AudiobookCard from '@/components/audiobooks/AudiobookCard';
+import { AudiobookWithPurchase, PurchaseType } from '@/types/audiobooks';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import dynamic from 'next/dynamic';
 
 const CreateAudiobookForm = dynamic(() => import('@/components/admin/audiobooks/CreateAudiobookForm'), {
   ssr: false
 });
 
-interface Audiobook {
-  book_id: number;
-  title: string;
-  author: string;
-  description: string;
-  cover_image_url?: string;
-  language_code: string;
-  level_code: string;
-  duration_seconds: number;
-  points_cost: number;
-  price_cents: number;
-  is_purchased: boolean;
-  user_points: number;
-  total_chapters: number;
-  free_chapters: number;
-}
-
 export default function AudiobooksPage() {
-  const [audiobooks, setAudiobooks] = useState<Audiobook[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [audiobooks, setAudiobooks] = useState<AudiobookWithPurchase[]>([]);
   const [userPoints, setUserPoints] = useState(0);
   const [editMode, setEditMode] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
   const { role: userRole } = useUserRole();
+  const { fetchAudiobooksWithPurchases, loading, error } = useAudiobookData();
 
   useEffect(() => {
-    fetchAudiobooks();
+    loadAudiobooks();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchAudiobooks = async () => {
+  const loadAudiobooks = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/auth/login');
-        return;
+      const data = await fetchAudiobooksWithPurchases();
+      setAudiobooks(data);
+      if (data.length > 0) {
+        setUserPoints(data[0].user_points);
       }
-
-      // Get user points
-      const { data: profile } = await supabase
-        .from('student_profiles')
-        .select('points')
-        .eq('profile_id', user.id)
-        .single();
-
-      setUserPoints(profile?.points || 0);
-
-      // Get audiobooks with purchase status
-      const { data: books } = await supabase
-        .from('audiobooks')
-        .select(`
-          *,
-          user_audiobook_purchases!left(purchase_id)
-        `)
-        .eq('is_active', true)
-        .eq('user_audiobook_purchases.profile_id', user.id)
-        .order('created_at', { ascending: false });
-
-      // Get chapter counts for each book
-      const audiobooksWithStatus = await Promise.all(
-        (books || []).map(async (book) => {
-          try {
-            const { data: chapters } = await supabase
-              .from('audiobook_chapters')
-              .select('chapter_id, is_free_sample')
-              .eq('book_id', book.book_id);
-
-            return {
-              ...book,
-              is_purchased: !!book.user_audiobook_purchases?.length,
-              user_points: profile?.points || 0,
-              total_chapters: chapters?.length || 0,
-              free_chapters: chapters?.filter(ch => ch.is_free_sample).length || 0
-            };
-          } catch {
-            return {
-              ...book,
-              is_purchased: !!book.user_audiobook_purchases?.length,
-              user_points: profile?.points || 0,
-              total_chapters: 0,
-              free_chapters: 0
-            };
-          }
-        })
-      );
-
-      setAudiobooks(audiobooksWithStatus);
-    } catch (error) {
-      console.error('Error fetching audiobooks:', error);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Failed to load audiobooks:', err);
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
-  };
 
-  const formatPrice = (cents: number) => {
-    return `$${(cents / 100).toFixed(2)}`;
-  };
 
-  const canAffordWithPoints = (book: Audiobook) => {
-    return userPoints >= book.points_cost;
-  };
-
-  const handleBookClick = (book: Audiobook) => {
+  const handleBookClick = (book: AudiobookWithPurchase) => {
     if (book.is_purchased || userRole === 'admin') {
       router.push(`/learn/audiobooks/${book.book_id}`);
     }
   };
 
-  const handlePurchase = async (book: Audiobook, purchaseType: 'points' | 'money') => {
+  const handlePurchase = async (book: AudiobookWithPurchase, purchaseType: PurchaseType) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       if (purchaseType === 'points') {
-        if (!canAffordWithPoints(book)) {
+        if (userPoints < book.points_cost) {
           alert('Not enough points!');
           return;
         }
@@ -148,20 +70,19 @@ export default function AudiobooksPage() {
           });
 
         if (!error) {
-          // Update user points
           await supabase
             .from('student_profiles')
             .update({ points: userPoints - book.points_cost })
             .eq('profile_id', user.id);
 
-          fetchAudiobooks(); // Refresh the list
+          loadAudiobooks();
         }
       } else {
-        // Handle money purchase (integrate with Stripe later)
         alert('Money purchases will be implemented with Stripe integration');
       }
     } catch (error) {
       console.error('Error purchasing book:', error);
+      alert('Purchase failed. Please try again.');
     }
   };
 
@@ -171,6 +92,16 @@ export default function AudiobooksPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading audiobooks...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">{error}</p>
         </div>
       </div>
     );
@@ -219,103 +150,14 @@ export default function AudiobooksPage() {
         {/* Audiobooks Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
           {audiobooks.map((book) => (
-            <div
+            <AudiobookCard
               key={book.book_id}
-              className={`group rounded-xl shadow-lg overflow-hidden transition-all duration-300 ${
-                book.is_purchased || userRole === 'admin'
-                  ? 'hover:shadow-xl cursor-pointer transform hover:-translate-y-1' 
-                  : 'opacity-90'
-              }`}
-              onClick={() => handleBookClick(book)}
-            >
-              {/* Cover Image - Pure 3:4 Aspect Ratio */}
-              <div className="aspect-[3/4] bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center relative">
-                {book.cover_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img 
-                    src={book.cover_image_url} 
-                    alt={book.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Book className="h-16 w-16 text-white" />
-                )}
-                
-                {/* Top Left Badges */}
-                <div className="absolute top-2 left-2 flex flex-col gap-1">
-                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded font-medium">
-                    {book.level_code}
-                  </span>
-                  <span className="bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                    {formatDuration(book.duration_seconds)}
-                  </span>
-                </div>
-                
-                <div className="absolute top-2 right-2 flex gap-1">
-                  {book.is_purchased && (
-                    <span className="bg-green-500 text-white text-xs px-2 py-1 rounded font-medium">
-                      Owned
-                    </span>
-                  )}
-                  {(book.is_purchased || userRole === 'admin') && (
-                    <div className="bg-green-600 text-white p-1 rounded-full">
-                      <Play className="h-3 w-3" />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Bottom Info Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                  <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1">
-                    {book.title}
-                  </h3>
-                  <p className="text-gray-200 text-xs mb-2">
-                    by {book.author}
-                  </p>
-                  
-                  {/* Purchase Options for Non-Owned Books */}
-                  {!(book.is_purchased || userRole === 'admin') && (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePurchase(book, 'points');
-                        }}
-                        disabled={!canAffordWithPoints(book)}
-                        className={`flex-1 text-xs font-semibold py-1 px-2 rounded transition-colors flex items-center justify-center gap-1 ${
-                          canAffordWithPoints(book)
-                            ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        }`}
-                      >
-                        <Coins className="h-3 w-3" />
-                        {book.points_cost}
-                        {!canAffordWithPoints(book) && <Lock className="h-3 w-3" />}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePurchase(book, 'money');
-                        }}
-                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-1 px-2 rounded transition-colors flex items-center justify-center gap-1"
-                      >
-                        <DollarSign className="h-3 w-3" />
-                        {formatPrice(book.price_cents)}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Free Chapters Badge */}
-                {book.free_chapters > 0 && (
-                  <div className="absolute top-16 left-2">
-                    <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded font-medium">
-                      {book.free_chapters} Free
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
+              audiobook={book}
+              userPoints={userPoints}
+              userRole={userRole}
+              onPurchase={handlePurchase}
+              onClick={handleBookClick}
+            />
           ))}
         </div>
 
@@ -332,7 +174,7 @@ export default function AudiobooksPage() {
         <CreateAudiobookForm
           onClose={() => setShowCreateForm(false)}
           onSuccess={() => {
-            fetchAudiobooks();
+            loadAudiobooks();
           }}
         />
       )}

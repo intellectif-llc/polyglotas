@@ -11,30 +11,10 @@ const CreateChapterForm = dynamic(() => import('@/components/admin/audiobooks/Cr
   ssr: false
 });
 
-interface AudiobookData {
-  book_id: number;
-  title: string;
-  author: string;
-  description: string;
-  cover_image_url?: string;
-  language_code: string;
-  level_code: string;
-  duration_seconds: number;
-  points_cost: number;
-  price_cents: number;
-  is_purchased: boolean;
-}
+import { AudiobookData, ChapterWithProgress } from '@/types/audiobooks';
 
-interface Chapter {
-  chapter_id: number;
-  chapter_order: number;
-  chapter_title: string;
-  duration_seconds: number;
-  is_free_sample: boolean;
-  user_progress?: {
-    current_position_seconds: number;
-    is_completed: boolean;
-  };
+interface AudiobookWithPurchase extends AudiobookData {
+  is_purchased: boolean;
 }
 
 export default function AudiobookOverviewPage() {
@@ -44,8 +24,8 @@ export default function AudiobookOverviewPage() {
   const supabase = createSupabaseBrowserClient();
   const { role: userRole } = useUserRole();
   
-  const [audiobook, setAudiobook] = useState<AudiobookData | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [audiobook, setAudiobook] = useState<AudiobookWithPurchase | null>(null);
+  const [chapters, setChapters] = useState<ChapterWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [showCreateChapterForm, setShowCreateChapterForm] = useState(false);
@@ -93,30 +73,34 @@ export default function AudiobookOverviewPage() {
         .eq('book_id', parseInt(bookId))
         .order('chapter_order');
 
-      // Get progress for each chapter
-      const chaptersWithProgress = await Promise.all(
-        (chaptersData || []).map(async (chapter) => {
-          try {
-            const { data: progress } = await supabase
-              .from('user_audiobook_progress')
-              .select('current_position_seconds, is_completed')
-              .eq('profile_id', user.id)
-              .eq('book_id', parseInt(bookId))
-              .eq('current_chapter_id', chapter.chapter_id)
-              .single();
+      // Get progress for all chapters in a single query
+      const chapterIds = (chaptersData || []).map(ch => ch.chapter_id);
+      const { data: progressData } = await supabase
+        .from('user_audiobook_progress')
+        .select('current_chapter_id, current_position_seconds, is_completed')
+        .eq('profile_id', user.id)
+        .eq('book_id', parseInt(bookId))
+        .in('current_chapter_id', chapterIds);
 
-            return {
-              ...chapter,
-              user_progress: progress || { current_position_seconds: 0, is_completed: false }
-            };
-          } catch {
-            return {
-              ...chapter,
-              user_progress: { current_position_seconds: 0, is_completed: false }
-            };
-          }
-        })
-      );
+      // Create progress lookup map
+      const progressMap = (progressData || []).reduce((acc, progress) => {
+        if (progress.current_chapter_id) {
+          acc[progress.current_chapter_id] = {
+            current_position_seconds: progress.current_position_seconds,
+            is_completed: progress.is_completed
+          };
+        }
+        return acc;
+      }, {} as Record<number, { current_position_seconds: number; is_completed: boolean }>);
+
+      // Map chapters with progress
+      const chaptersWithProgress = (chaptersData || []).map(chapter => ({
+        ...chapter,
+        user_progress: progressMap[chapter.chapter_id] || {
+          current_position_seconds: 0,
+          is_completed: false
+        }
+      }));
 
       setChapters(chaptersWithProgress);
 
@@ -127,7 +111,7 @@ export default function AudiobookOverviewPage() {
     }
   };
 
-  const canAccessChapter = (chapter: Chapter) => {
+  const canAccessChapter = (chapter: ChapterWithProgress) => {
     // Admin can access everything
     if (userRole === 'admin') return true;
     
@@ -140,7 +124,7 @@ export default function AudiobookOverviewPage() {
     return false;
   };
 
-  const handleChapterClick = (chapter: Chapter) => {
+  const handleChapterClick = (chapter: ChapterWithProgress) => {
     if (canAccessChapter(chapter)) {
       router.push(`/learn/audiobooks/${bookId}/${chapter.chapter_id}`);
     }
@@ -155,7 +139,7 @@ export default function AudiobookOverviewPage() {
     return `${minutes}m`;
   };
 
-  const getProgressPercentage = (chapter: Chapter) => {
+  const getProgressPercentage = (chapter: ChapterWithProgress) => {
     if (!chapter.user_progress || !chapter.duration_seconds) return 0;
     return Math.round((chapter.user_progress.current_position_seconds / chapter.duration_seconds) * 100);
   };

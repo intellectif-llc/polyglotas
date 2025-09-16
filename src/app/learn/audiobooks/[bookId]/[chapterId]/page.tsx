@@ -1,90 +1,47 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  BookOpen,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Settings,
-} from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
-import WordTooltip from "@/components/speech/WordTooltip";
+import { useAudiobookData } from "@/hooks/audiobooks/useAudiobookData";
+import { useProgressSaver } from "@/hooks/audiobooks/useProgressSaver";
+import AudioPlayer from "@/components/audiobooks/AudioPlayer";
+import TextHighlighter from "@/components/audiobooks/TextHighlighter";
+import ChapterNavigation from "@/components/audiobooks/ChapterNavigation";
+import { AudiobookData, ChapterData, AlignmentData, UserProgress } from "@/types/audiobooks";
 import dynamic from "next/dynamic";
 
 const AudioGenerationPanel = dynamic(
   () => import("@/components/admin/audiobooks/AudioGenerationPanel"),
-  {
-    ssr: false,
-  }
+  { ssr: false }
 );
 const AlignmentPanel = dynamic(
   () => import("@/components/admin/audiobooks/AlignmentPanel"),
-  {
-    ssr: false,
-  }
+  { ssr: false }
 );
-
-interface AudiobookData {
-  book_id: number;
-  title: string;
-  author: string;
-}
-
-interface ChapterData {
-  chapter_id: number;
-  chapter_order: number;
-  chapter_title: string;
-  audio_url: string;
-  duration_seconds: number;
-  is_free_sample: boolean;
-}
-
-interface AlignmentData {
-  full_text: string;
-  characters_data: Array<{
-    text: string;
-    start: number;
-    end: number;
-  }>;
-  words_data: Array<{
-    text: string;
-    start: number;
-    end: number;
-    loss: number;
-  }>;
-}
-
-interface UserProgress {
-  current_position_seconds: number;
-  is_completed: boolean;
-}
 
 export default function ChapterPlayerPage() {
   const params = useParams();
   const router = useRouter();
   const bookId = params.bookId as string;
   const chapterId = params.chapterId as string;
-  const supabase = createSupabaseBrowserClient();
   const { role: userRole } = useUserRole();
+  const { fetchChapterData, loading, error } = useAudiobookData();
+  const { saveProgress } = useProgressSaver();
 
   const [audiobook, setAudiobook] = useState<AudiobookData | null>(null);
   const [chapter, setChapter] = useState<ChapterData | null>(null);
   const [alignment, setAlignment] = useState<AlignmentData | null>(null);
   const [userProgress, setUserProgress] = useState<UserProgress>({
+    progress_id: 0,
+    profile_id: '',
+    book_id: 0,
     current_position_seconds: 0,
-    is_completed: false,
+    last_read_at: '',
+    is_completed: false
   });
   const [allChapters, setAllChapters] = useState<ChapterData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -103,24 +60,45 @@ export default function ChapterPlayerPage() {
     triggerElement: null,
   });
 
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const textDisplayRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    fetchChapterData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadChapterData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId, chapterId]);
 
+  const loadChapterData = useCallback(async () => {
+    try {
+      const data = await fetchChapterData(bookId, chapterId);
+      setAudiobook(data.audiobook);
+      setChapter(data.chapter);
+      setAlignment(data.alignment);
+      setUserProgress(data.userProgress);
+      setAllChapters(data.allChapters);
+      setCurrentTime(data.userProgress.current_position_seconds);
+      
+      if (data.alignment?.full_text) {
+        let cleanText = data.alignment.full_text;
+        if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
+          cleanText = cleanText.slice(1, -1);
+        }
+        cleanText = cleanText
+          .replace(/\\n/g, "\n")
+          .replace(/\\"/g, '"')
+          .replace(/\\'/g, "'");
+        setChapterScript(cleanText);
+      }
+    } catch (err) {
+      console.error('Failed to load chapter data:', err);
+      router.push(`/learn/audiobooks/${bookId}`);
+    }
+  }, [bookId, chapterId, fetchChapterData, router]);
+
   const updateHighlighting = useCallback(() => {
-    if (!alignment || !alignment.words_data || !audioRef.current) return;
+    if (!alignment?.words_data) return;
 
-    const audioTime = audioRef.current.currentTime;
-    const CURRENT_ANTICIPATION = 0.1;  // Highlight current word 100ms early
-    const NEXT_ANTICIPATION = 0.2;     // Show next word 200ms early
-    
-    const predictiveTime = audioTime + CURRENT_ANTICIPATION;
+    const CURRENT_ANTICIPATION_SECONDS = 0.1;
+    const NEXT_ANTICIPATION_SECONDS = 0.2;
+    const predictiveTime = currentTime + CURRENT_ANTICIPATION_SECONDS;
 
-    // Find current word with predictive timing
     const currentIndex = alignment.words_data.findIndex(
       (word) => predictiveTime >= word.start && predictiveTime <= word.end
     );
@@ -129,12 +107,14 @@ export default function ChapterPlayerPage() {
       setCurrentWordIndex(currentIndex);
     }
 
-    // Find next word for anticipation
     let nextIndex = -1;
     if (currentIndex >= 0) {
       for (let i = currentIndex + 1; i < alignment.words_data.length; i++) {
         const nextWord = alignment.words_data[i];
-        if (nextWord.start - audioTime <= NEXT_ANTICIPATION && nextWord.start > audioTime) {
+        if (
+          nextWord.start - currentTime <= NEXT_ANTICIPATION_SECONDS &&
+          nextWord.start > currentTime
+        ) {
           nextIndex = i;
           break;
         }
@@ -144,14 +124,21 @@ export default function ChapterPlayerPage() {
     if (nextIndex !== nextWordIndex) {
       setNextWordIndex(nextIndex);
     }
-  }, [alignment, audioRef, currentWordIndex, nextWordIndex]);
+  }, [alignment, currentTime, currentWordIndex, nextWordIndex]);
 
-  // Update highlighting when time changes
   useEffect(() => {
-    if (alignment && alignment.words_data) {
+    if (alignment?.words_data) {
       updateHighlighting();
     }
   }, [currentTime, alignment, updateHighlighting]);
+
+  const handleTextSelection = useCallback((text: string, element: HTMLElement) => {
+    setTooltipConfig({
+      visible: true,
+      selectedText: text,
+      triggerElement: element,
+    });
+  }, []);
 
   const closeTooltip = useCallback(() => {
     setTooltipConfig({
@@ -161,358 +148,42 @@ export default function ChapterPlayerPage() {
     });
   }, []);
 
-  // Handle text selection for tooltip
-  useEffect(() => {
-    const handleMouseUp = () => {
-      const selection = window.getSelection();
-      const selectedText = selection?.toString().trim();
-
-      if (
-        selectedText &&
-        selection &&
-        selection.anchorNode &&
-        textDisplayRef.current?.contains(selection.anchorNode)
-      ) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-
-        const trigger = document.createElement("div");
-        trigger.style.position = "absolute";
-        trigger.style.left = `${rect.left + window.scrollX}px`;
-        trigger.style.top = `${rect.top + window.scrollY}px`;
-        trigger.style.width = `${rect.width}px`;
-        trigger.style.height = `${rect.height}px`;
-        trigger.style.pointerEvents = "none";
-        trigger.style.zIndex = "1";
-
-        setTooltipConfig({
-          visible: true,
-          selectedText: selectedText,
-          triggerElement: trigger,
-        });
-      }
-    };
-
-    document.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, []);
-
-  // Close tooltip when alignment changes
   useEffect(() => {
     closeTooltip();
   }, [alignment, closeTooltip]);
 
-  const fetchChapterData = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/auth/login");
-        return;
-      }
 
-      // Check access permissions
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
 
-      const isAdmin = profile?.role === "admin";
+  const handleTimeUpdate = useCallback((time: number) => {
+    setCurrentTime(time);
+    saveProgress(bookId, chapterId, time);
+  }, [bookId, chapterId, saveProgress]);
 
-      // Get chapter data
-      const { data: chapterData } = await supabase
-        .from("audiobook_chapters")
-        .select("*")
-        .eq("chapter_id", parseInt(chapterId))
-        .single();
+  const togglePlayPause = useCallback(() => {
+    setIsPlaying(!isPlaying);
+  }, [isPlaying]);
 
-      if (!chapterData) {
-        router.push(`/learn/audiobooks/${bookId}`);
-        return;
-      }
+  const handleSeek = useCallback((time: number) => {
+    setCurrentTime(time);
+  }, []);
 
-      // Check access to this chapter
-      if (!chapterData.is_free_sample && !isAdmin) {
-        const { data: purchase } = await supabase
-          .from("user_audiobook_purchases")
-          .select("purchase_id")
-          .eq("profile_id", user.id)
-          .eq("book_id", parseInt(bookId))
-          .single();
+  const handleDurationChange = useCallback((newDuration: number) => {
+    setDuration(newDuration);
+  }, []);
 
-        if (!purchase) {
-          router.push(`/learn/audiobooks/${bookId}`);
-          return;
-        }
-      }
-
-      setChapter(chapterData);
-
-      // Get audiobook info
-      const { data: audiobookData } = await supabase
-        .from("audiobooks")
-        .select("book_id, title, author")
-        .eq("book_id", parseInt(bookId))
-        .single();
-
-      setAudiobook(audiobookData);
-
-      // Get all chapters for navigation
-      const { data: chaptersData } = await supabase
-        .from("audiobook_chapters")
-        .select("*")
-        .eq("book_id", parseInt(bookId))
-        .order("chapter_order");
-
-      setAllChapters(chaptersData || []);
-
-      // Get alignment data
-      const { data: alignmentData } = await supabase
-        .from("audiobook_alignment")
-        .select("*")
-        .eq("book_id", parseInt(bookId))
-        .eq("chapter_id", parseInt(chapterId))
-        .single();
-
-      if (alignmentData) {
-        console.log("✅ ALIGNMENT DATA LOADED");
-        console.log("📄 Words data length:", alignmentData.words_data?.length);
-        console.log(
-          "📄 First 5 words with timing:",
-          alignmentData.words_data
-            ?.slice(0, 5)
-            .map((w: { text: string; start: number; end: number }) => ({
-              text: w.text,
-              start: w.start,
-              end: w.end,
-            }))
-        );
-
-        setAlignment({
-          full_text: alignmentData.full_text,
-          characters_data: alignmentData.characters_data,
-          words_data: alignmentData.words_data,
-        });
-
-        // Set the script from full_text for admin editing only
-        if (alignmentData.full_text) {
-          let cleanText = alignmentData.full_text;
-
-          // Remove surrounding quotes if present
-          if (cleanText.startsWith('"') && cleanText.endsWith('"')) {
-            cleanText = cleanText.slice(1, -1);
-          }
-
-          // Convert escaped characters
-          cleanText = cleanText
-            .replace(/\\n/g, "\n")
-            .replace(/\\"/g, '"')
-            .replace(/\\'/g, "'");
-
-          setChapterScript(cleanText);
-        }
-
-        console.log(
-          "✅ Alignment loaded with",
-          alignmentData.words_data?.length,
-          "words"
-        );
-      } else {
-        console.log("❌ NO ALIGNMENT DATA FOUND");
-      }
-
-      // Get user progress for this chapter
-      const { data: progressData } = await supabase
-        .from("user_audiobook_progress")
-        .select("*")
-        .eq("profile_id", user.id)
-        .eq("book_id", parseInt(bookId))
-        .eq("current_chapter_id", parseInt(chapterId));
-
-      const progress = progressData?.[0];
-      if (progress) {
-        setUserProgress(progress);
-        setCurrentTime(progress.current_position_seconds);
-        console.log(
-          "📍 Restored progress to:",
-          progress.current_position_seconds,
-          "seconds"
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching chapter data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      const time = audioRef.current.currentTime;
-      setCurrentTime(time);
-
-      if (Math.floor(time) % 5 === 0) {
-        saveProgress(time);
-      }
-    }
-  };
-
-  const saveProgress = async (time: number) => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // First try to update existing progress
-      const { error: updateError } = await supabase
-        .from("user_audiobook_progress")
-        .update({
-          current_position_seconds: time,
-          last_read_at: new Date().toISOString(),
-        })
-        .eq("profile_id", user.id)
-        .eq("book_id", parseInt(bookId))
-        .eq("current_chapter_id", parseInt(chapterId));
-
-      // If no rows were updated, insert new progress
-      if (updateError?.code === "PGRST116") {
-        await supabase.from("user_audiobook_progress").insert({
-          profile_id: user.id,
-          book_id: parseInt(bookId),
-          current_chapter_id: parseInt(chapterId),
-          current_position_seconds: time,
-          last_read_at: new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      console.error("Error saving progress:", error);
-    }
-  };
-
-  const togglePlayPause = async () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        try {
-          await audioRef.current.play();
-        } catch (error) {
-          console.error("Play failed:", error);
-        }
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const skipTime = (seconds: number) => {
-    if (audioRef.current) {
-      const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
-      audioRef.current.currentTime = newTime;
-      // Immediately update highlighting after seeking
-      updateHighlighting();
-    }
-  };
-
-  const navigateToChapter = (targetChapterId: number) => {
+  const navigateToChapter = useCallback((targetChapterId: number) => {
     router.push(`/learn/audiobooks/${bookId}/${targetChapterId}`);
-  };
+  }, [router, bookId]);
 
-  const getCurrentChapterIndex = () => {
-    return allChapters.findIndex((ch) => ch.chapter_id === parseInt(chapterId));
-  };
-
-  const canAccessChapter = (chapterData: ChapterData) => {
-    // Admin access
+  const canAccessChapter = useCallback((chapterData: ChapterData) => {
     if (userRole === "admin") return true;
-
-    // Free sample access
     if (chapterData.is_free_sample) return true;
-
-    // For now, simplified logic - would need purchase check
     return false;
-  };
+  }, [userRole]);
 
-  const formatTime = (time: number) => {
-    const hours = Math.floor(time / 3600);
-    const minutes = Math.floor((time % 3600) / 60);
-    const seconds = Math.floor(time % 60);
 
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
 
-  const renderTextWithHighlighting = () => {
-    if (!alignment || !showText) return null;
 
-    const paragraphs: React.ReactNode[][] = [];
-    let currentParagraph: React.ReactNode[] = [];
-
-    alignment.words_data.forEach((word, index) => {
-      const isCurrentWord = index === currentWordIndex;
-      const isNextWord = index === nextWordIndex;
-      const isPastWord = index < currentWordIndex;
-
-      // Check if this is a paragraph break marker
-      if (word.text === "\r" || word.text === "\n") {
-        // End current paragraph if it has content
-        if (currentParagraph.length > 0) {
-          paragraphs.push([...currentParagraph]);
-          currentParagraph = [];
-        }
-        return;
-      }
-
-      // Clean word text for display
-      const displayText = word.text.replace(/\\'/g, "'").replace(/\\"/g, '"');
-
-      // Add word span to current paragraph
-      currentParagraph.push(
-        <span
-          key={index}
-          className={`transition-all duration-200 ${
-            isCurrentWord
-              ? "bg-yellow-300 text-black font-medium"
-              : isNextWord
-              ? "bg-yellow-100 text-gray-800"
-              : isPastWord
-              ? "text-gray-500"
-              : "text-gray-900"
-          }`}
-        >
-          {displayText}
-        </span>
-      );
-
-      // Add space after word (except for punctuation)
-      if (!displayText.match(/[.!?]$/)) {
-        currentParagraph.push(" ");
-      }
-    });
-
-    // Add final paragraph if it has content
-    if (currentParagraph.length > 0) {
-      paragraphs.push(currentParagraph);
-    }
-
-    return (
-      <div className="text-lg leading-relaxed space-y-4">
-        {paragraphs.map((paragraph, pIndex) => (
-          <p key={pIndex} className="mb-4">
-            {paragraph}
-          </p>
-        ))}
-      </div>
-    );
-  };
 
   if (loading) {
     return (
@@ -525,23 +196,15 @@ export default function ChapterPlayerPage() {
     );
   }
 
-  if (!audiobook || !chapter) {
+  if (error || !audiobook || !chapter) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">Chapter not found</p>
+          <p className="text-gray-600">{error || 'Chapter not found'}</p>
         </div>
       </div>
     );
   }
-
-  const currentChapterIndex = getCurrentChapterIndex();
-  const prevChapter =
-    currentChapterIndex > 0 ? allChapters[currentChapterIndex - 1] : null;
-  const nextChapter =
-    currentChapterIndex < allChapters.length - 1
-      ? allChapters[currentChapterIndex + 1]
-      : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -580,153 +243,28 @@ export default function ChapterPlayerPage() {
           )}
         </div>
 
-        {/* Chapter Navigation */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() =>
-              prevChapter && navigateToChapter(prevChapter.chapter_id)
-            }
-            disabled={!prevChapter || !canAccessChapter(prevChapter)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              prevChapter && canAccessChapter(prevChapter)
-                ? "bg-white hover:bg-gray-50 text-gray-700"
-                : "bg-gray-100 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {prevChapter ? `Chapter ${prevChapter.chapter_order}` : "Previous"}
-          </button>
+        <ChapterNavigation
+          chapters={allChapters}
+          currentChapter={chapter}
+          canAccessChapter={canAccessChapter}
+          onNavigate={navigateToChapter}
+        />
 
-          <span className="text-sm text-gray-600">
-            Chapter {chapter.chapter_order} of {allChapters.length}
-          </span>
+        <AudioPlayer
+          audioUrl={chapter.audio_url}
+          currentTime={currentTime}
+          duration={duration}
+          isPlaying={isPlaying}
+          showText={showText}
+          userProgress={userProgress}
+          onTimeUpdate={handleTimeUpdate}
+          onPlayPause={togglePlayPause}
+          onSeek={handleSeek}
+          onToggleText={() => setShowText(!showText)}
+          onUpdateHighlighting={updateHighlighting}
+          onDurationChange={handleDurationChange}
+        />
 
-          <button
-            onClick={() =>
-              nextChapter && navigateToChapter(nextChapter.chapter_id)
-            }
-            disabled={!nextChapter || !canAccessChapter(nextChapter)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              nextChapter && canAccessChapter(nextChapter)
-                ? "bg-white hover:bg-gray-50 text-gray-700"
-                : "bg-gray-100 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            {nextChapter ? `Chapter ${nextChapter.chapter_order}` : "Next"}
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Audio Player */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <audio
-            ref={audioRef}
-            preload="metadata"
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={() => {
-              if (audioRef.current) {
-                setDuration(audioRef.current.duration);
-                audioRef.current.currentTime =
-                  userProgress.current_position_seconds;
-              }
-            }}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-          >
-            <source
-              src={
-                chapter.audio_url.startsWith("http")
-                  ? chapter.audio_url
-                  : `https://${chapter.audio_url}`
-              }
-              type="audio/mpeg"
-            />
-            <source
-              src={
-                chapter.audio_url.startsWith("http")
-                  ? chapter.audio_url
-                  : `https://${chapter.audio_url}`
-              }
-              type="audio/mp3"
-            />
-            Your browser does not support the audio element.
-          </audio>
-
-          {/* Progress Bar */}
-          <div className="mb-6">
-            <div className="flex justify-between text-sm text-gray-500 mb-2">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-            <div
-              className="w-full bg-gray-200 rounded-full h-2 cursor-pointer hover:h-3 transition-all duration-200"
-              onClick={(e) => {
-                if (audioRef.current && duration > 0) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const clickX = e.clientX - rect.left;
-                  const percentage = clickX / rect.width;
-                  const newTime = percentage * duration;
-                  audioRef.current.currentTime = Math.max(
-                    0,
-                    Math.min(duration, newTime)
-                  );
-                  // Immediately update highlighting after seeking
-                  updateHighlighting();
-                }
-              }}
-            >
-              <div
-                className="bg-indigo-600 h-2 rounded-full transition-all duration-300 hover:h-3"
-                style={{
-                  width: `${
-                    duration > 0 ? (currentTime / duration) * 100 : 0
-                  }%`,
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => skipTime(-10)}
-              className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              <SkipBack className="h-5 w-5" />
-            </button>
-
-            <button
-              onClick={togglePlayPause}
-              className="p-4 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
-            >
-              {isPlaying ? (
-                <Pause className="h-6 w-6" />
-              ) : (
-                <Play className="h-6 w-6" />
-              )}
-            </button>
-
-            <button
-              onClick={() => skipTime(10)}
-              className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              <SkipForward className="h-5 w-5" />
-            </button>
-
-            <button
-              onClick={() => setShowText(!showText)}
-              className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors ml-4"
-            >
-              {showText ? (
-                <EyeOff className="h-5 w-5" />
-              ) : (
-                <Eye className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Admin Tools */}
         {editMode && userRole === "admin" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <AudioGenerationPanel
@@ -734,7 +272,7 @@ export default function ChapterPlayerPage() {
               chapterId={chapterId}
               script={chapterScript}
               onSuccess={() => {
-                fetchChapterData();
+                loadChapterData();
                 alert("Audio generated successfully!");
               }}
             />
@@ -744,7 +282,7 @@ export default function ChapterPlayerPage() {
               script={chapterScript}
               hasAudio={!!chapter?.audio_url}
               onSuccess={() => {
-                fetchChapterData();
+                loadChapterData();
                 alert("Alignment generated successfully!");
               }}
             />
@@ -764,43 +302,17 @@ export default function ChapterPlayerPage() {
           </div>
         )}
 
-        {/* Text Display */}
-        {showText && (
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <div className="flex items-center gap-2 mb-6">
-              <BookOpen className="h-5 w-5 text-indigo-600" />
-              <h2 className="text-xl font-semibold text-gray-900">
-                Read Along
-              </h2>
-            </div>
-
-            <div className="mb-4 pb-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-800">
-                {chapter.chapter_title}
-              </h3>
-            </div>
-
-            <div className="prose max-w-none" ref={textDisplayRef} style={{ userSelect: "text" }}>
-              {alignment ? (
-                renderTextWithHighlighting()
-              ) : chapterScript ? (
-                <div className="text-lg leading-relaxed whitespace-pre-line text-gray-800">
-                  {chapterScript}
-                </div>
-              ) : (
-                <p className="text-gray-500 italic">No text available</p>
-              )}
-            </div>
-            
-            {tooltipConfig.visible && (
-              <WordTooltip
-                selectedText={tooltipConfig.selectedText}
-                onClose={closeTooltip}
-                triggerElement={tooltipConfig.triggerElement}
-              />
-            )}
-          </div>
-        )}
+        <TextHighlighter
+          alignment={alignment}
+          currentWordIndex={currentWordIndex}
+          nextWordIndex={nextWordIndex}
+          showText={showText}
+          chapterScript={chapterScript}
+          chapterTitle={chapter.chapter_title}
+          tooltipConfig={tooltipConfig}
+          onTextSelection={handleTextSelection}
+          onCloseTooltip={closeTooltip}
+        />
       </div>
     </div>
   );
