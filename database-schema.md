@@ -34,7 +34,6 @@ title character varying NOT NULL,
 author character varying NOT NULL,
 description text,
 cover_image_url character varying,
-audio_url character varying NOT NULL,
 language_code character varying NOT NULL,
 level_code USER-DEFINED NOT NULL,
 duration_seconds integer,
@@ -361,7 +360,7 @@ CREATE TABLE public.student_target_languages (
 profile_id uuid NOT NULL,
 language_code character varying NOT NULL,
 added_at timestamp with time zone DEFAULT now(),
-CONSTRAINT student_target_languages_pkey PRIMARY KEY (profile_id, language_code),
+CONSTRAINT student_target_languages_pkey PRIMARY KEY (language_code, profile_id),
 CONSTRAINT fk_student_target_languages_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
 CONSTRAINT student_target_languages_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
@@ -410,6 +409,22 @@ updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT units_pkey PRIMARY KEY (unit_id),
 CONSTRAINT fk_units_to_language_levels FOREIGN KEY (level) REFERENCES public.language_levels(level_code)
 );
+CREATE TABLE public.user_audiobook_chapter_progress (
+id integer NOT NULL DEFAULT nextval('user_audiobook_chapter_progress_id_seq'::regclass),
+profile_id uuid NOT NULL,
+book_id integer NOT NULL,
+chapter_id integer NOT NULL,
+current_position_seconds numeric DEFAULT 0,
+is_completed boolean DEFAULT false,
+completed_at timestamp with time zone,
+last_listened_at timestamp with time zone DEFAULT now(),
+created_at timestamp with time zone DEFAULT now(),
+updated_at timestamp with time zone DEFAULT now(),
+CONSTRAINT user_audiobook_chapter_progress_pkey PRIMARY KEY (id),
+CONSTRAINT user_audiobook_chapter_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
+CONSTRAINT user_audiobook_chapter_progress_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.audiobooks(book_id),
+CONSTRAINT user_audiobook_chapter_progress_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES public.audiobook_chapters(chapter_id)
+);
 CREATE TABLE public.user_audiobook_progress (
 progress_id integer NOT NULL DEFAULT nextval('user_audiobook_progress_progress_id_seq'::regclass),
 profile_id uuid NOT NULL,
@@ -419,6 +434,9 @@ last_read_at timestamp with time zone DEFAULT now(),
 is_completed boolean DEFAULT false,
 completed_at timestamp with time zone,
 current_chapter_id integer,
+total_chapters integer DEFAULT 0,
+completed_chapters integer DEFAULT 0,
+completion_percentage numeric DEFAULT 0,
 CONSTRAINT user_audiobook_progress_pkey PRIMARY KEY (progress_id),
 CONSTRAINT user_audiobook_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
 CONSTRAINT user_audiobook_progress_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.audiobooks(book_id),
@@ -461,7 +479,7 @@ profile_id uuid NOT NULL,
 level_code USER-DEFINED NOT NULL,
 completed_at timestamp with time zone NOT NULL DEFAULT now(),
 created_at timestamp with time zone NOT NULL DEFAULT now(),
-CONSTRAINT user_level_completion_pkey PRIMARY KEY (level_code, profile_id),
+CONSTRAINT user_level_completion_pkey PRIMARY KEY (profile_id, level_code),
 CONSTRAINT user_level_completion_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
 CONSTRAINT user_level_completion_level_code_fkey FOREIGN KEY (level_code) REFERENCES public.language_levels(level_code)
 );
@@ -2331,3 +2349,224 @@ BEGIN
 RETURN level_code_param = ANY(public.get_user_available_levels(profile_id_param));
 END;
 $function$;
+
+
+## calculate_book_completion
+-- Fix completion percentage calculation and handle new chapters gracefully
+-- CORRECTED VERSION based on actual database schema
+
+-- 1. Update the calculate_book_completion function to cap at 100%
+CREATE OR REPLACE FUNCTION public.calculate_book_completion(p_profile_id UUID, p_book_id INTEGER)
+RETURNS TABLE(
+    total_chapters INTEGER,
+    completed_chapters INTEGER,
+    completion_percentage NUMERIC,
+    is_book_completed BOOLEAN
+) AS $$
+DECLARE
+    v_total_chapters INTEGER;
+    v_completed_chapters INTEGER;
+    v_completion_percentage NUMERIC;
+    v_is_book_completed BOOLEAN;
+BEGIN
+    -- Get total chapters for the book
+    SELECT COUNT(*) INTO v_total_chapters
+    FROM public.audiobook_chapters
+    WHERE book_id = p_book_id;
+    
+    -- Get completed chapters for the user
+    SELECT COUNT(*) INTO v_completed_chapters
+    FROM public.user_audiobook_chapter_progress
+    WHERE profile_id = p_profile_id 
+    AND book_id = p_book_id 
+    AND is_completed = true;
+    
+    -- Calculate completion percentage (capped at 100%)
+    v_completion_percentage := CASE 
+        WHEN v_total_chapters > 0 THEN 
+            LEAST(100, (v_completed_chapters::NUMERIC / v_total_chapters::NUMERIC) * 100)
+        ELSE 0
+    END;
+    
+    -- Determine if book is completed (all chapters completed)
+    v_is_book_completed := v_completed_chapters = v_total_chapters AND v_total_chapters > 0;
+    
+    RETURN QUERY SELECT 
+        v_total_chapters,
+        v_completed_chapters,
+        v_completion_percentage,
+        v_is_book_completed;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Create function to handle new chapters added to completed books
+CREATE OR REPLACE FUNCTION public.handle_new_chapter_added()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- When a new chapter is added, update all user progress for this book
+    -- to reflect the new total and recalculate completion
+    UPDATE public.user_audiobook_progress 
+    SET 
+        total_chapters = (
+            SELECT COUNT(*) 
+            FROM public.audiobook_chapters 
+            WHERE book_id = NEW.book_id
+        ),
+        completion_percentage = (
+            SELECT LEAST(100, CASE 
+                WHEN COUNT(ac.*) > 0 THEN 
+                    (COUNT(CASE WHEN uacp.is_completed THEN 1 END)::NUMERIC / COUNT(ac.*)::NUMERIC) * 100
+                ELSE 0 
+            END)
+            FROM public.audiobook_chapters ac
+            LEFT JOIN public.user_audiobook_chapter_progress uacp 
+                ON ac.chapter_id = uacp.chapter_id 
+                AND uacp.profile_id = user_audiobook_progress.profile_id
+            WHERE ac.book_id = NEW.book_id
+        ),
+        is_completed = false, -- Reset completion status when new chapters are added
+        completed_at = NULL   -- Clear completion timestamp
+    WHERE book_id = NEW.book_id;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 3. Create trigger for new chapter additions
+DROP TRIGGER IF EXISTS trigger_new_chapter_added ON public.audiobook_chapters;
+CREATE TRIGGER trigger_new_chapter_added
+    AFTER INSERT ON public.audiobook_chapters
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_chapter_added();
+
+-- 4. Fix existing completion percentages over 100%
+UPDATE public.user_audiobook_progress 
+SET completion_percentage = LEAST(100, completion_percentage)
+WHERE completion_percentage > 100;
+
+-- 5. Create function to automatically update audiobook duration
+CREATE OR REPLACE FUNCTION public.update_audiobook_duration()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Update the audiobook's total duration when chapter duration changes
+    UPDATE public.audiobooks 
+    SET 
+        duration_seconds = (
+            SELECT COALESCE(SUM(duration_seconds), 0)
+            FROM public.audiobook_chapters 
+            WHERE book_id = COALESCE(NEW.book_id, OLD.book_id)
+            AND duration_seconds IS NOT NULL
+        ),
+        updated_at = now()
+    WHERE book_id = COALESCE(NEW.book_id, OLD.book_id);
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- 6. Create triggers for automatic audiobook duration updates
+DROP TRIGGER IF EXISTS trigger_update_audiobook_duration_insert ON public.audiobook_chapters;
+DROP TRIGGER IF EXISTS trigger_update_audiobook_duration_update ON public.audiobook_chapters;
+DROP TRIGGER IF EXISTS trigger_update_audiobook_duration_delete ON public.audiobook_chapters;
+
+CREATE TRIGGER trigger_update_audiobook_duration_insert
+    AFTER INSERT ON public.audiobook_chapters
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_audiobook_duration();
+
+CREATE TRIGGER trigger_update_audiobook_duration_update
+    AFTER UPDATE OF duration_seconds ON public.audiobook_chapters
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_audiobook_duration();
+
+CREATE TRIGGER trigger_update_audiobook_duration_delete
+    AFTER DELETE ON public.audiobook_chapters
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_audiobook_duration();
+
+
+## update_chapter_progress
+CREATE OR REPLACE FUNCTION public.update_chapter_progress(
+    p_profile_id UUID,
+    p_book_id INTEGER,
+    p_chapter_id INTEGER,
+    p_position_seconds NUMERIC,
+    p_chapter_duration_seconds INTEGER DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_is_completed BOOLEAN := false;
+    v_completion_threshold NUMERIC := 0.95;
+BEGIN
+    -- Determine if chapter is completed (95% watched or explicit completion)
+    IF p_chapter_duration_seconds IS NOT NULL AND p_position_seconds >= (p_chapter_duration_seconds * v_completion_threshold) THEN
+        v_is_completed := true;
+    END IF;
+    
+    -- Upsert chapter progress with FIXED logic
+    INSERT INTO public.user_audiobook_chapter_progress (
+        profile_id, book_id, chapter_id, current_position_seconds, 
+        is_completed, completed_at, last_listened_at, created_at, updated_at
+    )
+    VALUES (
+        p_profile_id, p_book_id, p_chapter_id, p_position_seconds,
+        v_is_completed, 
+        CASE WHEN v_is_completed THEN now() ELSE NULL END,
+        now(), now(), now()
+    )
+    ON CONFLICT (profile_id, book_id, chapter_id)
+    DO UPDATE SET
+        current_position_seconds = EXCLUDED.current_position_seconds,
+        -- FIXED: Allow completion to be set to true when threshold is met
+        is_completed = CASE 
+            WHEN user_audiobook_chapter_progress.is_completed = true THEN true  -- Keep completed status
+            WHEN EXCLUDED.is_completed = true THEN true  -- Allow new completion
+            ELSE false  -- Otherwise keep as incomplete
+        END,
+        completed_at = CASE 
+            WHEN user_audiobook_chapter_progress.completed_at IS NOT NULL THEN user_audiobook_chapter_progress.completed_at  -- Keep existing completion time
+            WHEN EXCLUDED.is_completed = true AND user_audiobook_chapter_progress.is_completed = false THEN now()  -- Set completion time for newly completed
+            ELSE NULL 
+        END,
+        last_listened_at = EXCLUDED.last_listened_at,
+        updated_at = EXCLUDED.updated_at;
+    
+    -- Update book-level progress
+    WITH book_stats AS (
+        SELECT * FROM public.calculate_book_completion(p_profile_id, p_book_id)
+    )
+    INSERT INTO public.user_audiobook_progress (
+        profile_id, book_id, current_chapter_id, current_position_seconds,
+        total_chapters, completed_chapters, completion_percentage,
+        is_completed, completed_at, last_read_at
+    )
+    SELECT 
+        p_profile_id, p_book_id, p_chapter_id, p_position_seconds,
+        bs.total_chapters, bs.completed_chapters, LEAST(100, bs.completion_percentage),
+        bs.is_book_completed, 
+        CASE WHEN bs.is_book_completed THEN now() ELSE NULL END,
+        now()
+    FROM book_stats bs
+    ON CONFLICT (profile_id, book_id)
+    DO UPDATE SET
+        current_chapter_id = EXCLUDED.current_chapter_id,
+        current_position_seconds = EXCLUDED.current_position_seconds,
+        total_chapters = EXCLUDED.total_chapters,
+        completed_chapters = EXCLUDED.completed_chapters,
+        completion_percentage = LEAST(100, EXCLUDED.completion_percentage),
+        -- FIXED: Same logic fix for book completion
+        is_completed = CASE 
+            WHEN user_audiobook_progress.is_completed = true THEN true
+            WHEN EXCLUDED.is_completed = true THEN true
+            ELSE false
+        END,
+        completed_at = CASE 
+            WHEN user_audiobook_progress.completed_at IS NOT NULL THEN user_audiobook_progress.completed_at
+            WHEN EXCLUDED.is_completed = true AND user_audiobook_progress.is_completed = false THEN now()
+            ELSE NULL
+        END,
+        last_read_at = EXCLUDED.last_read_at;
+    
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql;
