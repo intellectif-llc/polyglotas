@@ -45,7 +45,8 @@ export default function TextHighlighter({
       const isNextWord = index === nextWordIndex;
       const isPastWord = index < currentWordIndex;
 
-      if (word.text === '\r' || word.text === '\n') {
+      // Skip whitespace characters with high loss scores that cause highlighting gaps
+      if (word.text === '\r' || word.text === '\n' || (word.text.trim() === '' && word.loss > 1)) {
         if (currentParagraph.length > 0) {
           paragraphs.push([...currentParagraph]);
           currentParagraph = [];

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Volume2, Loader2 } from 'lucide-react';
 
+
 interface AudioGenerationPanelProps {
   bookId: string;
   chapterId: string;
@@ -18,6 +19,7 @@ export default function AudioGenerationPanel({
 }: AudioGenerationPanelProps) {
   const [speed, setSpeed] = useState(0.9);
   const [loading, setLoading] = useState(false);
+
 
   const handleGenerateAudio = async () => {
     setLoading(true);
@@ -35,6 +37,7 @@ export default function AudioGenerationPanel({
 
       const result = await response.json();
       console.log('Audio generated:', result.audio_url);
+      
       onSuccess();
     } catch (error) {
       console.error('Error generating audio:', error);

@@ -47,11 +47,14 @@ export async function POST(
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   try {
+    console.log('🔵 Chapter creation started');
     const supabase = await createClient();
     const resolvedParams = await params;
+    console.log('📋 Resolved params:', resolvedParams);
     
     // Check admin permissions
     const { data: { user } } = await supabase.auth.getUser();
+    console.log('👤 User check:', user ? 'authenticated' : 'not authenticated');
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -62,33 +65,52 @@ export async function POST(
       .eq('id', user.id)
       .single();
 
+    console.log('🔐 User role:', profile?.role);
     if (profile?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await request.json();
-    const { chapter_title, duration_seconds, is_free_sample, chapter_order } = body;
+    console.log('📝 Request body:', body);
+    const { chapter_title, is_free_sample, chapter_order } = body;
+
+    const insertData = {
+      book_id: parseInt(resolvedParams.bookId),
+      chapter_title,
+      is_free_sample: is_free_sample || false,
+      chapter_order,
+    };
+    console.log('💾 Insert data:', insertData);
 
     const { data, error } = await supabase
       .from('audiobook_chapters')
-      .insert({
-        book_id: parseInt(resolvedParams.bookId),
-        chapter_title,
-        audio_url: '', // Will be updated when audio is generated
-        duration_seconds: duration_seconds || 0,
-        is_free_sample: is_free_sample || false,
-        chapter_order,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error('❌ Database error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      return NextResponse.json({ 
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      }, { status: 400 });
     }
 
+    console.log('✅ Chapter created successfully:', data);
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error creating chapter:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('💥 Unexpected error creating chapter:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

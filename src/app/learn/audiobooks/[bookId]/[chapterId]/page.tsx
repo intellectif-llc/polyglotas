@@ -21,6 +21,7 @@ const AlignmentPanel = dynamic(
   { ssr: false }
 );
 
+
 export default function ChapterPlayerPage() {
   const params = useParams();
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function ChapterPlayerPage() {
   const chapterId = params.chapterId as string;
   const { role: userRole } = useUserRole();
   const { fetchChapterData, loading, error } = useAudiobookData();
-  const { saveProgress } = useProgressSaver();
+  const { saveProgress, saveProgressForced } = useProgressSaver();
 
   const [audiobook, setAudiobook] = useState<AudiobookData | null>(null);
   const [chapter, setChapter] = useState<ChapterData | null>(null);
@@ -152,12 +153,27 @@ export default function ChapterPlayerPage() {
     closeTooltip();
   }, [alignment, closeTooltip]);
 
+  // Save progress when component unmounts (navigation away)
+  useEffect(() => {
+    return () => {
+      if (currentTime > 0) {
+        saveProgressForced(bookId, chapterId, currentTime);
+      }
+    };
+  }, [bookId, chapterId, currentTime, saveProgressForced]);
+
 
 
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);
     saveProgress(bookId, chapterId, time);
   }, [bookId, chapterId, saveProgress]);
+
+  const handleAudioEnd = useCallback((time: number) => {
+    setCurrentTime(time);
+    // Force immediate save when audio ends to ensure completion is tracked
+    saveProgressForced(bookId, chapterId, time);
+  }, [bookId, chapterId, saveProgressForced]);
 
   const togglePlayPause = useCallback(() => {
     setIsPlaying(!isPlaying);
@@ -167,9 +183,23 @@ export default function ChapterPlayerPage() {
     setCurrentTime(time);
   }, []);
 
-  const handleDurationChange = useCallback((newDuration: number) => {
+  const handleDurationChange = useCallback(async (newDuration: number) => {
     setDuration(newDuration);
-  }, []);
+    
+    // Auto-save duration to database if user is admin
+    if (userRole === 'admin' && newDuration > 0) {
+      try {
+        await fetch(`/api/admin/audiobooks/${bookId}/chapters/${chapterId}/update-duration`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ duration: newDuration })
+        });
+        console.log('Duration auto-saved:', Math.round(newDuration), 'seconds');
+      } catch (error) {
+        console.error('Failed to save duration:', error);
+      }
+    }
+  }, [userRole, bookId, chapterId]);
 
   const navigateToChapter = useCallback((targetChapterId: number) => {
     router.push(`/learn/audiobooks/${bookId}/${targetChapterId}`);
@@ -258,6 +288,7 @@ export default function ChapterPlayerPage() {
           showText={showText}
           userProgress={userProgress}
           onTimeUpdate={handleTimeUpdate}
+          onAudioEnd={handleAudioEnd}
           onPlayPause={togglePlayPause}
           onSeek={handleSeek}
           onToggleText={() => setShowText(!showText)}
@@ -286,6 +317,7 @@ export default function ChapterPlayerPage() {
                 alert("Alignment generated successfully!");
               }}
             />
+
           </div>
         )}
 

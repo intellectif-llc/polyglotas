@@ -11,6 +11,7 @@ interface AudioPlayerProps {
   showText: boolean;
   userProgress: { current_position_seconds: number };
   onTimeUpdate: (time: number) => void;
+  onAudioEnd?: (time: number) => void;
   onPlayPause: () => void;
   onSeek: (time: number) => void;
   onToggleText: () => void;
@@ -26,6 +27,7 @@ export default function AudioPlayer({
   showText,
   userProgress,
   onTimeUpdate,
+  onAudioEnd,
   onPlayPause,
   onSeek,
   onToggleText,
@@ -68,7 +70,7 @@ export default function AudioPlayer({
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !audioUrl) return;
 
     const handleTimeUpdate = () => {
       const time = audio.currentTime;
@@ -96,11 +98,29 @@ export default function AudioPlayer({
       if (isPlaying) onPlayPause();
     };
 
+    const handleEnded = () => {
+      // Force final progress save when audio ends
+      const time = audio.currentTime;
+      if (onAudioEnd) {
+        onAudioEnd(time);
+      } else {
+        onTimeUpdate(time);
+      }
+      if (isPlaying) onPlayPause();
+    };
+
+    const handleError = (e: Event) => {
+      console.error('Audio loading error:', e);
+      console.error('Audio URL:', audioUrl);
+    };
+
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
@@ -108,15 +128,26 @@ export default function AudioPlayer({
       audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
     };
-  }, [onTimeUpdate, userProgress.current_position_seconds, onDurationChange, isPlaying, onPlayPause]);
+  }, [onTimeUpdate, userProgress.current_position_seconds, onDurationChange, isPlaying, onPlayPause, audioUrl, onAudioEnd]);
+
+  // Don't render if no audio URL
+  if (!audioUrl) {
+    return (
+      <div className="bg-gray-100 rounded-xl p-6 mb-8 text-center">
+        <p className="text-gray-500">No audio available for this chapter yet.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
       <audio
         ref={audioRef}
         preload="metadata"
-        src={audioUrl.startsWith('http') ? audioUrl : `https://${audioUrl}`}
+        src={audioUrl && audioUrl.startsWith('http') ? audioUrl : audioUrl ? `https://${audioUrl}` : undefined}
       >
         Your browser does not support the audio element.
       </audio>

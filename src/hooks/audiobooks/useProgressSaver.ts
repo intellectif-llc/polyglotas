@@ -4,6 +4,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 interface UseProgressSaverReturn {
   saveProgress: (bookId: string, chapterId: string, time: number) => void;
   saveProgressImmediate: (bookId: string, chapterId: string, time: number) => Promise<void>;
+  saveProgressForced: (bookId: string, chapterId: string, time: number) => Promise<void>;
 }
 
 export function useProgressSaver(): UseProgressSaverReturn {
@@ -16,24 +17,24 @@ export function useProgressSaver(): UseProgressSaverReturn {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error: updateError } = await supabase
-        .from('user_audiobook_progress')
-        .update({
-          current_position_seconds: time,
-          last_read_at: new Date().toISOString(),
-        })
-        .eq('profile_id', user.id)
-        .eq('book_id', parseInt(bookId))
-        .eq('current_chapter_id', parseInt(chapterId));
+      // Get chapter duration for completion calculation
+      const { data: chapterData } = await supabase
+        .from('audiobook_chapters')
+        .select('duration_seconds')
+        .eq('chapter_id', parseInt(chapterId))
+        .single();
 
-      if (updateError?.code === 'PGRST116') {
-        await supabase.from('user_audiobook_progress').insert({
-          profile_id: user.id,
-          book_id: parseInt(bookId),
-          current_chapter_id: parseInt(chapterId),
-          current_position_seconds: time,
-          last_read_at: new Date().toISOString(),
-        });
+      // Use the new progress tracking function
+      const { error } = await supabase.rpc('update_chapter_progress', {
+        p_profile_id: user.id,
+        p_book_id: parseInt(bookId),
+        p_chapter_id: parseInt(chapterId),
+        p_position_seconds: time,
+        p_chapter_duration_seconds: chapterData?.duration_seconds || null
+      });
+
+      if (error) {
+        console.error('Error saving progress:', error);
       }
     } catch (error) {
       console.error('Error saving progress:', error);
@@ -61,8 +62,15 @@ export function useProgressSaver(): UseProgressSaverReturn {
     }
   }, [saveProgressImmediate]);
 
+  const saveProgressForced = useCallback(async (bookId: string, chapterId: string, time: number) => {
+    // Force immediate save, bypassing throttling
+    lastSaveTimeRef.current = Date.now();
+    await saveProgressImmediate(bookId, chapterId, time);
+  }, [saveProgressImmediate]);
+
   return {
     saveProgress,
-    saveProgressImmediate
+    saveProgressImmediate,
+    saveProgressForced
   };
 }

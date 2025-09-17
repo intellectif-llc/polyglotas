@@ -13,7 +13,7 @@ interface UseAudiobookDataReturn {
     allChapters: ChapterData[];
   }>;
   fetchAudiobooksWithPurchases: () => Promise<AudiobookWithPurchase[]>;
-  fetchChapterProgress: (bookId: string, chapterIds: number[]) => Promise<Record<number, UserProgress>>;
+  fetchChapterProgress: (bookId: string) => Promise<Record<number, UserProgress>>;
 }
 
 export function useAudiobookData(): UseAudiobookDataReturn {
@@ -59,11 +59,11 @@ export function useAudiobookData(): UseAudiobookDataReturn {
           .eq('chapter_id', parseInt(chapterId))
           .single(),
         supabase
-          .from('user_audiobook_progress')
+          .from('user_audiobook_chapter_progress')
           .select('*')
           .eq('profile_id', user.id)
           .eq('book_id', parseInt(bookId))
-          .eq('current_chapter_id', parseInt(chapterId))
+          .eq('chapter_id', parseInt(chapterId))
           .single()
       ]);
 
@@ -154,17 +154,16 @@ export function useAudiobookData(): UseAudiobookDataReturn {
     }
   }, [supabase]);
 
-  const fetchChapterProgress = useCallback(async (bookId: string, chapterIds: number[]) => {
+  const fetchChapterProgress = useCallback(async (bookId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return {};
 
       const { data: progressData } = await supabase
-        .from('user_audiobook_progress')
+        .from('user_audiobook_chapter_progress')
         .select('*')
         .eq('profile_id', user.id)
-        .eq('book_id', parseInt(bookId))
-        .in('current_chapter_id', chapterIds);
+        .eq('book_id', parseInt(bookId));
 
       return (progressData || []).reduce((acc, progress) => {
         if (progress.current_chapter_id) {

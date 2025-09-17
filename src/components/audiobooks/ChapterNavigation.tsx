@@ -36,7 +36,10 @@ export default function ChapterNavigation({
       </button>
 
       <span className="text-sm text-gray-600 text-center">
-        Chapter {currentChapter.chapter_order} of {chapters.length}
+        {currentChapter.chapter_order === 0 
+          ? `Introduction (${chapters.length} chapters total)`
+          : `Chapter ${currentChapter.chapter_order} of ${chapters.filter(ch => ch.chapter_order > 0).length}`
+        }
       </span>
 
       <button

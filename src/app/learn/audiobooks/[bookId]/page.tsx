@@ -76,20 +76,18 @@ export default function AudiobookOverviewPage() {
       // Get progress for all chapters in a single query
       const chapterIds = (chaptersData || []).map(ch => ch.chapter_id);
       const { data: progressData } = await supabase
-        .from('user_audiobook_progress')
-        .select('current_chapter_id, current_position_seconds, is_completed')
+        .from('user_audiobook_chapter_progress')
+        .select('chapter_id, current_position_seconds, is_completed')
         .eq('profile_id', user.id)
         .eq('book_id', parseInt(bookId))
-        .in('current_chapter_id', chapterIds);
+        .in('chapter_id', chapterIds);
 
       // Create progress lookup map
       const progressMap = (progressData || []).reduce((acc, progress) => {
-        if (progress.current_chapter_id) {
-          acc[progress.current_chapter_id] = {
-            current_position_seconds: progress.current_position_seconds,
-            is_completed: progress.is_completed
-          };
-        }
+        acc[progress.chapter_id] = {
+          current_position_seconds: progress.current_position_seconds,
+          is_completed: progress.is_completed
+        };
         return acc;
       }, {} as Record<number, { current_position_seconds: number; is_completed: boolean }>);
 
