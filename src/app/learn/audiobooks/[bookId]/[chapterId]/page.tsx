@@ -8,6 +8,9 @@ import { useAudiobookData } from "@/hooks/audiobooks/useAudiobookData";
 import { useProgressSaver } from "@/hooks/audiobooks/useProgressSaver";
 import AudioPlayer from "@/components/audiobooks/AudioPlayer";
 import TextHighlighter from "@/components/audiobooks/TextHighlighter";
+import VideoPlayer from "@/components/audiobooks/VideoPlayer";
+import DisplayModeToggle from "@/components/audiobooks/DisplayModeToggle";
+import DictionaryTooltip from "@/components/audiobooks/DictionaryTooltip";
 import ChapterNavigation from "@/components/audiobooks/ChapterNavigation";
 import { AudiobookData, ChapterData, AlignmentData, UserProgress } from "@/types/audiobooks";
 import dynamic from "next/dynamic";
@@ -46,7 +49,9 @@ export default function ChapterPlayerPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [displayMode, setDisplayMode] = useState<'text' | 'video'>('text');
   const [showText, setShowText] = useState(true);
+  const [showSubtitles, setShowSubtitles] = useState(true);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [nextWordIndex, setNextWordIndex] = useState(-1);
   const [editMode, setEditMode] = useState(false);
@@ -60,11 +65,31 @@ export default function ChapterPlayerPage() {
     selectedText: "",
     triggerElement: null,
   });
+  const [dictionaryTooltip, setDictionaryTooltip] = useState<{
+    visible: boolean;
+    word: string;
+    position: { x: number; y: number };
+  }>({ visible: false, word: '', position: { x: 0, y: 0 } });
 
   useEffect(() => {
     loadChapterData();
+    loadUserPreferences();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId, chapterId]);
+
+  const loadUserPreferences = useCallback(async () => {
+    try {
+      const response = await fetch('/api/profile/preferences');
+      if (response.ok) {
+        const { preferences } = await response.json();
+        if (preferences?.audiobook_display_mode) {
+          setDisplayMode(preferences.audiobook_display_mode);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load user preferences:', error);
+    }
+  }, []);
 
   const loadChapterData = useCallback(async () => {
     try {
@@ -149,9 +174,54 @@ export default function ChapterPlayerPage() {
     });
   }, []);
 
+  const handleWordClick = useCallback((word: string, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    setDictionaryTooltip({
+      visible: true,
+      word: word.replace(/[^\w]/g, ''), // Clean word of punctuation
+      position: {
+        x: rect.left + rect.width / 2,
+        y: rect.top
+      }
+    });
+  }, []);
+
+  const closeDictionaryTooltip = useCallback(() => {
+    setDictionaryTooltip({ visible: false, word: '', position: { x: 0, y: 0 } });
+  }, []);
+
+  const handleDisplayModeChange = useCallback(async (mode: 'text' | 'video') => {
+    setDisplayMode(mode);
+    try {
+      await fetch('/api/profile/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          preferences: { audiobook_display_mode: mode }
+        })
+      });
+    } catch (error) {
+      console.error('Failed to save display mode preference:', error);
+    }
+  }, []);
+
   useEffect(() => {
     closeTooltip();
   }, [alignment, closeTooltip]);
+
+  // Close dictionary tooltip on click outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (dictionaryTooltip.visible) {
+        closeDictionaryTooltip();
+      }
+    };
+
+    if (dictionaryTooltip.visible) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [dictionaryTooltip.visible, closeDictionaryTooltip]);
 
   // Save progress when component unmounts (navigation away)
   useEffect(() => {
@@ -280,21 +350,52 @@ export default function ChapterPlayerPage() {
           onNavigate={navigateToChapter}
         />
 
-        <AudioPlayer
-          audioUrl={chapter.audio_url}
-          currentTime={currentTime}
-          duration={duration}
-          isPlaying={isPlaying}
-          showText={showText}
-          userProgress={userProgress}
-          onTimeUpdate={handleTimeUpdate}
-          onAudioEnd={handleAudioEnd}
-          onPlayPause={togglePlayPause}
-          onSeek={handleSeek}
-          onToggleText={() => setShowText(!showText)}
-          onUpdateHighlighting={updateHighlighting}
-          onDurationChange={handleDurationChange}
+        <DisplayModeToggle
+          currentMode={displayMode}
+          hasVideo={!!chapter.video_url}
+          onModeChange={handleDisplayModeChange}
         />
+
+        {displayMode === 'video' && chapter.video_url ? (
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <VideoPlayer
+              videoUrl={chapter.video_url}
+              currentTime={currentTime}
+              duration={duration}
+              isPlaying={isPlaying}
+              showSubtitles={showSubtitles}
+              alignment={alignment}
+              currentWordIndex={currentWordIndex}
+              onTimeUpdate={handleTimeUpdate}
+              onPlayPause={togglePlayPause}
+              onSeek={handleSeek}
+              onToggleSubtitles={() => setShowSubtitles(!showSubtitles)}
+              onDurationChange={handleDurationChange}
+              onWordClick={handleWordClick}
+              onAudioEnd={handleAudioEnd}
+            />
+          </div>
+        ) : displayMode === 'video' ? (
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8 text-center">
+            <p className="text-gray-500">No video available for this chapter</p>
+          </div>
+        ) : (
+          <AudioPlayer
+            audioUrl={chapter.audio_url}
+            currentTime={currentTime}
+            duration={duration}
+            isPlaying={isPlaying}
+            showText={showText}
+            userProgress={userProgress}
+            onTimeUpdate={handleTimeUpdate}
+            onAudioEnd={handleAudioEnd}
+            onPlayPause={togglePlayPause}
+            onSeek={handleSeek}
+            onToggleText={() => setShowText(!showText)}
+            onUpdateHighlighting={updateHighlighting}
+            onDurationChange={handleDurationChange}
+          />
+        )}
 
         {editMode && userRole === "admin" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -334,17 +435,28 @@ export default function ChapterPlayerPage() {
           </div>
         )}
 
-        <TextHighlighter
-          alignment={alignment}
-          currentWordIndex={currentWordIndex}
-          nextWordIndex={nextWordIndex}
-          showText={showText}
-          chapterScript={chapterScript}
-          chapterTitle={chapter.chapter_title}
-          tooltipConfig={tooltipConfig}
-          onTextSelection={handleTextSelection}
-          onCloseTooltip={closeTooltip}
-        />
+        {displayMode === 'text' && (
+          <TextHighlighter
+            alignment={alignment}
+            currentWordIndex={currentWordIndex}
+            nextWordIndex={nextWordIndex}
+            showText={showText}
+            chapterScript={chapterScript}
+            chapterTitle={chapter.chapter_title}
+            tooltipConfig={tooltipConfig}
+            onTextSelection={handleTextSelection}
+            onCloseTooltip={closeTooltip}
+          />
+        )}
+
+        {/* Dictionary Tooltip */}
+        {dictionaryTooltip.visible && (
+          <DictionaryTooltip
+            word={dictionaryTooltip.word}
+            position={dictionaryTooltip.position}
+            onClose={closeDictionaryTooltip}
+          />
+        )}
       </div>
     </div>
   );

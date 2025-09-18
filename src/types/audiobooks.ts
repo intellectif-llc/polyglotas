@@ -25,6 +25,7 @@ export interface ChapterData {
   book_id: number;
   chapter_title: string;
   audio_url: string;
+  video_url?: string;
   duration_seconds: number;
   is_free_sample: boolean;
   chapter_order: number;
