@@ -12,7 +12,7 @@ export default async function BillingPage() {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    redirect("/auth/signin");
+    redirect("/auth");
   }
 
   return <BillingDashboard />;

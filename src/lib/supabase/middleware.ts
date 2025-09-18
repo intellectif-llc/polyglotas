@@ -91,7 +91,7 @@ export async function updateSession(request: NextRequest) {
   // If no user and trying to access a protected path
   if (!user && protectedPaths.some((path) => pathname.startsWith(path))) {
     console.log(
-      `[AUTH_DEBUG] [middleware/updateSession] No user, trying to access protected path: ${pathname}. Redirecting to /auth/signin.`
+      `[AUTH_DEBUG] [middleware/updateSession] No user, trying to access protected path: ${pathname}. Redirecting to /auth.`
     );
     const url = request.nextUrl.clone();
     url.pathname = "/auth";

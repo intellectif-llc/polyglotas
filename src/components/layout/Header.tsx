@@ -35,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { data: partnership } = usePartnership();
   const { data: userStats } = useUserStats();
-  
+
   // Set up real-time stats updates
   useRealtimeUserStats();
 
@@ -97,7 +97,7 @@ const Header: React.FC<HeaderProps> = ({
         >
           <Menu size={24} />
         </button>
-        
+
         {/* Logo */}
         <div className="flex items-center space-x-2">
           <Image
@@ -128,7 +128,7 @@ const Header: React.FC<HeaderProps> = ({
             />
           </div>
         )}
-        
+
         {/* Desktop Stats - visible on desktop for redundancy */}
         {user && userStats && (
           <div className="hidden md:block">
@@ -179,7 +179,7 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         ) : (
           <Link
-            href="/auth/signin"
+            href="/auth"
             className="px-3 py-2 md:px-4 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
           >
             Sign In
