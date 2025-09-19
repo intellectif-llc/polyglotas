@@ -61,8 +61,9 @@ export default function HomeClient({ initialUser }: HomeClientProps) {
   }, [initialUser, supabaseClient]);
 
   const handleSignIn = (provider: "google" | "github" | "azure") => {
-    // Check for invitation token
-    const invitationToken = localStorage.getItem("invitation_token");
+    // If user is already logged in, they shouldn't see this component
+    // But as a safety measure, don't include invitation tokens for logged-in users
+    const invitationToken = user ? null : localStorage.getItem("invitation_token");
     const redirectUrl = invitationToken
       ? `${window.location.origin}/auth/callback?invitation_token=${invitationToken}`
       : `${window.location.origin}/auth/callback`;

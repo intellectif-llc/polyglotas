@@ -12,7 +12,15 @@ export default function LearnPage() {
 
   useEffect(() => {
     const invitationRedeemed = searchParams.get('invitation_redeemed');
+    const invitationAlreadyRedeemed = searchParams.get('invitation_already_redeemed');
+    const clearToken = searchParams.get('clear_invitation_token');
     const partnership = searchParams.get('partnership');
+    
+    // Handle invitation token cleanup
+    if (clearToken === 'true') {
+      console.log('[LEARN_PAGE] Clearing invitation token as requested');
+      localStorage.removeItem('invitation_token');
+    }
     
     if (invitationRedeemed === 'true') {
       console.log('[LEARN_PAGE] Invitation redeemed detected, invalidating cache', { partnership });
@@ -22,15 +30,23 @@ export default function LearnPage() {
       queryClient.invalidateQueries({ queryKey: ['userStats'] });
       queryClient.invalidateQueries({ queryKey: ['subscriptionTier'] });
       queryClient.invalidateQueries({ queryKey: ['pronunciationUnits'] });
-      
-      // Clear the URL parameters to avoid repeated invalidation
+    }
+    
+    if (invitationAlreadyRedeemed === 'true') {
+      console.log('[LEARN_PAGE] User tried to redeem already-redeemed invitation');
+    }
+    
+    // Clear URL parameters to avoid repeated processing
+    if (invitationRedeemed || invitationAlreadyRedeemed || clearToken) {
       const url = new URL(window.location.href);
       url.searchParams.delete('invitation_redeemed');
+      url.searchParams.delete('invitation_already_redeemed');
+      url.searchParams.delete('clear_invitation_token');
       url.searchParams.delete('partnership');
       url.searchParams.delete('t');
       window.history.replaceState({}, '', url.toString());
       
-      console.log('[LEARN_PAGE] Cache invalidated and URL cleaned');
+      console.log('[LEARN_PAGE] URL parameters cleaned');
     }
   }, [searchParams, queryClient]);
 

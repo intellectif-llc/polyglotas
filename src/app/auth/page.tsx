@@ -2,24 +2,71 @@
 
 import Link from "next/link";
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import AuthForm from "@/components/auth/AuthForm";
 
 function AuthContent() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const supabase = createSupabaseBrowserClient();
 
-  // Handle URL error parameters
+  // Industry standard: Check if user is already logged in and redirect
   useEffect(() => {
-    const urlError = searchParams.get("error");
-    const urlErrorDescription = searchParams.get("error_description");
-
-    if (urlError) {
-      setError(urlErrorDescription || urlError);
-    }
-  }, [searchParams]);
+    const checkAuthAndCleanup = async () => {
+      try {
+        // Check authentication status
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          console.log('[AUTH_PAGE] User already authenticated, redirecting to learn');
+          router.replace('/learn');
+          return;
+        }
+        
+        // Handle URL error parameters
+        const urlError = searchParams.get("error");
+        const urlErrorDescription = searchParams.get("error_description");
+        if (urlError) {
+          setError(urlErrorDescription || urlError);
+        }
+        
+        // Clear stale invitation tokens when accessing auth page directly
+        const currentUrl = window.location.href;
+        const hasInvitationContext = currentUrl.includes('invitation') || 
+                                   currentUrl.includes('invite') ||
+                                   searchParams.has('invitation_token');
+        
+        if (!hasInvitationContext) {
+          const existingToken = localStorage.getItem('invitation_token');
+          if (existingToken) {
+            console.log('[AUTH_PAGE] Clearing stale invitation token from direct auth access');
+            localStorage.removeItem('invitation_token');
+          }
+        }
+        
+      } catch (error) {
+        console.error('[AUTH_PAGE] Error checking authentication:', error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+    
+    checkAuthAndCleanup();
+  }, [searchParams, router, supabase]);
+  
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
   const handleSuccess = (message: string) => {
     setError(null);

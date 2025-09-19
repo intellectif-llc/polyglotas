@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL(`/invite/${token}`, process.env.NEXT_PUBLIC_SITE_URL));
     }
 
-    // Get invitation details
+    // Get invitation details (check all statuses first)
     console.log('[INVITE_REDEEM] Fetching invitation details', { token });
     const { data: invitation, error: invitationError } = await serviceSupabase
       .from('partnership_invitations')
@@ -34,13 +34,13 @@ export async function GET(request: NextRequest) {
         partnership:partnerships(*)
       `)
       .eq('token', token)
-      .eq('status', 'pending')
-      .gt('expires_at', new Date().toISOString())
       .single();
 
     console.log('[INVITE_REDEEM] Invitation fetch result', { 
       hasInvitation: !!invitation, 
       invitationId: invitation?.id,
+      status: invitation?.status,
+      redeemedBy: invitation?.redeemed_by_profile_id,
       partnershipId: invitation?.partnership_id,
       trialTier: invitation?.partnership?.trial_tier,
       trialDuration: invitation?.partnership?.trial_duration_days,
@@ -48,7 +48,40 @@ export async function GET(request: NextRequest) {
     });
 
     if (!invitation) {
-      console.log('[INVITE_REDEEM] ERROR: Invalid or expired invitation');
+      console.log('[INVITE_REDEEM] ERROR: Invalid invitation token');
+      return NextResponse.redirect(new URL('/invite/error?error=invalid', process.env.NEXT_PUBLIC_SITE_URL));
+    }
+
+    // Check if invitation has expired
+    if (new Date(invitation.expires_at) <= new Date()) {
+      console.log('[INVITE_REDEEM] ERROR: Invitation has expired');
+      return NextResponse.redirect(new URL('/invite/error?error=expired', process.env.NEXT_PUBLIC_SITE_URL));
+    }
+
+    // Check if invitation has already been redeemed
+    if (invitation.status === 'redeemed') {
+      console.log('[INVITE_REDEEM] Invitation already redeemed', { 
+        redeemedBy: invitation.redeemed_by_profile_id,
+        currentUser: user.id,
+        isSameUser: invitation.redeemed_by_profile_id === user.id
+      });
+      
+      // If the same user is trying to redeem again, redirect to learn page
+      if (invitation.redeemed_by_profile_id === user.id) {
+        const redirectUrl = new URL('/learn', process.env.NEXT_PUBLIC_SITE_URL);
+        redirectUrl.searchParams.set('invitation_already_redeemed', 'true');
+        redirectUrl.searchParams.set('clear_invitation_token', 'true');
+        
+        return NextResponse.redirect(redirectUrl);
+      } else {
+        // Different user trying to redeem already used invitation
+        return NextResponse.redirect(new URL('/invite/error?error=invalid', process.env.NEXT_PUBLIC_SITE_URL));
+      }
+    }
+
+    // Check if invitation is still pending
+    if (invitation.status !== 'pending') {
+      console.log('[INVITE_REDEEM] ERROR: Invitation not in pending status', { status: invitation.status });
       return NextResponse.redirect(new URL('/invite/error?error=invalid', process.env.NEXT_PUBLIC_SITE_URL));
     }
 
@@ -215,25 +248,14 @@ export async function GET(request: NextRequest) {
       console.error('[INVITE_REDEEM] ERROR: Failed to update subscription tier via function:', tierUpdateError);
     }
 
-    // Create response with script to clear localStorage
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Invitation Redeemed</title>
-        </head>
-        <body>
-          <script>
-            localStorage.removeItem('invitation_token');
-            window.location.href = '${process.env.NEXT_PUBLIC_SITE_URL}/learn?invitation_redeemed=true&partnership=${encodeURIComponent(invitation.partnership.name)}';
-          </script>
-        </body>
-      </html>
-    `;
+    // Redirect to learn page with success indicator
+    // Token cleanup will be handled client-side
+    const redirectUrl = new URL('/learn', process.env.NEXT_PUBLIC_SITE_URL);
+    redirectUrl.searchParams.set('invitation_redeemed', 'true');
+    redirectUrl.searchParams.set('partnership', invitation.partnership.name);
+    redirectUrl.searchParams.set('clear_invitation_token', 'true');
     
-    return new NextResponse(html, {
-      headers: { 'Content-Type': 'text/html' },
-    });
+    return NextResponse.redirect(redirectUrl);
 
   } catch (error) {
     console.error('[INVITE_REDEEM] FATAL ERROR: Exception during invitation redemption:', error);

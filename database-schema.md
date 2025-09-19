@@ -2834,6 +2834,67 @@ BEGIN
 END;
 
 
+## redeem_partnership_invitation
+
+### Definition
+CREATE OR REPLACE FUNCTION public.redeem_partnership_invitation(
+  p_token uuid,
+  p_user_id uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_invitation RECORD;
+  v_user_email TEXT;
+  v_result jsonb;
+BEGIN
+  -- Get user email
+  SELECT email INTO v_user_email 
+  FROM auth.users 
+  WHERE id = p_user_id;
+  
+  -- Get invitation details
+  SELECT * INTO v_invitation
+  FROM partnership_invitations
+  WHERE token = p_token
+  AND status = 'pending'
+  AND expires_at > now();
+  
+  -- Validate invitation
+  IF v_invitation IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'invalid');
+  END IF;
+  
+  -- Check email match
+  IF v_invitation.intended_for_email != v_user_email THEN
+    RETURN jsonb_build_object('success', false, 'error', 'wrong_email');
+  END IF;
+  
+  -- Update invitation (this bypasses RLS due to SECURITY DEFINER)
+  UPDATE partnership_invitations
+  SET 
+    status = 'redeemed',
+    redeemed_by_profile_id = p_user_id,
+    redeemed_at = now()
+  WHERE id = v_invitation.id;
+  
+  -- Update user profiles
+  UPDATE profiles
+  SET partnership_id = v_invitation.partnership_id
+  WHERE id = p_user_id;
+  
+  -- Return success with invitation details
+  RETURN jsonb_build_object(
+    'success', true,
+    'invitation', row_to_json(v_invitation)
+  );
+END;
+$function$;
+
+
+
 # Triggers
 
 ## trigger_update_audiobook_duration
