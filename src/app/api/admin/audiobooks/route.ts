@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
         stripePriceId = price.id;
 
         // Store Stripe product in database
-        const { error: productError } = await supabase.from("products").insert({
+        await supabase.from("products").insert({
           stripe_product_id: product.id,
           active: true,
           name: product.name,
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (dbProduct) {
-          const { error: priceError } = await supabase.from("prices").insert({
+          await supabase.from("prices").insert({
             stripe_price_id: price.id,
             product_id: dbProduct.id,
             active: true,
