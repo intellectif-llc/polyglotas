@@ -77,6 +77,32 @@ async function handlePriceSync(priceData: Record<string, unknown>) {
       console.error("Error syncing price:", error);
     } else {
       console.log(`Price ${priceData.id} synced successfully`);
+      
+      // Also update audiobook price if this is an audiobook product
+      if (product?.id) {
+        const { data: audiobookProduct } = await supabase
+          .from('products')
+          .select('book_id, product_type')
+          .eq('id', product.id)
+          .eq('product_type', 'audiobook')
+          .single();
+          
+        if (audiobookProduct?.book_id) {
+          const { error: audiobookError } = await supabase
+            .from('audiobooks')
+            .update({ 
+              price_cents: (priceData.unit_amount || priceData.amount) as number,
+              updated_at: new Date().toISOString()
+            })
+            .eq('book_id', audiobookProduct.book_id);
+            
+          if (audiobookError) {
+            console.error(`Error updating audiobook price for book_id ${audiobookProduct.book_id}:`, audiobookError);
+          } else {
+            console.log(`Audiobook price updated for book_id ${audiobookProduct.book_id}`);
+          }
+        }
+      }
     }
   } catch (error) {
     console.error("Error in handlePriceSync:", error);
