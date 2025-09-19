@@ -308,21 +308,21 @@ export default function ChapterPlayerPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
             <button
               onClick={() => router.push(`/learn/audiobooks/${bookId}`)}
-              className="p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
+              className="flex-shrink-0 p-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight truncate">
                 {chapter.chapter_title}
               </h1>
-              <p className="text-lg text-gray-600">
+              <p className="text-sm sm:text-base lg:text-lg text-gray-600 truncate">
                 {audiobook.title} by {audiobook.author}
               </p>
             </div>
@@ -331,14 +331,15 @@ export default function ChapterPlayerPage() {
           {userRole === "admin" && (
             <button
               onClick={() => setEditMode(!editMode)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap flex-shrink-0 ${
                 editMode
                   ? "bg-indigo-600 text-white"
                   : "bg-white text-gray-700 border border-gray-300"
               }`}
             >
-              <Settings className="h-4 w-4" />
-              {editMode ? "Exit Admin" : "Admin Tools"}
+              <Settings className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{editMode ? "Exit Admin" : "Admin Tools"}</span>
+              <span className="sm:hidden">{editMode ? "Exit" : "Admin"}</span>
             </button>
           )}
         </div>
@@ -357,7 +358,7 @@ export default function ChapterPlayerPage() {
         />
 
         {displayMode === 'video' && chapter.video_url ? (
-          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
             <VideoPlayer
               videoUrl={chapter.video_url}
               currentTime={currentTime}
@@ -376,8 +377,8 @@ export default function ChapterPlayerPage() {
             />
           </div>
         ) : displayMode === 'video' ? (
-          <div className="bg-white rounded-xl shadow-lg p-6 mb-8 text-center">
-            <p className="text-gray-500">No video available for this chapter</p>
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8 text-center">
+            <p className="text-gray-500 text-sm sm:text-base">No video available for this chapter</p>
           </div>
         ) : (
           <AudioPlayer
@@ -398,7 +399,7 @@ export default function ChapterPlayerPage() {
         )}
 
         {editMode && userRole === "admin" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <AudioGenerationPanel
               bookId={bookId}
               chapterId={chapterId}
@@ -424,12 +425,12 @@ export default function ChapterPlayerPage() {
 
         {/* Script Editor for Admin */}
         {editMode && userRole === "admin" && (
-          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-            <h3 className="text-lg font-semibold mb-4">Chapter Script</h3>
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Chapter Script</h3>
             <textarea
               value={chapterScript}
               onChange={(e) => setChapterScript(e.target.value)}
-              className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full h-32 sm:h-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
               placeholder="Enter or edit the chapter script here..."
             />
           </div>

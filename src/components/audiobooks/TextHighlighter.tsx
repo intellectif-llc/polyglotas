@@ -83,9 +83,9 @@ export default function TextHighlighter({
     }
 
     return (
-      <div className="text-lg leading-relaxed space-y-4">
+      <div className="text-base sm:text-lg leading-relaxed space-y-3 sm:space-y-4">
         {paragraphs.map((paragraph, pIndex) => (
-          <p key={pIndex} className="mb-4">
+          <p key={pIndex} className="mb-3 sm:mb-4">
             {paragraph}
           </p>
         ))}
@@ -127,29 +127,29 @@ export default function TextHighlighter({
   if (!showText) return null;
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-8">
-      <div className="flex items-center gap-2 mb-6">
-        <BookOpen className="h-5 w-5 text-indigo-600" />
-        <h2 className="text-xl font-semibold text-gray-900">Read Along</h2>
+    <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:p-8">
+      <div className="flex items-center gap-2 mb-4 sm:mb-6">
+        <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 flex-shrink-0" />
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Read Along</h2>
       </div>
 
-      <div className="mb-4 pb-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-800">{chapterTitle}</h3>
+      <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-gray-200">
+        <h3 className="text-base sm:text-lg font-medium text-gray-800 truncate">{chapterTitle}</h3>
       </div>
 
       <div
-        className="prose max-w-none"
+        className="prose max-w-none prose-sm sm:prose-base"
         ref={textDisplayRef}
         style={{ userSelect: 'text' }}
       >
         {alignment ? (
           renderedText
         ) : chapterScript ? (
-          <div className="text-lg leading-relaxed whitespace-pre-line text-gray-800">
+          <div className="text-base sm:text-lg leading-relaxed whitespace-pre-line text-gray-800">
             {chapterScript}
           </div>
         ) : (
-          <p className="text-gray-500 italic">No text available</p>
+          <p className="text-gray-500 italic text-sm sm:text-base">No text available</p>
         )}
       </div>
 
