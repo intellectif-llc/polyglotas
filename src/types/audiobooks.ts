@@ -68,6 +68,8 @@ export interface AudiobookWithPurchase extends AudiobookData {
   user_points: number;
   total_chapters: number;
   free_chapters: number;
+  stripe_product_id?: string;
+  stripe_price_id?: string;
 }
 
 export interface ChapterWithProgress extends ChapterData {

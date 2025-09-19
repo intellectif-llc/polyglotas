@@ -294,45 +294,69 @@ async function handleInvoicePaymentSucceeded(
   invoiceData: Record<string, unknown>
 ) {
   try {
-    let subscriptionId = (invoiceData.subscription as string) || "";
+    const metadata = invoiceData.metadata as Record<string, string> | undefined;
+    const isAudiobookPurchase = metadata?.type === 'audiobook_purchase';
     
-    // If no subscription ID in invoice, try to find active subscription for customer
-    if (!subscriptionId) {
-      const { data: activeSubscription } = await supabase
-        .from("student_subscriptions")
-        .select(`
-          stripe_subscription_id,
-          student_profiles!inner(stripe_customer_id)
-        `)
-        .eq("student_profiles.stripe_customer_id", invoiceData.customer as string)
-        .in("status", ["active", "trialing"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-        
-      if (activeSubscription?.stripe_subscription_id) {
-        subscriptionId = activeSubscription.stripe_subscription_id;
-        console.log(`Found active subscription ${subscriptionId} for customer ${invoiceData.customer}`);
-      }
-    }
-    
-    console.log(`Processing invoice ${invoiceData.id} with subscription_id: ${subscriptionId || 'NULL'}`);
-    
-    // Use the new database function to handle invoice upsert
-    const { error } = await supabase.rpc("upsert_stripe_invoice", {
-      p_stripe_invoice_id: invoiceData.id as string,
-      p_stripe_customer_id: invoiceData.customer as string,
-      p_stripe_subscription_id: subscriptionId,
-      p_invoice_data: {
-        ...invoiceData,
-        status: "paid", // Override status for successful payment
-      },
-    });
+    if (isAudiobookPurchase) {
+      // Handle audiobook purchase
+      console.log(`Processing audiobook purchase invoice ${invoiceData.id}`);
+      
+      const { error } = await supabase.rpc("upsert_audiobook_purchase", {
+        p_stripe_invoice_id: invoiceData.id as string,
+        p_stripe_customer_id: invoiceData.customer as string,
+        p_invoice_data: {
+          ...invoiceData,
+          status: "paid",
+        },
+      });
 
-    if (error) {
-      console.error("Error creating/updating invoice:", error);
+      if (error) {
+        console.error("Error processing audiobook purchase:", error);
+      } else {
+        console.log(`Audiobook purchase ${invoiceData.id} recorded successfully`);
+      }
     } else {
-      console.log(`Invoice ${invoiceData.id} payment recorded successfully`);
+      // Handle subscription invoice
+      let subscriptionId = (invoiceData.subscription as string) || "";
+      
+      // If no subscription ID in invoice, try to find active subscription for customer
+      if (!subscriptionId) {
+        const { data: activeSubscription } = await supabase
+          .from("student_subscriptions")
+          .select(`
+            stripe_subscription_id,
+            student_profiles!inner(stripe_customer_id)
+          `)
+          .eq("student_profiles.stripe_customer_id", invoiceData.customer as string)
+          .in("status", ["active", "trialing"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+          
+        if (activeSubscription?.stripe_subscription_id) {
+          subscriptionId = activeSubscription.stripe_subscription_id;
+          console.log(`Found active subscription ${subscriptionId} for customer ${invoiceData.customer}`);
+        }
+      }
+      
+      console.log(`Processing subscription invoice ${invoiceData.id} with subscription_id: ${subscriptionId || 'NULL'}`);
+      
+      // Use the existing database function to handle invoice upsert
+      const { error } = await supabase.rpc("upsert_stripe_invoice", {
+        p_stripe_invoice_id: invoiceData.id as string,
+        p_stripe_customer_id: invoiceData.customer as string,
+        p_stripe_subscription_id: subscriptionId,
+        p_invoice_data: {
+          ...invoiceData,
+          status: "paid", // Override status for successful payment
+        },
+      });
+
+      if (error) {
+        console.error("Error creating/updating subscription invoice:", error);
+      } else {
+        console.log(`Subscription invoice ${invoiceData.id} payment recorded successfully`);
+      }
     }
   } catch (error) {
     console.error("Error in handleInvoicePaymentSucceeded:", error);
@@ -396,6 +420,7 @@ async function handleCheckoutSessionCompleted(
     const subscriptionId = sessionData.subscription as string;
     const metadata = sessionData.metadata as Record<string, string> | undefined;
     const userId = metadata?.user_id;
+    const isAudiobookPurchase = metadata?.type === 'audiobook_purchase';
 
     if (userId && customerId) {
       // Ensure the customer ID is saved to the user profile
@@ -416,8 +441,11 @@ async function handleCheckoutSessionCompleted(
       `Checkout session ${sessionData.id} completed for customer ${customerId}`
     );
 
-    // If there's a subscription, it will be handled by the subscription.created event
-    if (subscriptionId) {
+    if (isAudiobookPurchase) {
+      console.log(
+        `Audiobook purchase checkout completed - invoice will be processed by invoice.payment_succeeded webhook`
+      );
+    } else if (subscriptionId) {
       console.log(
         `Subscription ${subscriptionId} will be processed by subscription.created webhook`
       );

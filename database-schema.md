@@ -6,25 +6,26 @@
 CREATE TABLE public.audiobook_alignment (
 alignment_id integer NOT NULL DEFAULT nextval('audiobook_alignment_alignment_id_seq'::regclass),
 book_id integer NOT NULL,
+chapter_id integer,
 full_text text NOT NULL,
 characters_data jsonb NOT NULL,
 words_data jsonb NOT NULL,
 loss_score numeric,
 created_at timestamp with time zone DEFAULT now(),
-chapter_id integer,
 CONSTRAINT audiobook_alignment_pkey PRIMARY KEY (alignment_id),
 CONSTRAINT audiobook_alignment_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.audiobooks(book_id),
 CONSTRAINT audiobook_alignment_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES public.audiobook_chapters(chapter_id)
 );
 CREATE TABLE public.audiobook_chapters (
 chapter_id integer NOT NULL DEFAULT nextval('audiobook_chapters_chapter_id_seq'::regclass),
-book_id bigint NOT NULL,
+book_id integer NOT NULL,
 chapter_title text NOT NULL,
-audio_url text NOT NULL,
+audio_url text,
 duration_seconds integer,
 is_free_sample boolean DEFAULT false,
 chapter_order integer NOT NULL,
 created_at timestamp with time zone DEFAULT now(),
+video_url text,
 CONSTRAINT audiobook_chapters_pkey PRIMARY KEY (chapter_id),
 CONSTRAINT audiobook_chapters_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.audiobooks(book_id)
 );
@@ -43,8 +44,8 @@ is_active boolean NOT NULL DEFAULT true,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT audiobooks_pkey PRIMARY KEY (book_id),
-CONSTRAINT fk_audiobooks_language FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-CONSTRAINT fk_audiobooks_level FOREIGN KEY (level_code) REFERENCES public.language_levels(level_code)
+CONSTRAINT audiobooks_language_code_fkey FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT audiobooks_level_code_fkey FOREIGN KEY (level_code) REFERENCES public.language_levels(level_code)
 );
 CREATE TABLE public.conversation_messages (
 message_id bigint NOT NULL DEFAULT nextval('conversation_messages_message_id_seq'::regclass),
@@ -107,10 +108,10 @@ overall_similarity_score numeric CHECK (overall_similarity_score IS NULL OR over
 word_level_feedback jsonb,
 created_at timestamp with time zone DEFAULT now(),
 CONSTRAINT dictation_attempts_pkey PRIMARY KEY (attempt_id),
+CONSTRAINT dictation_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
 CONSTRAINT dictation_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
 CONSTRAINT dictation_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT fk_dictation_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-CONSTRAINT dictation_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+CONSTRAINT fk_dictation_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code)
 );
 CREATE TABLE public.invoices (
 id integer NOT NULL DEFAULT nextval('invoices_id_seq'::regclass),
@@ -179,8 +180,8 @@ all_prompts_addressed_at timestamp with time zone,
 last_message_at timestamp with time zone,
 CONSTRAINT lesson_chat_conversations_pkey PRIMARY KEY (conversation_id),
 CONSTRAINT fk_lesson_chat_conversations_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
-CONSTRAINT lesson_chat_conversations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT lesson_chat_conversations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+CONSTRAINT lesson_chat_conversations_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT lesson_chat_conversations_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.lesson_translations (
 lesson_translation_id integer NOT NULL DEFAULT nextval('lesson_translations_lesson_translation_id_seq'::regclass),
@@ -274,7 +275,10 @@ tier_key USER-DEFINED,
 metadata jsonb,
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
-CONSTRAINT products_pkey PRIMARY KEY (id)
+book_id integer,
+product_type character varying DEFAULT 'subscription'::character varying,
+CONSTRAINT products_pkey PRIMARY KEY (id),
+CONSTRAINT products_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.audiobooks(book_id)
 );
 CREATE TABLE public.profiles (
 id uuid NOT NULL,
@@ -306,9 +310,9 @@ prosody_score numeric CHECK (prosody_score >= 0::numeric AND prosody_score <= 10
 phonetic_data jsonb,
 CONSTRAINT speech_attempts_pkey PRIMARY KEY (attempt_id),
 CONSTRAINT fk_speech_attempts_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT speech_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
 CONSTRAINT speech_attempts_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
-CONSTRAINT speech_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT speech_attempts_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+CONSTRAINT speech_attempts_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.student_profiles (
 profile_id uuid NOT NULL,
@@ -327,12 +331,13 @@ created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
 partnership_id bigint,
 selected_level_code USER-DEFINED,
+preferences jsonb DEFAULT '{}'::jsonb,
 CONSTRAINT student_profiles_pkey PRIMARY KEY (profile_id),
+CONSTRAINT fk_student_profiles_selected_level FOREIGN KEY (selected_level_code) REFERENCES public.language_levels(level_code),
 CONSTRAINT fk_student_profiles_native_lang FOREIGN KEY (native_language_code) REFERENCES public.languages(language_code),
 CONSTRAINT fk_student_profiles_target_lang FOREIGN KEY (current_target_language_code) REFERENCES public.languages(language_code),
-CONSTRAINT student_profiles_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
-CONSTRAINT fk_student_profiles_selected_level FOREIGN KEY (selected_level_code) REFERENCES public.language_levels(level_code),
-CONSTRAINT student_profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id)
+CONSTRAINT student_profiles_partnership_id_fkey FOREIGN KEY (partnership_id) REFERENCES public.partnerships(id),
+CONSTRAINT student_profiles_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.student_subscriptions (
 id integer NOT NULL DEFAULT nextval('student_subscriptions_id_seq'::regclass),
@@ -421,26 +426,26 @@ last_listened_at timestamp with time zone DEFAULT now(),
 created_at timestamp with time zone DEFAULT now(),
 updated_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_audiobook_chapter_progress_pkey PRIMARY KEY (id),
+CONSTRAINT user_audiobook_chapter_progress_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES public.audiobook_chapters(chapter_id),
 CONSTRAINT user_audiobook_chapter_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT user_audiobook_chapter_progress_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.audiobooks(book_id),
-CONSTRAINT user_audiobook_chapter_progress_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES public.audiobook_chapters(chapter_id)
+CONSTRAINT user_audiobook_chapter_progress_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.audiobooks(book_id)
 );
 CREATE TABLE public.user_audiobook_progress (
 progress_id integer NOT NULL DEFAULT nextval('user_audiobook_progress_progress_id_seq'::regclass),
 profile_id uuid NOT NULL,
 book_id integer NOT NULL,
+current_chapter_id integer,
 current_position_seconds numeric DEFAULT 0,
 last_read_at timestamp with time zone DEFAULT now(),
 is_completed boolean DEFAULT false,
 completed_at timestamp with time zone,
-current_chapter_id integer,
 total_chapters integer DEFAULT 0,
 completed_chapters integer DEFAULT 0,
 completion_percentage numeric DEFAULT 0,
 CONSTRAINT user_audiobook_progress_pkey PRIMARY KEY (progress_id),
 CONSTRAINT user_audiobook_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
 CONSTRAINT user_audiobook_progress_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.audiobooks(book_id),
-CONSTRAINT user_audiobook_progress_chapter_id_fkey FOREIGN KEY (current_chapter_id) REFERENCES public.audiobook_chapters(chapter_id)
+CONSTRAINT user_audiobook_progress_current_chapter_id_fkey FOREIGN KEY (current_chapter_id) REFERENCES public.audiobook_chapters(chapter_id)
 );
 CREATE TABLE public.user_audiobook_purchases (
 purchase_id integer NOT NULL DEFAULT nextval('user_audiobook_purchases_purchase_id_seq'::regclass),
@@ -471,15 +476,15 @@ lesson_id integer NOT NULL,
 started_at timestamp with time zone DEFAULT now(),
 last_progress_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_lesson_progress_pkey PRIMARY KEY (progress_id),
-CONSTRAINT user_lesson_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT user_lesson_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+CONSTRAINT user_lesson_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
+CONSTRAINT user_lesson_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_level_completion (
 profile_id uuid NOT NULL,
 level_code USER-DEFINED NOT NULL,
 completed_at timestamp with time zone NOT NULL DEFAULT now(),
 created_at timestamp with time zone NOT NULL DEFAULT now(),
-CONSTRAINT user_level_completion_pkey PRIMARY KEY (profile_id, level_code),
+CONSTRAINT user_level_completion_pkey PRIMARY KEY (level_code, profile_id),
 CONSTRAINT user_level_completion_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
 CONSTRAINT user_level_completion_level_code_fkey FOREIGN KEY (level_code) REFERENCES public.language_levels(level_code)
 );
@@ -498,9 +503,9 @@ dictation_last_attempt_at timestamp with time zone,
 last_progress_at timestamp with time zone DEFAULT now(),
 CONSTRAINT user_phrase_progress_pkey PRIMARY KEY (phrase_progress_id),
 CONSTRAINT fk_user_phrase_progress_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
+CONSTRAINT user_phrase_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id),
 CONSTRAINT user_phrase_progress_phrase_id_fkey FOREIGN KEY (phrase_id) REFERENCES public.vocabulary_phrases(id),
-CONSTRAINT user_phrase_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT user_phrase_progress_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(lesson_id)
+CONSTRAINT user_phrase_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
 CREATE TABLE public.user_points_log (
 log_id integer NOT NULL DEFAULT nextval('user_points_log_log_id_seq'::regclass),
@@ -515,10 +520,10 @@ notes text,
 created_at timestamp with time zone DEFAULT now(),
 activity_type USER-DEFINED,
 CONSTRAINT user_points_log_pkey PRIMARY KEY (log_id),
+CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id),
 CONSTRAINT fk_user_points_log_related_word_lang FOREIGN KEY (related_word_language_code) REFERENCES public.languages(language_code),
 CONSTRAINT user_points_log_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
-CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id),
-CONSTRAINT user_points_log_related_phrase_id_fkey FOREIGN KEY (related_phrase_id) REFERENCES public.vocabulary_phrases(id)
+CONSTRAINT user_points_log_related_lesson_id_fkey FOREIGN KEY (related_lesson_id) REFERENCES public.lessons(lesson_id)
 );
 CREATE TABLE public.user_tour_progress (
 profile_id uuid NOT NULL,
@@ -527,7 +532,7 @@ status USER-DEFINED NOT NULL DEFAULT 'pending'::tour_progress_status,
 last_completed_step integer NOT NULL DEFAULT 0,
 completed_at timestamp with time zone,
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
-CONSTRAINT user_tour_progress_pkey PRIMARY KEY (profile_id, tour_id),
+CONSTRAINT user_tour_progress_pkey PRIMARY KEY (tour_id, profile_id),
 CONSTRAINT user_tour_progress_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id),
 CONSTRAINT user_tour_progress_tour_id_fkey FOREIGN KEY (tour_id) REFERENCES public.tours(tour_id)
 );
@@ -2350,167 +2355,173 @@ RETURN level_code_param = ANY(public.get_user_available_levels(profile_id_param)
 END;
 $function$;
 
-
 ## calculate_book_completion
--- Fix completion percentage calculation and handle new chapters gracefully
--- CORRECTED VERSION based on actual database schema
 
--- 1. Update the calculate_book_completion function to cap at 100%
-CREATE OR REPLACE FUNCTION public.calculate_book_completion(p_profile_id UUID, p_book_id INTEGER)
-RETURNS TABLE(
-    total_chapters INTEGER,
-    completed_chapters INTEGER,
-    completion_percentage NUMERIC,
-    is_book_completed BOOLEAN
-) AS $$
+### Description
+
+Calculates a user's completion status for a specific audiobook. It determines the total chapters, the number of chapters the user has finished, the completion percentage, and whether the entire book is completed.
+
+### Parameters
+
+p_profile_id (UUID): The unique identifier of the user's profile.
+p_book_id (INTEGER): The unique identifier of the audiobook.
+
+### Returns
+
+total_chapters (INTEGER): The total number of chapters in the book.
+completed_chapters (INTEGER): The number of chapters the user has marked as complete for the book.
+completion_percentage (NUMERIC): The percentage of chapters completed, calculated as (completed / total) \* 100.
+is_book_completed (BOOLEAN): true if completed_chapters equals total_chapters (and total_chapters is greater than 0), otherwise false.
+
+### Definition
+
 DECLARE
-    v_total_chapters INTEGER;
-    v_completed_chapters INTEGER;
-    v_completion_percentage NUMERIC;
-    v_is_book_completed BOOLEAN;
+v_total_chapters INTEGER;
+v_completed_chapters INTEGER;
+v_completion_percentage NUMERIC;
+v_is_book_completed BOOLEAN;
 BEGIN
-    -- Get total chapters for the book
-    SELECT COUNT(*) INTO v_total_chapters
-    FROM public.audiobook_chapters
-    WHERE book_id = p_book_id;
-    
+-- Get total chapters for the book
+SELECT COUNT(\*) INTO v_total_chapters
+FROM public.audiobook_chapters
+WHERE book_id = p_book_id;
+
     -- Get completed chapters for the user
     SELECT COUNT(*) INTO v_completed_chapters
     FROM public.user_audiobook_chapter_progress
-    WHERE profile_id = p_profile_id 
-    AND book_id = p_book_id 
+    WHERE profile_id = p_profile_id
+    AND book_id = p_book_id
     AND is_completed = true;
-    
+
     -- Calculate completion percentage (capped at 100%)
-    v_completion_percentage := CASE 
-        WHEN v_total_chapters > 0 THEN 
+    v_completion_percentage := CASE
+        WHEN v_total_chapters > 0 THEN
             LEAST(100, (v_completed_chapters::NUMERIC / v_total_chapters::NUMERIC) * 100)
         ELSE 0
     END;
-    
+
     -- Determine if book is completed (all chapters completed)
     v_is_book_completed := v_completed_chapters = v_total_chapters AND v_total_chapters > 0;
-    
-    RETURN QUERY SELECT 
+
+    RETURN QUERY SELECT
         v_total_chapters,
         v_completed_chapters,
         v_completion_percentage,
         v_is_book_completed;
-END;
-$$ LANGUAGE plpgsql;
 
--- 2. Create function to handle new chapters added to completed books
-CREATE OR REPLACE FUNCTION public.handle_new_chapter_added()
-RETURNS TRIGGER AS $$
+END;
+
+## handle_new_chapter_added
+
+### Description
+
+A trigger function designed to run automatically when a new chapter is added to the audiobook_chapters table. It updates all existing user progress records for that specific book, ensuring that the total chapter count and completion percentages are accurate after the new chapter is included. It also resets the book's overall completion status to false.
+
+### Parametesr
+
+This is a trigger function and does not accept any direct arguments. It implicitly receives context from the NEW record, which represents the newly inserted chapter row.
+
+### Returns
+
+Returns a TRIGGER data type. Specifically, it returns the NEW record, which allows the INSERT operation that fired the trigger to proceed successfully.
+
+### Definition
+
 BEGIN
-    -- When a new chapter is added, update all user progress for this book
-    -- to reflect the new total and recalculate completion
-    UPDATE public.user_audiobook_progress 
-    SET 
-        total_chapters = (
-            SELECT COUNT(*) 
-            FROM public.audiobook_chapters 
-            WHERE book_id = NEW.book_id
-        ),
-        completion_percentage = (
-            SELECT LEAST(100, CASE 
-                WHEN COUNT(ac.*) > 0 THEN 
-                    (COUNT(CASE WHEN uacp.is_completed THEN 1 END)::NUMERIC / COUNT(ac.*)::NUMERIC) * 100
-                ELSE 0 
-            END)
-            FROM public.audiobook_chapters ac
-            LEFT JOIN public.user_audiobook_chapter_progress uacp 
-                ON ac.chapter_id = uacp.chapter_id 
-                AND uacp.profile_id = user_audiobook_progress.profile_id
-            WHERE ac.book_id = NEW.book_id
-        ),
-        is_completed = false, -- Reset completion status when new chapters are added
-        completed_at = NULL   -- Clear completion timestamp
-    WHERE book_id = NEW.book_id;
-    
+-- When a new chapter is added, update all user progress for this book
+-- to reflect the new total and recalculate completion
+UPDATE public.user*audiobook_progress
+SET
+total_chapters = (
+SELECT COUNT(*)
+FROM public.audiobook*chapters
+WHERE book_id = NEW.book_id
+),
+completion_percentage = (
+SELECT LEAST(100, CASE
+WHEN COUNT(ac.*) > 0 THEN
+(COUNT(CASE WHEN uacp.is*completed THEN 1 END)::NUMERIC / COUNT(ac.*)::NUMERIC) \_ 100
+ELSE 0
+END)
+FROM public.audiobook_chapters ac
+LEFT JOIN public.user_audiobook_chapter_progress uacp
+ON ac.chapter_id = uacp.chapter_id
+AND uacp.profile_id = user_audiobook_progress.profile_id
+WHERE ac.book_id = NEW.book_id
+),
+is_completed = false, -- Reset completion status when new chapters are added
+completed_at = NULL -- Clear completion timestamp
+WHERE book_id = NEW.book_id;
+
     RETURN NEW;
+
 END;
-$$ LANGUAGE plpgsql;
 
--- 3. Create trigger for new chapter additions
-DROP TRIGGER IF EXISTS trigger_new_chapter_added ON public.audiobook_chapters;
-CREATE TRIGGER trigger_new_chapter_added
-    AFTER INSERT ON public.audiobook_chapters
-    FOR EACH ROW
-    EXECUTE FUNCTION public.handle_new_chapter_added();
+## check_audiobook_ownership
 
--- 4. Fix existing completion percentages over 100%
-UPDATE public.user_audiobook_progress 
-SET completion_percentage = LEAST(100, completion_percentage)
-WHERE completion_percentage > 100;
+### Description
 
--- 5. Create function to automatically update audiobook duration
-CREATE OR REPLACE FUNCTION public.update_audiobook_duration()
-RETURNS TRIGGER AS $$
+Checks if a specific user has purchased a specific audiobook by looking for a corresponding record in the user_audiobook_purchases table.
+
+### Parameters
+
+p_profile_id (UUID): The unique identifier of the user's profile.
+p_book_id (INTEGER): The unique identifier of the audiobook.
+
+### Returns
+
+A BOOLEAN value: true if the user owns the audiobook, otherwise false.
+
+### definition
+
 BEGIN
-    -- Update the audiobook's total duration when chapter duration changes
-    UPDATE public.audiobooks 
-    SET 
-        duration_seconds = (
-            SELECT COALESCE(SUM(duration_seconds), 0)
-            FROM public.audiobook_chapters 
-            WHERE book_id = COALESCE(NEW.book_id, OLD.book_id)
-            AND duration_seconds IS NOT NULL
-        ),
-        updated_at = now()
-    WHERE book_id = COALESCE(NEW.book_id, OLD.book_id);
-    
-    RETURN COALESCE(NEW, OLD);
+RETURN EXISTS (
+SELECT 1 FROM user_audiobook_purchases
+WHERE profile_id = p_profile_id AND book_id = p_book_id
+);
 END;
-$$ LANGUAGE plpgsql;
-
--- 6. Create triggers for automatic audiobook duration updates
-DROP TRIGGER IF EXISTS trigger_update_audiobook_duration_insert ON public.audiobook_chapters;
-DROP TRIGGER IF EXISTS trigger_update_audiobook_duration_update ON public.audiobook_chapters;
-DROP TRIGGER IF EXISTS trigger_update_audiobook_duration_delete ON public.audiobook_chapters;
-
-CREATE TRIGGER trigger_update_audiobook_duration_insert
-    AFTER INSERT ON public.audiobook_chapters
-    FOR EACH ROW
-    EXECUTE FUNCTION public.update_audiobook_duration();
-
-CREATE TRIGGER trigger_update_audiobook_duration_update
-    AFTER UPDATE OF duration_seconds ON public.audiobook_chapters
-    FOR EACH ROW
-    EXECUTE FUNCTION public.update_audiobook_duration();
-
-CREATE TRIGGER trigger_update_audiobook_duration_delete
-    AFTER DELETE ON public.audiobook_chapters
-    FOR EACH ROW
-    EXECUTE FUNCTION public.update_audiobook_duration();
-
 
 ## update_chapter_progress
-CREATE OR REPLACE FUNCTION public.update_chapter_progress(
-    p_profile_id UUID,
-    p_book_id INTEGER,
-    p_chapter_id INTEGER,
-    p_position_seconds NUMERIC,
-    p_chapter_duration_seconds INTEGER DEFAULT NULL
-)
-RETURNS BOOLEAN AS $$
+
+### Description
+
+This is a comprehensive function to track and save a user's listening progress for an audiobook chapter. It performs two key actions:
+
+Upserts Chapter Progress: It creates or updates the user's progress for a specific chapter, storing their current position in seconds. A chapter is automatically marked as "completed" if the user's position surpasses 95% of its total duration.
+
+Updates Overall Book Progress: After updating the chapter, it recalculates and upserts the user's overall progress for the entire book, updating total chapters completed, completion percentage, and the book's final completion status.
+
+### Parameters
+
+p_profile_id (UUID): The unique identifier of the user's profile.
+p_book_id (INTEGER): The unique identifier of the audiobook.
+p_chapter_id (INTEGER): The unique identifier of the chapter being listened to.
+p_position_seconds (NUMERIC): The user's current playback position within the chapter, in seconds.
+p_chapter_duration_seconds (INTEGER): The total duration of the chapter in seconds, used to calculate completion.
+
+### Returns
+
+Returns a BOOLEAN value (true) to indicate that the progress was processed successfully.
+
+### Definition
+
 DECLARE
-    v_is_completed BOOLEAN := false;
-    v_completion_threshold NUMERIC := 0.95;
+v_is_completed BOOLEAN := false;
+v_completion_threshold NUMERIC := 0.95;
 BEGIN
-    -- Determine if chapter is completed (95% watched or explicit completion)
-    IF p_chapter_duration_seconds IS NOT NULL AND p_position_seconds >= (p_chapter_duration_seconds * v_completion_threshold) THEN
-        v_is_completed := true;
-    END IF;
-    
+-- Determine if chapter is completed (95% watched or explicit completion)
+IF p_chapter_duration_seconds IS NOT NULL AND p_position_seconds >= (p_chapter_duration_seconds \* v_completion_threshold) THEN
+v_is_completed := true;
+END IF;
+
     -- Upsert chapter progress with FIXED logic
     INSERT INTO public.user_audiobook_chapter_progress (
-        profile_id, book_id, chapter_id, current_position_seconds, 
+        profile_id, book_id, chapter_id, current_position_seconds,
         is_completed, completed_at, last_listened_at, created_at, updated_at
     )
     VALUES (
         p_profile_id, p_book_id, p_chapter_id, p_position_seconds,
-        v_is_completed, 
+        v_is_completed,
         CASE WHEN v_is_completed THEN now() ELSE NULL END,
         now(), now(), now()
     )
@@ -2518,19 +2529,19 @@ BEGIN
     DO UPDATE SET
         current_position_seconds = EXCLUDED.current_position_seconds,
         -- FIXED: Allow completion to be set to true when threshold is met
-        is_completed = CASE 
+        is_completed = CASE
             WHEN user_audiobook_chapter_progress.is_completed = true THEN true  -- Keep completed status
             WHEN EXCLUDED.is_completed = true THEN true  -- Allow new completion
             ELSE false  -- Otherwise keep as incomplete
         END,
-        completed_at = CASE 
+        completed_at = CASE
             WHEN user_audiobook_chapter_progress.completed_at IS NOT NULL THEN user_audiobook_chapter_progress.completed_at  -- Keep existing completion time
             WHEN EXCLUDED.is_completed = true AND user_audiobook_chapter_progress.is_completed = false THEN now()  -- Set completion time for newly completed
-            ELSE NULL 
+            ELSE NULL
         END,
         last_listened_at = EXCLUDED.last_listened_at,
         updated_at = EXCLUDED.updated_at;
-    
+
     -- Update book-level progress
     WITH book_stats AS (
         SELECT * FROM public.calculate_book_completion(p_profile_id, p_book_id)
@@ -2540,10 +2551,10 @@ BEGIN
         total_chapters, completed_chapters, completion_percentage,
         is_completed, completed_at, last_read_at
     )
-    SELECT 
+    SELECT
         p_profile_id, p_book_id, p_chapter_id, p_position_seconds,
         bs.total_chapters, bs.completed_chapters, LEAST(100, bs.completion_percentage),
-        bs.is_book_completed, 
+        bs.is_book_completed,
         CASE WHEN bs.is_book_completed THEN now() ELSE NULL END,
         now()
     FROM book_stats bs
@@ -2555,18 +2566,291 @@ BEGIN
         completed_chapters = EXCLUDED.completed_chapters,
         completion_percentage = LEAST(100, EXCLUDED.completion_percentage),
         -- FIXED: Same logic fix for book completion
-        is_completed = CASE 
+        is_completed = CASE
             WHEN user_audiobook_progress.is_completed = true THEN true
             WHEN EXCLUDED.is_completed = true THEN true
             ELSE false
         END,
-        completed_at = CASE 
+        completed_at = CASE
             WHEN user_audiobook_progress.completed_at IS NOT NULL THEN user_audiobook_progress.completed_at
             WHEN EXCLUDED.is_completed = true AND user_audiobook_progress.is_completed = false THEN now()
             ELSE NULL
         END,
         last_read_at = EXCLUDED.last_read_at;
-    
+
     RETURN true;
+
 END;
-$$ LANGUAGE plpgsql;
+
+## get_user_audiobook_purchases
+
+### Description
+
+Retrieves a detailed list of all audiobooks purchased by a specific user, ordered from the most to least recent purchase. It joins purchase information with audiobook details and links to any associated Stripe invoices.
+
+### Parameters
+
+p_profile_id (UUID): The unique identifier of the user's profile.
+
+### Returns
+
+Returns a TABLE containing a set of rows with the following columns for each purchased audiobook:
+book_id (INTEGER): The unique identifier of the audiobook.
+title (CHARACTER VARYING): The title of the audiobook.
+author (CHARACTER VARYING): The author of the audiobook.
+cover_image_url (CHARACTER VARYING): The URL for the audiobook's cover image.
+purchase_type (purchase_type_enum): The method of purchase (e.g., 'money' or 'points').
+amount_paid_cents (INTEGER): The amount paid in cents, if purchased with money.
+points_spent (INTEGER): The number of points spent, if purchased with points.
+purchased_at (TIMESTAMP WITH TIME ZONE): The timestamp of when the purchase was made.
+invoice_pdf_url (TEXT): A URL to the PDF of the Stripe invoice, if available.
+hosted_invoice_url (TEXT): A URL to the Stripe-hosted invoice page, if available.
+
+### Definition
+
+BEGIN
+RETURN QUERY
+SELECT
+a.book_id,
+a.title,
+a.author,
+a.cover_image_url,
+p.purchase_type,
+p.amount_paid_cents,
+p.points_spent,
+p.purchased_at,
+i.invoice_pdf_url,
+i.hosted_invoice_url
+FROM user_audiobook_purchases p
+JOIN audiobooks a ON p.book_id = a.book_id
+LEFT JOIN invoices i ON i.profile_id = p.profile_id
+AND (i.metadata->>'book_id')::INTEGER = p.book_id
+WHERE p.profile_id = p_profile_id
+ORDER BY p.purchased_at DESC;
+END;
+
+## update_audiobook_duration
+
+### Description
+
+A trigger function that automatically recalculates and updates the total duration_seconds of an audiobook whenever one of its chapters is inserted, updated, or deleted. It ensures the parent audiobooks record always reflects the accurate total duration of all its associated chapters.
+
+### Parameters
+
+This is a trigger function and does not accept any direct arguments. It implicitly receives context from special trigger variables like NEW (the new row data) and OLD (the old row data).
+
+### Returns
+
+Returns a TRIGGER data type. It returns the appropriate record (NEW or OLD) to allow the original INSERT, UPDATE, or DELETE operation to proceed successfully.
+
+### Definition
+
+BEGIN
+-- Log trigger execution
+RAISE NOTICE 'update_audiobook_duration triggered: operation=%, book_id=%',
+TG_OP, COALESCE(NEW.book_id, OLD.book_id);
+
+    -- Update the audiobook's total duration when chapter duration changes
+    UPDATE public.audiobooks
+    SET
+        duration_seconds = (
+            SELECT COALESCE(SUM(duration_seconds), 0)
+            FROM public.audiobook_chapters
+            WHERE book_id = COALESCE(NEW.book_id, OLD.book_id)
+            AND duration_seconds IS NOT NULL
+        ),
+        updated_at = now()
+    WHERE book_id = COALESCE(NEW.book_id, OLD.book_id);
+
+    -- Log the result
+    RAISE NOTICE 'Audiobook duration updated for book_id=%: new_duration=%',
+        COALESCE(NEW.book_id, OLD.book_id),
+        (SELECT duration_seconds FROM public.audiobooks WHERE book_id = COALESCE(NEW.book_id, OLD.book_id));
+
+    RETURN COALESCE(NEW, OLD);
+
+END;
+
+## upsert_audiobook_purchase
+
+### Description
+
+Processes a one-time audiobook purchase, typically called from a Stripe webhook handler. This function finds the user's profile via their Stripe customer ID, extracts the audiobook ID from the invoice metadata, and then performs two key database operations:
+
+Creates an entry in the user_audiobook_purchases table to grant ownership of the book to the user.
+
+Creates or updates a corresponding record in the invoices table to log the financial transaction details.
+
+The function will raise an exception if the customer ID or book ID cannot be found.
+
+### Parameters
+
+p_stripe_invoice_id (TEXT): The unique invoice identifier from Stripe.
+p_stripe_customer_id (TEXT): The unique customer identifier from Stripe.
+p_invoice_data (JSONB): The full JSONB payload of the invoice object, typically received from a Stripe webhook.
+
+### Returns
+
+This function returns VOID as it performs actions on the database but does not return any value.
+
+### Definition
+
+DECLARE
+v_profile_id UUID;
+v_book_id INTEGER;
+v_amount_paid INTEGER;
+BEGIN
+-- Get profile_id from stripe_customer_id
+SELECT profile_id INTO v_profile_id
+FROM student_profiles
+WHERE stripe_customer_id = p_stripe_customer_id;
+
+IF v_profile_id IS NULL THEN
+RAISE EXCEPTION 'Customer not found: %', p_stripe_customer_id;
+END IF;
+
+-- Extract book_id from invoice metadata (fixed JSONB access)
+v_book_id := (p_invoice_data->'metadata'->>'book_id')::INTEGER;
+v_amount_paid := (p_invoice_data->>'amount_paid')::INTEGER;
+
+IF v_book_id IS NULL THEN
+RAISE EXCEPTION 'Book ID not found in invoice metadata';
+END IF;
+
+-- Insert purchase record
+INSERT INTO user_audiobook_purchases (
+profile_id,
+book_id,
+purchase_type,
+amount_paid_cents,
+purchased_at
+) VALUES (
+v_profile_id,
+v_book_id,
+'money',
+v_amount_paid,
+NOW()
+) ON CONFLICT (profile_id, book_id) DO NOTHING;
+
+-- Insert/update invoice record
+INSERT INTO invoices (
+profile_id,
+stripe_invoice_id,
+stripe_customer_id,
+status,
+amount_due,
+amount_paid,
+amount_remaining,
+currency,
+paid_at,
+invoice_pdf_url,
+hosted_invoice_url,
+metadata,
+issued_at
+) VALUES (
+v_profile_id,
+p_stripe_invoice_id,
+p_stripe_customer_id,
+(p_invoice_data->>'status')::invoice_status_enum,
+COALESCE((p_invoice_data->>'amount_due')::INTEGER, 0),
+COALESCE((p_invoice_data->>'amount_paid')::INTEGER, 0),
+COALESCE((p_invoice_data->>'amount_remaining')::INTEGER, 0),
+COALESCE(p_invoice_data->>'currency', 'usd'),
+CASE WHEN p_invoice_data->>'status' = 'paid' THEN NOW() ELSE NULL END,
+p_invoice_data->>'invoice_pdf',
+p_invoice_data->>'hosted_invoice_url',
+p_invoice_data,
+TO_TIMESTAMP((p_invoice_data->>'created')::INTEGER)
+) ON CONFLICT (stripe_invoice_id) DO UPDATE SET
+status = EXCLUDED.status,
+amount_paid = EXCLUDED.amount_paid,
+amount_remaining = EXCLUDED.amount_remaining,
+paid_at = EXCLUDED.paid_at,
+invoice_pdf_url = EXCLUDED.invoice_pdf_url,
+hosted_invoice_url = EXCLUDED.hosted_invoice_url,
+metadata = EXCLUDED.metadata,
+updated_at = NOW();
+
+END;
+
+## expire_partnership_trials
+
+### Description
+
+A maintenance function, typically run on a schedule (e.g., daily), that finds and processes all expired partnership trials. For each user with an expired trial, it updates their trial subscription status to 'canceled' and then recalculates their overall subscription tier to ensure their access rights are accurate.
+
+### Parameters
+
+This function does not accept any arguments.
+
+### Returns
+
+This function returns VOID as it performs actions on the database but does not return any value.
+
+### Definition
+
+DECLARE
+expired*profile_id uuid;
+BEGIN
+-- Loop through expired trials and update each user's tier
+FOR expired_profile_id IN
+SELECT DISTINCT profile_id
+FROM student_subscriptions
+WHERE status = 'trialing'
+AND trial_end_at <= NOW()
+AND stripe_subscription_id LIKE 'trial*%'
+LOOP
+-- Update the subscription status first
+UPDATE student*subscriptions
+SET
+status = 'canceled',
+ended_at = NOW(),
+updated_at = NOW()
+WHERE profile_id = expired_profile_id
+AND status = 'trialing'
+AND stripe_subscription_id LIKE 'trial*%';
+
+    -- Then update the user's subscription tier using existing function
+    PERFORM update_user_subscription_tier(expired_profile_id);
+
+END LOOP;
+END;
+
+## can_user_access_level
+
+### Description
+An access-control function that checks if a user is permitted to access a specific language level. It works by calling the get_user_available_levels function and checking if the requested level exists in the array of levels available to that user.
+
+### Parameters
+profile_id_param (UUID): The unique identifier of the user's profile.
+level_code_param (level_enum): The language level code to check for access (e.g., 'A1', 'B2').
+
+### Returns
+Returns a BOOLEAN: true if the user can access the level, otherwise false.
+
+### Definition
+BEGIN
+    RETURN level_code_param = ANY(public.get_user_available_levels(profile_id_param));
+END;
+
+
+# Triggers
+
+## trigger_update_audiobook_duration
+
+CREATE TRIGGER trigger_update_audiobook_duration
+AFTER INSERT OR DELETE OR UPDATE OF duration_seconds ON public.audiobook_chapters
+FOR EACH ROW EXECUTE FUNCTION public.update_audiobook_duration();
+
+$$
+$$
+
+## handle_new_chapter_added
+CREATE TRIGGER trigger_new_chapter_added
+AFTER INSERT ON public.audiobook_chapters
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_chapter_added();
+
+## on_auth_user_created
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_profile();

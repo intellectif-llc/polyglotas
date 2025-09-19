@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Play, Lock, Clock, BookOpen, Edit, Plus } from 'lucide-react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Play, Lock, Clock, BookOpen, Edit, Plus, CheckCircle } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import dynamic from 'next/dynamic';
 
@@ -20,6 +20,7 @@ interface AudiobookWithPurchase extends AudiobookData {
 export default function AudiobookOverviewPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const bookId = params.bookId as string;
   const supabase = createSupabaseBrowserClient();
   const { role: userRole } = useUserRole();
@@ -29,11 +30,33 @@ export default function AudiobookOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [showCreateChapterForm, setShowCreateChapterForm] = useState(false);
+  const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
 
   useEffect(() => {
     fetchAudiobookData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
+
+  // Handle purchase success from URL params
+  useEffect(() => {
+    const purchased = searchParams.get('purchased');
+    
+    if (purchased === 'true') {
+      setShowPurchaseSuccess(true);
+      // Clean up URL
+      router.replace(`/learn/audiobooks/${bookId}`, { scroll: false });
+      // Refresh data to show new purchase status
+      fetchAudiobookData();
+    }
+
+    // Auto-hide message after 5 seconds
+    const timer = setTimeout(() => {
+      setShowPurchaseSuccess(false);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, router, bookId]);
 
   const fetchAudiobookData = async () => {
     try {
@@ -166,6 +189,18 @@ export default function AudiobookOverviewPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
+        {/* Purchase Success Message */}
+        {showPurchaseSuccess && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+              <p className="text-green-800">
+                Audiobook purchased successfully! You now have access to all chapters.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">

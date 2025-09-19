@@ -124,6 +124,12 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
           isActive: pathname.startsWith("/account/billing"),
         },
         {
+          href: "/account/purchases",
+          label: "Purchases",
+          icon: Headphones,
+          isActive: pathname.startsWith("/account/purchases"),
+        },
+        {
           href: "/account/settings",
           label: "Settings",
           icon: Settings,

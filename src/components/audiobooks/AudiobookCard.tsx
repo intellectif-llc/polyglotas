@@ -1,7 +1,12 @@
-'use client';
+"use client";
 
-import { Book, Coins, DollarSign, Play, Lock } from 'lucide-react';
-import { AudiobookWithPurchase, PurchaseType, UserRole } from '@/types/audiobooks';
+import { Book, Coins, DollarSign, Play, Lock, Loader2 } from "lucide-react";
+import {
+  AudiobookWithPurchase,
+  PurchaseType,
+  UserRole,
+} from "@/types/audiobooks";
+import { useAudiobookCheckout } from "@/hooks/audiobooks/useAudiobookCheckout";
 
 interface AudiobookCardProps {
   audiobook: AudiobookWithPurchase;
@@ -16,8 +21,12 @@ export default function AudiobookCard({
   userPoints,
   userRole,
   onPurchase,
-  onClick
+  onClick,
 }: AudiobookCardProps) {
+  const {
+    createCheckout,
+    isLoading: isCheckoutLoading,
+  } = useAudiobookCheckout();
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -29,14 +38,14 @@ export default function AudiobookCard({
   };
 
   const canAffordWithPoints = userPoints >= audiobook.points_cost;
-  const canAccess = audiobook.is_purchased || userRole === 'admin';
+  const canAccess = audiobook.is_purchased || userRole === "admin";
 
   return (
     <div
       className={`group rounded-xl shadow-lg overflow-hidden transition-all duration-300 ${
         canAccess
-          ? 'hover:shadow-xl cursor-pointer transform hover:-translate-y-1'
-          : 'opacity-90'
+          ? "hover:shadow-xl cursor-pointer transform hover:-translate-y-1"
+          : "opacity-90"
       }`}
       onClick={() => canAccess && onClick(audiobook)}
     >
@@ -89,13 +98,13 @@ export default function AudiobookCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onPurchase(audiobook, 'points');
+                  onPurchase(audiobook, "points");
                 }}
                 disabled={!canAffordWithPoints}
                 className={`flex-1 text-xs font-semibold py-1 px-2 rounded transition-colors flex items-center justify-center gap-1 ${
                   canAffordWithPoints
-                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 }`}
               >
                 <Coins className="h-3 w-3" />
@@ -103,14 +112,25 @@ export default function AudiobookCard({
                 {!canAffordWithPoints && <Lock className="h-3 w-3" />}
               </button>
               <button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  onPurchase(audiobook, 'money');
+                  if (audiobook.price_cents > 0) {
+                    await createCheckout(audiobook.book_id);
+                  } else {
+                    onPurchase(audiobook, "money");
+                  }
                 }}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-1 px-2 rounded transition-colors flex items-center justify-center gap-1"
+                disabled={isCheckoutLoading}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-xs font-semibold py-1 px-2 rounded transition-colors flex items-center justify-center gap-1 cursor-pointer"
               >
-                <DollarSign className="h-3 w-3" />
-                {formatPrice(audiobook.price_cents)}
+                {isCheckoutLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <>
+                    <DollarSign className="h-3 w-3" />
+                    {formatPrice(audiobook.price_cents)}
+                  </>
+                )}
               </button>
             </div>
           )}
