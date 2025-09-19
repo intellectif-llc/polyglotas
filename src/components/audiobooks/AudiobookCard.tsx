@@ -38,7 +38,7 @@ export default function AudiobookCard({
   };
 
   const canAffordWithPoints = userPoints >= audiobook.points_cost;
-  const canAccess = audiobook.is_purchased || userRole === "admin";
+  const canAccess = audiobook.is_purchased || userRole === "admin" || audiobook.free_chapters > 0;
 
   return (
     <div

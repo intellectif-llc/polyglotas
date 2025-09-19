@@ -71,7 +71,7 @@ export default function AudiobooksPage() {
 
 
   const handleBookClick = (book: AudiobookWithPurchase) => {
-    if (book.is_purchased || userRole === 'admin') {
+    if (book.is_purchased || userRole === 'admin' || book.free_chapters > 0) {
       router.push(`/learn/audiobooks/${book.book_id}`);
     }
   };

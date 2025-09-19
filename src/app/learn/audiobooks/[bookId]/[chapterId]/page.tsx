@@ -278,8 +278,9 @@ export default function ChapterPlayerPage() {
   const canAccessChapter = useCallback((chapterData: ChapterData) => {
     if (userRole === "admin") return true;
     if (chapterData.is_free_sample) return true;
+    if (audiobook?.is_purchased) return true;
     return false;
-  }, [userRole]);
+  }, [userRole, audiobook]);
 
 
 

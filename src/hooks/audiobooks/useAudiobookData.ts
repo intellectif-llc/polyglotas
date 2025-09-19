@@ -6,7 +6,7 @@ interface UseAudiobookDataReturn {
   loading: boolean;
   error: string | null;
   fetchChapterData: (bookId: string, chapterId: string) => Promise<{
-    audiobook: AudiobookData | null;
+    audiobook: (AudiobookData & { is_purchased?: boolean }) | null;
     chapter: ChapterData | null;
     alignment: AlignmentData | null;
     userProgress: UserProgress;
@@ -44,8 +44,12 @@ export function useAudiobookData(): UseAudiobookDataReturn {
           .single(),
         supabase
           .from('audiobooks')
-          .select('book_id, title, author, description, cover_image_url, language_code, level_code, duration_seconds, points_cost, price_cents, is_active, created_at, updated_at')
+          .select(`
+            book_id, title, author, description, cover_image_url, language_code, level_code, duration_seconds, points_cost, price_cents, is_active, created_at, updated_at,
+            user_audiobook_purchases!left(purchase_id)
+          `)
           .eq('book_id', parseInt(bookId))
+          .eq('user_audiobook_purchases.profile_id', user.id)
           .single(),
         supabase
           .from('audiobook_chapters')
@@ -78,7 +82,10 @@ export function useAudiobookData(): UseAudiobookDataReturn {
       };
 
       return {
-        audiobook: audiobookData,
+        audiobook: audiobookData ? {
+          ...audiobookData,
+          is_purchased: !!audiobookData.user_audiobook_purchases?.length
+        } : null,
         chapter: chapterData,
         alignment: alignmentData,
         userProgress: progressData || defaultProgress,
