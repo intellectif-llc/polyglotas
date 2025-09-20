@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Play, Lock, Clock, BookOpen, Edit, Plus, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Play, Lock, Clock, BookOpen, Edit, Plus, CheckCircle, Coins, DollarSign, Loader2 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import dynamic from 'next/dynamic';
 
@@ -11,10 +11,12 @@ const CreateChapterForm = dynamic(() => import('@/components/admin/audiobooks/Cr
   ssr: false
 });
 
-import { AudiobookData, ChapterWithProgress } from '@/types/audiobooks';
+import { AudiobookData, ChapterWithProgress, PurchaseType } from '@/types/audiobooks';
+import { useAudiobookCheckout } from '@/hooks/audiobooks/useAudiobookCheckout';
 
 interface AudiobookWithPurchase extends AudiobookData {
   is_purchased: boolean;
+  user_points?: number;
 }
 
 export default function AudiobookOverviewPage() {
@@ -31,6 +33,9 @@ export default function AudiobookOverviewPage() {
   const [editMode, setEditMode] = useState(false);
   const [showCreateChapterForm, setShowCreateChapterForm] = useState(false);
   const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
+  const [userPoints, setUserPoints] = useState(0);
+  
+  const { createCheckout, isLoading: isCheckoutLoading } = useAudiobookCheckout();
 
   useEffect(() => {
     fetchAudiobookData();
@@ -64,6 +69,17 @@ export default function AudiobookOverviewPage() {
       if (!user) {
         router.push('/auth/login');
         return;
+      }
+
+      // Get user points
+      const { data: profile } = await supabase
+        .from('student_profiles')
+        .select('points')
+        .eq('profile_id', user.id)
+        .single();
+      
+      if (profile) {
+        setUserPoints(profile.points || 0);
       }
 
       // Get audiobook data with purchase status
@@ -148,6 +164,48 @@ export default function AudiobookOverviewPage() {
   const handleChapterClick = (chapter: ChapterWithProgress) => {
     if (canAccessChapter(chapter)) {
       router.push(`/learn/audiobooks/${bookId}/${chapter.chapter_id}`);
+    }
+  };
+
+  const handlePurchase = async (purchaseType: PurchaseType) => {
+    if (!audiobook) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (purchaseType === 'points') {
+        if (userPoints < audiobook.points_cost) {
+          alert('Not enough points!');
+          return;
+        }
+
+        const { error } = await supabase
+          .from('user_audiobook_purchases')
+          .insert({
+            profile_id: user.id,
+            book_id: audiobook.book_id,
+            purchase_type: 'points',
+            points_spent: audiobook.points_cost
+          });
+
+        if (!error) {
+          await supabase
+            .from('student_profiles')
+            .update({ points: userPoints - audiobook.points_cost })
+            .eq('profile_id', user.id);
+
+          // Refresh data to show new purchase status
+          fetchAudiobookData();
+        }
+      } else if (purchaseType === 'money') {
+        if (audiobook.price_cents > 0) {
+          await createCheckout(audiobook.book_id);
+        }
+      }
+    } catch (error) {
+      console.error('Error purchasing book:', error);
+      alert('Purchase failed. Please try again.');
     }
   };
 
@@ -272,11 +330,42 @@ export default function AudiobookOverviewPage() {
                 {!audiobook.is_purchased && userRole !== 'admin' && (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800 mb-2">
-                      Purchase required for full access
+                      Purchase to unlock all chapters
                     </p>
-                    <p className="text-xs text-yellow-600">
-                      Free chapters are available to preview
-                    </p>
+                    {chapters.some(ch => ch.is_free_sample) && (
+                      <p className="text-xs text-yellow-600 mb-3">
+                        Free chapters are available to preview
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handlePurchase('points')}
+                        disabled={userPoints < audiobook.points_cost}
+                        className={`flex-1 text-sm font-semibold py-2 px-3 rounded transition-colors flex items-center justify-center gap-1 ${
+                          userPoints >= audiobook.points_cost
+                            ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        <Coins className="h-4 w-4" />
+                        {audiobook.points_cost}
+                        {userPoints < audiobook.points_cost && <Lock className="h-3 w-3" />}
+                      </button>
+                      <button
+                        onClick={() => handlePurchase('money')}
+                        disabled={isCheckoutLoading}
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-semibold py-2 px-3 rounded transition-colors flex items-center justify-center gap-1"
+                      >
+                        {isCheckoutLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <DollarSign className="h-4 w-4" />
+                            ${(audiobook.price_cents / 100).toFixed(2)}
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

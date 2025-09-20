@@ -39,6 +39,7 @@ export default function AudiobookCard({
 
   const canAffordWithPoints = userPoints >= audiobook.points_cost;
   const canAccess = audiobook.is_purchased || userRole === "admin" || audiobook.free_chapters > 0;
+  const shouldShowPurchaseOptions = !audiobook.is_purchased && userRole !== "admin";
 
   return (
     <div
@@ -93,7 +94,7 @@ export default function AudiobookCard({
           <p className="text-gray-200 text-xs mb-2">by {audiobook.author}</p>
 
           {/* Purchase Options */}
-          {!canAccess && (
+          {shouldShowPurchaseOptions && (
             <div className="flex gap-1">
               <button
                 onClick={(e) => {
