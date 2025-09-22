@@ -119,11 +119,11 @@ export async function POST(request: NextRequest) {
 
     // Fetch reference phrase text
     const { data: phraseData, error: phraseFetchError } = await supabase
-      .from("vocabulary_phrases")
+      .from("phrases")
       .select(`
         phrase_versions!inner(phrase_text)
       `)
-      .eq("id", phrase_id)
+      .eq("phrase_id", phrase_id)
       .eq("phrase_versions.language_code", language_code)
       .single();
 

@@ -37,21 +37,23 @@ export async function GET(
     const targetLanguage = profile?.current_target_language_code || "en";
 
     const { data: phrases, error } = await supabase
-      .from("vocabulary_phrases")
+      .from("lesson_phrases")
       .select(
         `
-        id,
         phrase_order,
-        concept_description,
-        phrase_versions (
-          phrase_text,
-          audio_url_normal,
-          audio_url_slow
+        phrases (
+          phrase_id,
+          concept_description,
+          phrase_versions (
+            phrase_text,
+            audio_url_normal,
+            audio_url_slow
+          )
         )
       `
       )
       .eq("lesson_id", parsedLessonId)
-      .eq("phrase_versions.language_code", targetLanguage)
+      .eq("phrases.phrase_versions.language_code", targetLanguage)
       .order("phrase_order", { ascending: true });
 
     if (error) {
@@ -66,7 +68,7 @@ export async function GET(
     }
 
     // Fetch phrase progress for the user
-    const phraseIds = phrases.map(p => p.id);
+    const phraseIds = phrases.map(p => p.phrases.phrase_id);
     const { data: phraseProgressData } = await supabase
       .from("user_phrase_progress")
       .select("phrase_id, pronunciation_completed, dictation_completed")
@@ -85,24 +87,26 @@ export async function GET(
 
     const formattedPhrases = phrases.map(
       (phrase: {
-        id: number;
         phrase_order: number;
-        concept_description: string;
-        phrase_versions: Array<{
-          phrase_text: string;
-          audio_url_normal: string;
-          audio_url_slow: string;
-        }>;
+        phrases: {
+          phrase_id: number;
+          concept_description: string;
+          phrase_versions: Array<{
+            phrase_text: string;
+            audio_url_normal: string;
+            audio_url_slow: string;
+          }>;
+        };
       }) => ({
-        id: phrase.id,
+        id: phrase.phrases.phrase_id,
         phrase_order: phrase.phrase_order,
-        concept_description: phrase.concept_description,
-        phrase_text: phrase.phrase_versions[0]?.phrase_text || "",
-        audio_url_normal: phrase.phrase_versions[0]?.audio_url_normal,
-        audio_url_slow: phrase.phrase_versions[0]?.audio_url_slow,
-        is_completed: phraseProgressMap.get(phrase.id)?.pronunciation_completed || false,
-        dictation_completed: phraseProgressMap.get(phrase.id)?.dictation_completed || false,
-        pronunciation_completed: phraseProgressMap.get(phrase.id)?.pronunciation_completed || false,
+        concept_description: phrase.phrases.concept_description,
+        phrase_text: phrase.phrases.phrase_versions[0]?.phrase_text || "",
+        audio_url_normal: phrase.phrases.phrase_versions[0]?.audio_url_normal,
+        audio_url_slow: phrase.phrases.phrase_versions[0]?.audio_url_slow,
+        is_completed: phraseProgressMap.get(phrase.phrases.phrase_id)?.pronunciation_completed || false,
+        dictation_completed: phraseProgressMap.get(phrase.phrases.phrase_id)?.dictation_completed || false,
+        pronunciation_completed: phraseProgressMap.get(phrase.phrases.phrase_id)?.pronunciation_completed || false,
       })
     );
 
