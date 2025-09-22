@@ -19,6 +19,11 @@ CREATE EXTENSION IF NOT EXISTS "pg_cron" WITH SCHEMA "pg_catalog";
 
 
 
+
+
+ALTER SCHEMA "public" OWNER TO "postgres";
+
+
 COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
@@ -244,10 +249,52 @@ $$;
 ALTER FUNCTION "public"."admin_fix_user_tier"("user_profile_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."can_user_access_lesson"("profile_id_param" "uuid", "lesson_id_param" integer) RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."calculate_book_completion"("p_profile_id" "uuid", "p_book_id" integer) RETURNS TABLE("total_chapters" integer, "completed_chapters" integer, "completion_percentage" numeric, "is_book_completed" boolean)
     LANGUAGE "plpgsql"
     AS $$
 DECLARE
+    v_total_chapters INTEGER;
+    v_completed_chapters INTEGER;
+    v_completion_percentage NUMERIC;
+    v_is_book_completed BOOLEAN;
+BEGIN
+    -- Get total chapters for the book
+    SELECT COUNT(*) INTO v_total_chapters
+    FROM public.audiobook_chapters
+    WHERE book_id = p_book_id;
+    
+    -- Get completed chapters for the user
+    SELECT COUNT(*) INTO v_completed_chapters
+    FROM public.user_audiobook_chapter_progress
+    WHERE profile_id = p_profile_id 
+    AND book_id = p_book_id 
+    AND is_completed = true;
+    
+    -- Calculate completion percentage (capped at 100%)
+    v_completion_percentage := CASE 
+        WHEN v_total_chapters > 0 THEN 
+            LEAST(100, (v_completed_chapters::NUMERIC / v_total_chapters::NUMERIC) * 100)
+        ELSE 0
+    END;
+    
+    -- Determine if book is completed (all chapters completed)
+    v_is_book_completed := v_completed_chapters = v_total_chapters AND v_total_chapters > 0;
+    
+    RETURN QUERY SELECT 
+        v_total_chapters,
+        v_completed_chapters,
+        v_completion_percentage,
+        v_is_book_completed;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."calculate_book_completion"("p_profile_id" "uuid", "p_book_id" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."can_user_access_lesson"("profile_id_param" "uuid", "lesson_id_param" integer) RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$DECLARE
     lesson_unit_id integer;
     lesson_order_val integer;
     previous_lesson_id integer;
@@ -284,8 +331,7 @@ BEGIN
 
     -- Check if previous lesson is completed using the helper function
     RETURN public.is_lesson_complete(profile_id_param, previous_lesson_id);
-END;
-$$;
+END;$$;
 
 
 ALTER FUNCTION "public"."can_user_access_lesson"("profile_id_param" "uuid", "lesson_id_param" integer) OWNER TO "postgres";
@@ -305,8 +351,7 @@ ALTER FUNCTION "public"."can_user_access_level"("profile_id_param" "uuid", "leve
 
 CREATE OR REPLACE FUNCTION "public"."can_user_access_unit"("profile_id_param" "uuid", "unit_id_param" integer) RETURNS boolean
     LANGUAGE "plpgsql"
-    AS $$
-DECLARE
+    AS $$DECLARE
     unit_level level_enum;
     unit_order_val integer;
     previous_unit_id integer;
@@ -343,8 +388,7 @@ BEGIN
 
     -- Check if the previous unit is completed
     RETURN public.is_unit_complete(profile_id_param, previous_unit_id);
-END;
-$$;
+END;$$;
 
 
 ALTER FUNCTION "public"."can_user_access_unit"("profile_id_param" "uuid", "unit_id_param" integer) OWNER TO "postgres";
@@ -414,6 +458,21 @@ $$;
 ALTER FUNCTION "public"."check_and_award_unit_completion_bonus"("profile_id_param" "uuid", "unit_id_param" integer, "triggering_lesson_id_param" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."check_audiobook_ownership"("p_profile_id" "uuid", "p_book_id" integer) RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM user_audiobook_purchases
+    WHERE profile_id = p_profile_id AND book_id = p_book_id
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."check_audiobook_ownership"("p_profile_id" "uuid", "p_book_id" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."cleanup_user_subscriptions"("user_profile_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql"
     AS $$
@@ -473,6 +532,35 @@ $$;
 
 
 ALTER FUNCTION "public"."expire_partnership_trials"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_user_audiobook_purchases"("p_profile_id" "uuid") RETURNS TABLE("book_id" integer, "title" character varying, "author" character varying, "cover_image_url" character varying, "purchase_type" "public"."purchase_type_enum", "amount_paid_cents" integer, "points_spent" integer, "purchased_at" timestamp with time zone, "invoice_pdf_url" "text", "hosted_invoice_url" "text")
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    a.book_id,
+    a.title,
+    a.author,
+    a.cover_image_url,
+    p.purchase_type,
+    p.amount_paid_cents,
+    p.points_spent,
+    p.purchased_at,
+    i.invoice_pdf_url,
+    i.hosted_invoice_url
+  FROM user_audiobook_purchases p
+  JOIN audiobooks a ON p.book_id = a.book_id
+  LEFT JOIN invoices i ON i.profile_id = p.profile_id 
+    AND (i.metadata->>'book_id')::INTEGER = p.book_id
+  WHERE p.profile_id = p_profile_id
+  ORDER BY p.purchased_at DESC;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_user_audiobook_purchases"("p_profile_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_user_available_levels"("profile_id_param" "uuid") RETURNS "public"."level_enum"[]
@@ -685,6 +773,43 @@ $$;
 
 
 ALTER FUNCTION "public"."get_user_progression_status"("profile_id_param" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."handle_new_chapter_added"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+    -- When a new chapter is added, update all user progress for this book
+    -- to reflect the new total and recalculate completion
+    UPDATE public.user_audiobook_progress 
+    SET 
+        total_chapters = (
+            SELECT COUNT(*) 
+            FROM public.audiobook_chapters 
+            WHERE book_id = NEW.book_id
+        ),
+        completion_percentage = (
+            SELECT LEAST(100, CASE 
+                WHEN COUNT(ac.*) > 0 THEN 
+                    (COUNT(CASE WHEN uacp.is_completed THEN 1 END)::NUMERIC / COUNT(ac.*)::NUMERIC) * 100
+                ELSE 0 
+            END)
+            FROM public.audiobook_chapters ac
+            LEFT JOIN public.user_audiobook_chapter_progress uacp 
+                ON ac.chapter_id = uacp.chapter_id 
+                AND uacp.profile_id = user_audiobook_progress.profile_id
+            WHERE ac.book_id = NEW.book_id
+        ),
+        is_completed = false, -- Reset completion status when new chapters are added
+        completed_at = NULL   -- Clear completion timestamp
+    WHERE book_id = NEW.book_id;
+    
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."handle_new_chapter_added"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user_profile"() RETURNS "trigger"
@@ -988,12 +1113,10 @@ ALTER FUNCTION "public"."process_chat_completion"("profile_id_param" "uuid", "le
 
 CREATE OR REPLACE FUNCTION "public"."process_user_activity"("profile_id_param" "uuid", "lesson_id_param" integer, "language_code_param" character varying, "activity_type_param" "public"."activity_type_enum", "phrase_id_param" integer DEFAULT NULL::integer, "reference_text_param" "text" DEFAULT NULL::"text", "recognized_text_param" "text" DEFAULT NULL::"text", "accuracy_score_param" numeric DEFAULT NULL::numeric, "fluency_score_param" numeric DEFAULT NULL::numeric, "completeness_score_param" numeric DEFAULT NULL::numeric, "pronunciation_score_param" numeric DEFAULT NULL::numeric, "prosody_score_param" numeric DEFAULT NULL::numeric, "phonetic_data_param" "jsonb" DEFAULT NULL::"jsonb", "written_text_param" "text" DEFAULT NULL::"text", "overall_similarity_score_param" numeric DEFAULT NULL::numeric, "word_level_feedback_param" "jsonb" DEFAULT NULL::"jsonb") RETURNS TABLE("points_awarded_total" integer)
     LANGUAGE "plpgsql"
-    AS $$
-DECLARE
-    -- IDs and Metadata
-    v_lesson_progress_id INT;
-    v_activity_progress_id INT;
-    v_unit_id INT;
+    AS $$DECLARE
+v_lesson_progress_id INT;
+v_activity_progress_id INT;
+v_unit_id INT;
 
     -- Attempt & Progress Tracking
     next_attempt_number INT;
@@ -1012,13 +1135,11 @@ DECLARE
     v_word_text TEXT;
     v_accuracy_score NUMERIC;
     word_needs_practice BOOLEAN;
-    
+
     -- No longer need streak variables here
+
 BEGIN
-    -- --- ADDED ---
-    -- Step 1: Handle Daily Streak Bonus (now robust and centralized)
-    -- This function will only award points once per day on the first activity.
-    total_points_for_this_attempt := total_points_for_this_attempt + public.handle_user_streak(profile_id_param);
+total_points_for_this_attempt := total_points_for_this_attempt + public.handle_user_streak(profile_id_param);
 
     -- Step 2: Ensure user_lesson_progress exists for all activity types
     INSERT INTO public.user_lesson_progress (profile_id, lesson_id, last_progress_at)
@@ -1048,7 +1169,7 @@ BEGIN
     IF activity_type_param = 'chat' THEN
         -- The streak logic that was here is now handled at the start of the function.
         -- We only need to handle the final point update and return.
-        
+
         -- Update total points if any were awarded from the streak
         IF total_points_for_this_attempt > 0 THEN
             UPDATE public.student_profiles SET points = points + total_points_for_this_attempt
@@ -1063,6 +1184,19 @@ BEGIN
     IF phrase_id_param IS NULL THEN
         RAISE EXCEPTION 'phrase_id_param is required for % activity', activity_type_param;
     END IF;
+
+    -- #############################################################
+    -- ### NECESSARY CORRECTION ADDED HERE ###
+    -- #############################################################
+    -- Ensure the provided phrase_id is actually part of the provided lesson_id
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.lesson_phrases
+        WHERE lesson_id = lesson_id_param AND phrase_id = phrase_id_param
+    ) THEN
+        RAISE EXCEPTION 'Phrase ID % is not part of Lesson ID %.', phrase_id_param, lesson_id_param;
+    END IF;
+    -- #############################################################
 
     -- Step 5: Insert the specific attempt record
     IF activity_type_param = 'pronunciation' THEN
@@ -1122,7 +1256,7 @@ BEGIN
     -- Step 8: Handle Activity Completion for phrase-based activities
     -- ... (logic remains the same)
     IF NOT COALESCE(was_activity_already_completed, false) THEN
-        SELECT l.total_phrases INTO total_phrases_in_lesson FROM public.lessons l WHERE l.lesson_id = lesson_id_param;
+        SELECT COUNT(*) INTO total_phrases_in_lesson FROM public.lesson_phrases WHERE lesson_id = lesson_id_param;
         IF activity_type_param = 'pronunciation' THEN
             SELECT COUNT(*) INTO phrases_completed_for_activity FROM public.user_phrase_progress WHERE profile_id = profile_id_param AND lesson_id = lesson_id_param AND pronunciation_completed = TRUE;
         ELSIF activity_type_param = 'dictation' THEN
@@ -1136,7 +1270,7 @@ BEGIN
             PERFORM public.check_and_award_unit_completion_bonus(profile_id_param, v_unit_id, lesson_id_param);
         END IF;
     END IF;
-    
+
     -- --- REMOVED ---
     -- The old streak logic from Step 8 has been removed.
 
@@ -1148,8 +1282,7 @@ BEGIN
 
     RETURN QUERY SELECT total_points_for_this_attempt;
 
-END;
-$$;
+END;$$;
 
 
 ALTER FUNCTION "public"."process_user_activity"("profile_id_param" "uuid", "lesson_id_param" integer, "language_code_param" character varying, "activity_type_param" "public"."activity_type_enum", "phrase_id_param" integer, "reference_text_param" "text", "recognized_text_param" "text", "accuracy_score_param" numeric, "fluency_score_param" numeric, "completeness_score_param" numeric, "pronunciation_score_param" numeric, "prosody_score_param" numeric, "phonetic_data_param" "jsonb", "written_text_param" "text", "overall_similarity_score_param" numeric, "word_level_feedback_param" "jsonb") OWNER TO "postgres";
@@ -1223,6 +1356,176 @@ $$;
 ALTER FUNCTION "public"."process_word_practice_attempt"("profile_id_param" "uuid", "word_text_param" character varying, "language_code_param" character varying, "accuracy_score_param" numeric) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."redeem_partnership_invitation"("p_token" "uuid", "p_user_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_invitation RECORD;
+  v_user_email TEXT;
+  v_result jsonb;
+BEGIN
+  -- Get user email
+  SELECT email INTO v_user_email 
+  FROM auth.users 
+  WHERE id = p_user_id;
+  
+  -- Get invitation details
+  SELECT * INTO v_invitation
+  FROM partnership_invitations
+  WHERE token = p_token
+  AND status = 'pending'
+  AND expires_at > now();
+  
+  -- Validate invitation
+  IF v_invitation IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'invalid');
+  END IF;
+  
+  -- Check email match
+  IF v_invitation.intended_for_email != v_user_email THEN
+    RETURN jsonb_build_object('success', false, 'error', 'wrong_email');
+  END IF;
+  
+  -- Update invitation (this bypasses RLS due to SECURITY DEFINER)
+  UPDATE partnership_invitations
+  SET 
+    status = 'redeemed',
+    redeemed_by_profile_id = p_user_id,
+    redeemed_at = now()
+  WHERE id = v_invitation.id;
+  
+  -- Update user profiles
+  UPDATE profiles
+  SET partnership_id = v_invitation.partnership_id
+  WHERE id = p_user_id;
+  
+  -- Return success with invitation details
+  RETURN jsonb_build_object(
+    'success', true,
+    'invitation', row_to_json(v_invitation)
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."redeem_partnership_invitation"("p_token" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_audiobook_duration"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$BEGIN
+    -- Log trigger execution
+    RAISE NOTICE 'update_audiobook_duration triggered: operation=%, book_id=%', 
+        TG_OP, COALESCE(NEW.book_id, OLD.book_id);
+    
+    -- Update the audiobook's total duration when chapter duration changes
+    UPDATE public.audiobooks 
+    SET 
+        duration_seconds = (
+            SELECT COALESCE(SUM(duration_seconds), 0)
+            FROM public.audiobook_chapters 
+            WHERE book_id = COALESCE(NEW.book_id, OLD.book_id)
+            AND duration_seconds IS NOT NULL
+        ),
+        updated_at = now()
+    WHERE book_id = COALESCE(NEW.book_id, OLD.book_id);
+    
+    -- Log the result
+    RAISE NOTICE 'Audiobook duration updated for book_id=%: new_duration=%', 
+        COALESCE(NEW.book_id, OLD.book_id),
+        (SELECT duration_seconds FROM public.audiobooks WHERE book_id = COALESCE(NEW.book_id, OLD.book_id));
+    
+    RETURN COALESCE(NEW, OLD);
+END;$$;
+
+
+ALTER FUNCTION "public"."update_audiobook_duration"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."update_chapter_progress"("p_profile_id" "uuid", "p_book_id" integer, "p_chapter_id" integer, "p_position_seconds" numeric, "p_chapter_duration_seconds" integer DEFAULT NULL::integer) RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+    v_is_completed BOOLEAN := false;
+    v_completion_threshold NUMERIC := 0.95;
+BEGIN
+    -- Determine if chapter is completed (95% watched or explicit completion)
+    IF p_chapter_duration_seconds IS NOT NULL AND p_position_seconds >= (p_chapter_duration_seconds * v_completion_threshold) THEN
+        v_is_completed := true;
+    END IF;
+    
+    -- Upsert chapter progress with FIXED logic
+    INSERT INTO public.user_audiobook_chapter_progress (
+        profile_id, book_id, chapter_id, current_position_seconds, 
+        is_completed, completed_at, last_listened_at, created_at, updated_at
+    )
+    VALUES (
+        p_profile_id, p_book_id, p_chapter_id, p_position_seconds,
+        v_is_completed, 
+        CASE WHEN v_is_completed THEN now() ELSE NULL END,
+        now(), now(), now()
+    )
+    ON CONFLICT (profile_id, book_id, chapter_id)
+    DO UPDATE SET
+        current_position_seconds = EXCLUDED.current_position_seconds,
+        -- FIXED: Allow completion to be set to true when threshold is met
+        is_completed = CASE 
+            WHEN user_audiobook_chapter_progress.is_completed = true THEN true  -- Keep completed status
+            WHEN EXCLUDED.is_completed = true THEN true  -- Allow new completion
+            ELSE false  -- Otherwise keep as incomplete
+        END,
+        completed_at = CASE 
+            WHEN user_audiobook_chapter_progress.completed_at IS NOT NULL THEN user_audiobook_chapter_progress.completed_at  -- Keep existing completion time
+            WHEN EXCLUDED.is_completed = true AND user_audiobook_chapter_progress.is_completed = false THEN now()  -- Set completion time for newly completed
+            ELSE NULL 
+        END,
+        last_listened_at = EXCLUDED.last_listened_at,
+        updated_at = EXCLUDED.updated_at;
+    
+    -- Update book-level progress
+    WITH book_stats AS (
+        SELECT * FROM public.calculate_book_completion(p_profile_id, p_book_id)
+    )
+    INSERT INTO public.user_audiobook_progress (
+        profile_id, book_id, current_chapter_id, current_position_seconds,
+        total_chapters, completed_chapters, completion_percentage,
+        is_completed, completed_at, last_read_at
+    )
+    SELECT 
+        p_profile_id, p_book_id, p_chapter_id, p_position_seconds,
+        bs.total_chapters, bs.completed_chapters, LEAST(100, bs.completion_percentage),
+        bs.is_book_completed, 
+        CASE WHEN bs.is_book_completed THEN now() ELSE NULL END,
+        now()
+    FROM book_stats bs
+    ON CONFLICT (profile_id, book_id)
+    DO UPDATE SET
+        current_chapter_id = EXCLUDED.current_chapter_id,
+        current_position_seconds = EXCLUDED.current_position_seconds,
+        total_chapters = EXCLUDED.total_chapters,
+        completed_chapters = EXCLUDED.completed_chapters,
+        completion_percentage = LEAST(100, EXCLUDED.completion_percentage),
+        -- FIXED: Same logic fix for book completion
+        is_completed = CASE 
+            WHEN user_audiobook_progress.is_completed = true THEN true
+            WHEN EXCLUDED.is_completed = true THEN true
+            ELSE false
+        END,
+        completed_at = CASE 
+            WHEN user_audiobook_progress.completed_at IS NOT NULL THEN user_audiobook_progress.completed_at
+            WHEN EXCLUDED.is_completed = true AND user_audiobook_progress.is_completed = false THEN now()
+            ELSE NULL
+        END,
+        last_read_at = EXCLUDED.last_read_at;
+    
+    RETURN true;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_chapter_progress"("p_profile_id" "uuid", "p_book_id" integer, "p_chapter_id" integer, "p_position_seconds" numeric, "p_chapter_duration_seconds" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."update_user_subscription_tier"("user_profile_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql"
     AS $$
@@ -1245,6 +1548,92 @@ $$;
 
 
 ALTER FUNCTION "public"."update_user_subscription_tier"("user_profile_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."upsert_audiobook_purchase"("p_stripe_invoice_id" "text", "p_stripe_customer_id" "text", "p_invoice_data" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  v_profile_id UUID;
+  v_book_id INTEGER;
+  v_amount_paid INTEGER;
+BEGIN
+  -- Get profile_id from stripe_customer_id
+  SELECT profile_id INTO v_profile_id
+  FROM student_profiles
+  WHERE stripe_customer_id = p_stripe_customer_id;
+
+  IF v_profile_id IS NULL THEN
+    RAISE EXCEPTION 'Customer not found: %', p_stripe_customer_id;
+  END IF;
+
+  -- Extract book_id from invoice metadata (fixed JSONB access)
+  v_book_id := (p_invoice_data->'metadata'->>'book_id')::INTEGER;
+  v_amount_paid := (p_invoice_data->>'amount_paid')::INTEGER;
+
+  IF v_book_id IS NULL THEN
+    RAISE EXCEPTION 'Book ID not found in invoice metadata';
+  END IF;
+
+  -- Insert purchase record
+  INSERT INTO user_audiobook_purchases (
+    profile_id,
+    book_id,
+    purchase_type,
+    amount_paid_cents,
+    purchased_at
+  ) VALUES (
+    v_profile_id,
+    v_book_id,
+    'money',
+    v_amount_paid,
+    NOW()
+  ) ON CONFLICT (profile_id, book_id) DO NOTHING;
+
+  -- Insert/update invoice record
+  INSERT INTO invoices (
+    profile_id,
+    stripe_invoice_id,
+    stripe_customer_id,
+    status,
+    amount_due,
+    amount_paid,
+    amount_remaining,
+    currency,
+    paid_at,
+    invoice_pdf_url,
+    hosted_invoice_url,
+    metadata,
+    issued_at
+  ) VALUES (
+    v_profile_id,
+    p_stripe_invoice_id,
+    p_stripe_customer_id,
+    (p_invoice_data->>'status')::invoice_status_enum,
+    COALESCE((p_invoice_data->>'amount_due')::INTEGER, 0),
+    COALESCE((p_invoice_data->>'amount_paid')::INTEGER, 0),
+    COALESCE((p_invoice_data->>'amount_remaining')::INTEGER, 0),
+    COALESCE(p_invoice_data->>'currency', 'usd'),
+    CASE WHEN p_invoice_data->>'status' = 'paid' THEN NOW() ELSE NULL END,
+    p_invoice_data->>'invoice_pdf',
+    p_invoice_data->>'hosted_invoice_url',
+    p_invoice_data,
+    TO_TIMESTAMP((p_invoice_data->>'created')::INTEGER)
+  ) ON CONFLICT (stripe_invoice_id) DO UPDATE SET
+    status = EXCLUDED.status,
+    amount_paid = EXCLUDED.amount_paid,
+    amount_remaining = EXCLUDED.amount_remaining,
+    paid_at = EXCLUDED.paid_at,
+    invoice_pdf_url = EXCLUDED.invoice_pdf_url,
+    hosted_invoice_url = EXCLUDED.hosted_invoice_url,
+    metadata = EXCLUDED.metadata,
+    updated_at = NOW();
+
+END;
+$$;
+
+
+ALTER FUNCTION "public"."upsert_audiobook_purchase"("p_stripe_invoice_id" "text", "p_stripe_customer_id" "text", "p_invoice_data" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."upsert_stripe_invoice"("p_stripe_invoice_id" "text", "p_stripe_customer_id" "text", "p_stripe_subscription_id" "text", "p_invoice_data" "jsonb") RETURNS boolean
@@ -1440,8 +1829,28 @@ $$;
 
 ALTER FUNCTION "public"."upsert_stripe_subscription"("p_stripe_subscription_id" "text", "p_stripe_customer_id" "text", "p_stripe_price_id" "text", "p_subscription_data" "jsonb") OWNER TO "postgres";
 
+SET default_tablespace = '';
+
+SET default_table_access_method = "heap";
+
+
+CREATE TABLE IF NOT EXISTS "public"."audiobook_alignment" (
+    "alignment_id" integer NOT NULL,
+    "book_id" integer NOT NULL,
+    "chapter_id" integer,
+    "full_text" "text" NOT NULL,
+    "characters_data" "jsonb" NOT NULL,
+    "words_data" "jsonb" NOT NULL,
+    "loss_score" numeric,
+    "created_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."audiobook_alignment" OWNER TO "postgres";
+
 
 CREATE SEQUENCE IF NOT EXISTS "public"."audiobook_alignment_alignment_id_seq"
+    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1451,27 +1860,29 @@ CREATE SEQUENCE IF NOT EXISTS "public"."audiobook_alignment_alignment_id_seq"
 
 ALTER TABLE "public"."audiobook_alignment_alignment_id_seq" OWNER TO "postgres";
 
-SET default_tablespace = '';
 
-SET default_table_access_method = "heap";
+ALTER SEQUENCE "public"."audiobook_alignment_alignment_id_seq" OWNED BY "public"."audiobook_alignment"."alignment_id";
 
 
-CREATE TABLE IF NOT EXISTS "public"."audiobook_alignment" (
-    "alignment_id" integer DEFAULT "nextval"('"public"."audiobook_alignment_alignment_id_seq"'::"regclass") NOT NULL,
+
+CREATE TABLE IF NOT EXISTS "public"."audiobook_chapters" (
+    "chapter_id" integer NOT NULL,
     "book_id" integer NOT NULL,
-    "full_text" "text" NOT NULL,
-    "characters_data" "jsonb" NOT NULL,
-    "words_data" "jsonb" NOT NULL,
-    "loss_score" numeric,
+    "chapter_title" "text" NOT NULL,
+    "audio_url" "text",
+    "duration_seconds" integer,
+    "is_free_sample" boolean DEFAULT false,
+    "chapter_order" integer NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
-    "chapter_id" integer
+    "video_url" "text"
 );
 
 
-ALTER TABLE "public"."audiobook_alignment" OWNER TO "postgres";
+ALTER TABLE "public"."audiobook_chapters" OWNER TO "postgres";
 
 
 CREATE SEQUENCE IF NOT EXISTS "public"."audiobook_chapters_chapter_id_seq"
+    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1482,39 +1893,16 @@ CREATE SEQUENCE IF NOT EXISTS "public"."audiobook_chapters_chapter_id_seq"
 ALTER TABLE "public"."audiobook_chapters_chapter_id_seq" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."audiobook_chapters" (
-    "chapter_id" integer DEFAULT "nextval"('"public"."audiobook_chapters_chapter_id_seq"'::"regclass") NOT NULL,
-    "book_id" bigint NOT NULL,
-    "chapter_title" "text" NOT NULL,
-    "audio_url" "text" NOT NULL,
-    "duration_seconds" integer,
-    "is_free_sample" boolean DEFAULT false,
-    "chapter_order" integer NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"()
-);
+ALTER SEQUENCE "public"."audiobook_chapters_chapter_id_seq" OWNED BY "public"."audiobook_chapters"."chapter_id";
 
-
-ALTER TABLE "public"."audiobook_chapters" OWNER TO "postgres";
-
-
-CREATE SEQUENCE IF NOT EXISTS "public"."audiobooks_book_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE "public"."audiobooks_book_id_seq" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."audiobooks" (
-    "book_id" integer DEFAULT "nextval"('"public"."audiobooks_book_id_seq"'::"regclass") NOT NULL,
+    "book_id" integer NOT NULL,
     "title" character varying NOT NULL,
     "author" character varying NOT NULL,
     "description" "text",
     "cover_image_url" character varying,
-    "audio_url" character varying NOT NULL,
     "language_code" character varying NOT NULL,
     "level_code" "public"."level_enum" NOT NULL,
     "duration_seconds" integer,
@@ -1527,6 +1915,22 @@ CREATE TABLE IF NOT EXISTS "public"."audiobooks" (
 
 
 ALTER TABLE "public"."audiobooks" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."audiobooks_book_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE "public"."audiobooks_book_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."audiobooks_book_id_seq" OWNED BY "public"."audiobooks"."book_id";
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."conversation_messages" (
@@ -2136,7 +2540,9 @@ CREATE TABLE IF NOT EXISTS "public"."products" (
     "tier_key" "public"."subscription_tier_enum",
     "metadata" "jsonb",
     "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"()
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "book_id" integer,
+    "product_type" character varying DEFAULT 'subscription'::character varying
 );
 
 
@@ -2261,6 +2667,7 @@ CREATE TABLE IF NOT EXISTS "public"."student_profiles" (
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "partnership_id" bigint,
     "selected_level_code" "public"."level_enum",
+    "preferences" "jsonb" DEFAULT '{}'::"jsonb",
     CONSTRAINT "student_profiles_points_check" CHECK (("points" >= 0))
 );
 
@@ -2513,7 +2920,59 @@ ALTER SEQUENCE "public"."units_unit_id_seq" OWNED BY "public"."units"."unit_id";
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."user_audiobook_chapter_progress" (
+    "id" integer NOT NULL,
+    "profile_id" "uuid" NOT NULL,
+    "book_id" integer NOT NULL,
+    "chapter_id" integer NOT NULL,
+    "current_position_seconds" numeric DEFAULT 0,
+    "is_completed" boolean DEFAULT false,
+    "completed_at" timestamp with time zone,
+    "last_listened_at" timestamp with time zone DEFAULT "now"(),
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."user_audiobook_chapter_progress" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."user_audiobook_chapter_progress_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE "public"."user_audiobook_chapter_progress_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."user_audiobook_chapter_progress_id_seq" OWNED BY "public"."user_audiobook_chapter_progress"."id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."user_audiobook_progress" (
+    "progress_id" integer NOT NULL,
+    "profile_id" "uuid" NOT NULL,
+    "book_id" integer NOT NULL,
+    "current_chapter_id" integer,
+    "current_position_seconds" numeric DEFAULT 0,
+    "last_read_at" timestamp with time zone DEFAULT "now"(),
+    "is_completed" boolean DEFAULT false,
+    "completed_at" timestamp with time zone,
+    "total_chapters" integer DEFAULT 0,
+    "completed_chapters" integer DEFAULT 0,
+    "completion_percentage" numeric DEFAULT 0
+);
+
+
+ALTER TABLE "public"."user_audiobook_progress" OWNER TO "postgres";
+
+
 CREATE SEQUENCE IF NOT EXISTS "public"."user_audiobook_progress_progress_id_seq"
+    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -2524,34 +2983,12 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_audiobook_progress_progress_id_seq"
 ALTER TABLE "public"."user_audiobook_progress_progress_id_seq" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."user_audiobook_progress" (
-    "progress_id" integer DEFAULT "nextval"('"public"."user_audiobook_progress_progress_id_seq"'::"regclass") NOT NULL,
-    "profile_id" "uuid" NOT NULL,
-    "book_id" integer NOT NULL,
-    "current_position_seconds" numeric DEFAULT 0,
-    "last_read_at" timestamp with time zone DEFAULT "now"(),
-    "is_completed" boolean DEFAULT false,
-    "completed_at" timestamp with time zone,
-    "current_chapter_id" integer
-);
+ALTER SEQUENCE "public"."user_audiobook_progress_progress_id_seq" OWNED BY "public"."user_audiobook_progress"."progress_id";
 
-
-ALTER TABLE "public"."user_audiobook_progress" OWNER TO "postgres";
-
-
-CREATE SEQUENCE IF NOT EXISTS "public"."user_audiobook_purchases_purchase_id_seq"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE "public"."user_audiobook_purchases_purchase_id_seq" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."user_audiobook_purchases" (
-    "purchase_id" integer DEFAULT "nextval"('"public"."user_audiobook_purchases_purchase_id_seq"'::"regclass") NOT NULL,
+    "purchase_id" integer NOT NULL,
     "profile_id" "uuid" NOT NULL,
     "book_id" integer NOT NULL,
     "purchase_type" "public"."purchase_type_enum" NOT NULL,
@@ -2562,6 +2999,22 @@ CREATE TABLE IF NOT EXISTS "public"."user_audiobook_purchases" (
 
 
 ALTER TABLE "public"."user_audiobook_purchases" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."user_audiobook_purchases_purchase_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE "public"."user_audiobook_purchases_purchase_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" OWNED BY "public"."user_audiobook_purchases"."purchase_id";
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."user_lesson_activity_progress" (
@@ -2889,6 +3342,18 @@ ALTER SEQUENCE "public"."vocabulary_phrases_id_seq" OWNED BY "public"."vocabular
 
 
 
+ALTER TABLE ONLY "public"."audiobook_alignment" ALTER COLUMN "alignment_id" SET DEFAULT "nextval"('"public"."audiobook_alignment_alignment_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."audiobook_chapters" ALTER COLUMN "chapter_id" SET DEFAULT "nextval"('"public"."audiobook_chapters_chapter_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."audiobooks" ALTER COLUMN "book_id" SET DEFAULT "nextval"('"public"."audiobooks_book_id_seq"'::"regclass");
+
+
+
 ALTER TABLE ONLY "public"."conversation_messages" ALTER COLUMN "message_id" SET DEFAULT "nextval"('"public"."conversation_messages_message_id_seq"'::"regclass");
 
 
@@ -2958,6 +3423,18 @@ ALTER TABLE ONLY "public"."unit_translations" ALTER COLUMN "unit_translation_id"
 
 
 ALTER TABLE ONLY "public"."units" ALTER COLUMN "unit_id" SET DEFAULT "nextval"('"public"."units_unit_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."user_audiobook_chapter_progress" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."user_audiobook_chapter_progress_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."user_audiobook_progress" ALTER COLUMN "progress_id" SET DEFAULT "nextval"('"public"."user_audiobook_progress_progress_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."user_audiobook_purchases" ALTER COLUMN "purchase_id" SET DEFAULT "nextval"('"public"."user_audiobook_purchases_purchase_id_seq"'::"regclass");
 
 
 
@@ -3255,6 +3732,16 @@ ALTER TABLE ONLY "public"."units"
 
 
 
+ALTER TABLE ONLY "public"."user_audiobook_chapter_progress"
+    ADD CONSTRAINT "user_audiobook_chapter_progre_profile_id_book_id_chapter_id_key" UNIQUE ("profile_id", "book_id", "chapter_id");
+
+
+
+ALTER TABLE ONLY "public"."user_audiobook_chapter_progress"
+    ADD CONSTRAINT "user_audiobook_chapter_progress_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."user_audiobook_progress"
     ADD CONSTRAINT "user_audiobook_progress_pkey" PRIMARY KEY ("progress_id");
 
@@ -3395,11 +3882,19 @@ CREATE INDEX "idx_prices_stripe_price_id" ON "public"."prices" USING "btree" ("s
 
 
 
+CREATE INDEX "idx_products_book_id" ON "public"."products" USING "btree" ("book_id");
+
+
+
 CREATE INDEX "idx_products_stripe_product_id" ON "public"."products" USING "btree" ("stripe_product_id");
 
 
 
 CREATE INDEX "idx_products_tier_key" ON "public"."products" USING "btree" ("tier_key");
+
+
+
+CREATE INDEX "idx_products_type" ON "public"."products" USING "btree" ("product_type");
 
 
 
@@ -3415,7 +3910,27 @@ CREATE INDEX "idx_student_subscriptions_stripe_subscription_id" ON "public"."stu
 
 
 
+CREATE INDEX "idx_user_audiobook_chapter_progress_chapter" ON "public"."user_audiobook_chapter_progress" USING "btree" ("chapter_id");
+
+
+
+CREATE INDEX "idx_user_audiobook_chapter_progress_completed" ON "public"."user_audiobook_chapter_progress" USING "btree" ("profile_id", "book_id", "is_completed");
+
+
+
+CREATE INDEX "idx_user_audiobook_chapter_progress_profile_book" ON "public"."user_audiobook_chapter_progress" USING "btree" ("profile_id", "book_id");
+
+
+
 CREATE INDEX "idx_user_level_completion_profile_id" ON "public"."user_level_completion" USING "btree" ("profile_id");
+
+
+
+CREATE OR REPLACE TRIGGER "trigger_new_chapter_added" AFTER INSERT ON "public"."audiobook_chapters" FOR EACH ROW EXECUTE FUNCTION "public"."handle_new_chapter_added"();
+
+
+
+CREATE OR REPLACE TRIGGER "trigger_update_audiobook_duration" AFTER INSERT OR DELETE OR UPDATE OF "duration_seconds" ON "public"."audiobook_chapters" FOR EACH ROW EXECUTE FUNCTION "public"."update_audiobook_duration"();
 
 
 
@@ -3431,6 +3946,16 @@ ALTER TABLE ONLY "public"."audiobook_alignment"
 
 ALTER TABLE ONLY "public"."audiobook_chapters"
     ADD CONSTRAINT "audiobook_chapters_book_id_fkey" FOREIGN KEY ("book_id") REFERENCES "public"."audiobooks"("book_id");
+
+
+
+ALTER TABLE ONLY "public"."audiobooks"
+    ADD CONSTRAINT "audiobooks_language_code_fkey" FOREIGN KEY ("language_code") REFERENCES "public"."languages"("language_code");
+
+
+
+ALTER TABLE ONLY "public"."audiobooks"
+    ADD CONSTRAINT "audiobooks_level_code_fkey" FOREIGN KEY ("level_code") REFERENCES "public"."language_levels"("level_code");
 
 
 
@@ -3481,16 +4006,6 @@ ALTER TABLE ONLY "public"."dictation_attempts"
 
 ALTER TABLE ONLY "public"."dictation_attempts"
     ADD CONSTRAINT "dictation_attempts_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "public"."student_profiles"("profile_id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."audiobooks"
-    ADD CONSTRAINT "fk_audiobooks_language" FOREIGN KEY ("language_code") REFERENCES "public"."languages"("language_code");
-
-
-
-ALTER TABLE ONLY "public"."audiobooks"
-    ADD CONSTRAINT "fk_audiobooks_level" FOREIGN KEY ("level_code") REFERENCES "public"."language_levels"("level_code");
 
 
 
@@ -3649,6 +4164,11 @@ ALTER TABLE ONLY "public"."prices"
 
 
 
+ALTER TABLE ONLY "public"."products"
+    ADD CONSTRAINT "products_book_id_fkey" FOREIGN KEY ("book_id") REFERENCES "public"."audiobooks"("book_id");
+
+
+
 ALTER TABLE ONLY "public"."profiles"
     ADD CONSTRAINT "profiles_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -3709,13 +4229,28 @@ ALTER TABLE ONLY "public"."unit_translations"
 
 
 
+ALTER TABLE ONLY "public"."user_audiobook_chapter_progress"
+    ADD CONSTRAINT "user_audiobook_chapter_progress_book_id_fkey" FOREIGN KEY ("book_id") REFERENCES "public"."audiobooks"("book_id");
+
+
+
+ALTER TABLE ONLY "public"."user_audiobook_chapter_progress"
+    ADD CONSTRAINT "user_audiobook_chapter_progress_chapter_id_fkey" FOREIGN KEY ("chapter_id") REFERENCES "public"."audiobook_chapters"("chapter_id");
+
+
+
+ALTER TABLE ONLY "public"."user_audiobook_chapter_progress"
+    ADD CONSTRAINT "user_audiobook_chapter_progress_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "public"."student_profiles"("profile_id");
+
+
+
 ALTER TABLE ONLY "public"."user_audiobook_progress"
     ADD CONSTRAINT "user_audiobook_progress_book_id_fkey" FOREIGN KEY ("book_id") REFERENCES "public"."audiobooks"("book_id");
 
 
 
 ALTER TABLE ONLY "public"."user_audiobook_progress"
-    ADD CONSTRAINT "user_audiobook_progress_chapter_id_fkey" FOREIGN KEY ("current_chapter_id") REFERENCES "public"."audiobook_chapters"("chapter_id");
+    ADD CONSTRAINT "user_audiobook_progress_current_chapter_id_fkey" FOREIGN KEY ("current_chapter_id") REFERENCES "public"."audiobook_chapters"("chapter_id");
 
 
 
@@ -3814,6 +4349,98 @@ ALTER TABLE ONLY "public"."vocabulary_phrases"
 
 
 
+CREATE POLICY "Allow admin users to delete audiobooks" ON "public"."audiobooks" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."profiles"
+  WHERE (("profiles"."id" = "auth"."uid"()) AND ("profiles"."role" = 'admin'::"public"."user_role_enum")))));
+
+
+
+CREATE POLICY "Allow admin users to insert audiobook alignment" ON "public"."audiobook_alignment" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."profiles" "p"
+  WHERE (("p"."id" = "auth"."uid"()) AND ("p"."role" = 'admin'::"public"."user_role_enum")))));
+
+
+
+CREATE POLICY "Allow admin users to insert audiobook chapters" ON "public"."audiobook_chapters" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."profiles" "p"
+  WHERE (("p"."id" = "auth"."uid"()) AND ("p"."role" = 'admin'::"public"."user_role_enum")))));
+
+
+
+CREATE POLICY "Allow admin users to insert audiobooks" ON "public"."audiobooks" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."profiles"
+  WHERE (("profiles"."id" = "auth"."uid"()) AND ("profiles"."role" = 'admin'::"public"."user_role_enum")))));
+
+
+
+CREATE POLICY "Allow admin users to update audiobook alignment" ON "public"."audiobook_alignment" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."profiles" "p"
+  WHERE (("p"."id" = "auth"."uid"()) AND ("p"."role" = 'admin'::"public"."user_role_enum"))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."profiles" "p"
+  WHERE (("p"."id" = "auth"."uid"()) AND ("p"."role" = 'admin'::"public"."user_role_enum")))));
+
+
+
+CREATE POLICY "Allow admin users to update audiobook chapters" ON "public"."audiobook_chapters" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."profiles" "p"
+  WHERE (("p"."id" = "auth"."uid"()) AND ("p"."role" = 'admin'::"public"."user_role_enum"))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."profiles" "p"
+  WHERE (("p"."id" = "auth"."uid"()) AND ("p"."role" = 'admin'::"public"."user_role_enum")))));
+
+
+
+CREATE POLICY "Allow admin users to update audiobooks" ON "public"."audiobooks" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."profiles"
+  WHERE (("profiles"."id" = "auth"."uid"()) AND ("profiles"."role" = 'admin'::"public"."user_role_enum"))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."profiles"
+  WHERE (("profiles"."id" = "auth"."uid"()) AND ("profiles"."role" = 'admin'::"public"."user_role_enum")))));
+
+
+
+CREATE POLICY "Allow authenticated users to read active audiobooks" ON "public"."audiobooks" FOR SELECT TO "authenticated" USING (("is_active" = true));
+
+
+
+CREATE POLICY "Allow authenticated users to read audiobook alignment" ON "public"."audiobook_alignment" FOR SELECT TO "authenticated" USING (true);
+
+
+
+CREATE POLICY "Allow authenticated users to read audiobook chapters" ON "public"."audiobook_chapters" FOR SELECT TO "authenticated" USING (true);
+
+
+
+CREATE POLICY "Users can insert their own audiobook progress" ON "public"."user_audiobook_progress" FOR INSERT TO "authenticated" WITH CHECK (("profile_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can insert their own audiobook purchases" ON "public"."user_audiobook_purchases" FOR INSERT TO "authenticated" WITH CHECK (("profile_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can insert their own chapter progress" ON "public"."user_audiobook_chapter_progress" FOR INSERT TO "authenticated" WITH CHECK (("profile_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can read their own audiobook progress" ON "public"."user_audiobook_progress" FOR SELECT TO "authenticated" USING (("profile_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can read their own audiobook purchases" ON "public"."user_audiobook_purchases" FOR SELECT TO "authenticated" USING (("profile_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can read their own chapter progress" ON "public"."user_audiobook_chapter_progress" FOR SELECT TO "authenticated" USING (("profile_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can update their own audiobook progress" ON "public"."user_audiobook_progress" FOR UPDATE TO "authenticated" USING (("profile_id" = "auth"."uid"())) WITH CHECK (("profile_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can update their own chapter progress" ON "public"."user_audiobook_chapter_progress" FOR UPDATE TO "authenticated" USING (("profile_id" = "auth"."uid"())) WITH CHECK (("profile_id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "allow_delete_for_admins_only" ON "public"."partnerships" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."profiles" "p"
   WHERE (("p"."id" = "auth"."uid"()) AND ("p"."role" = 'admin'::"public"."user_role_enum")))));
@@ -3837,6 +4464,15 @@ CREATE POLICY "allow_update_on_own_or_all_partnerships" ON "public"."partnership
    FROM "public"."profiles" "p"
   WHERE (("p"."id" = "auth"."uid"()) AND (("p"."role" = 'admin'::"public"."user_role_enum") OR (("p"."role" = 'partnership_manager'::"public"."user_role_enum") AND ("partnerships"."id" = "p"."partnership_id")))))));
 
+
+
+ALTER TABLE "public"."audiobook_alignment" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."audiobook_chapters" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."audiobooks" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "delete_own_or_admin_partnership_invitations" ON "public"."partnership_invitations" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
@@ -3871,6 +4507,12 @@ CREATE POLICY "update_own_or_admin_partnership_invitations" ON "public"."partner
 
 
 
+ALTER TABLE "public"."user_audiobook_progress" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."user_audiobook_purchases" ENABLE ROW LEVEL SECURITY;
+
+
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
@@ -3883,10 +4525,11 @@ ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
 
 
-GRANT USAGE ON SCHEMA "public" TO "postgres";
-GRANT USAGE ON SCHEMA "public" TO "anon";
-GRANT USAGE ON SCHEMA "public" TO "authenticated";
+REVOKE USAGE ON SCHEMA "public" FROM PUBLIC;
+GRANT ALL ON SCHEMA "public" TO "anon";
+GRANT ALL ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
+GRANT USAGE ON SCHEMA "public" TO "authenticator";
 
 
 
@@ -4067,6 +4710,12 @@ GRANT ALL ON FUNCTION "public"."admin_fix_user_tier"("user_profile_id" "uuid") T
 
 
 
+GRANT ALL ON FUNCTION "public"."calculate_book_completion"("p_profile_id" "uuid", "p_book_id" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."calculate_book_completion"("p_profile_id" "uuid", "p_book_id" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."calculate_book_completion"("p_profile_id" "uuid", "p_book_id" integer) TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."can_user_access_lesson"("profile_id_param" "uuid", "lesson_id_param" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."can_user_access_lesson"("profile_id_param" "uuid", "lesson_id_param" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."can_user_access_lesson"("profile_id_param" "uuid", "lesson_id_param" integer) TO "service_role";
@@ -4091,6 +4740,12 @@ GRANT ALL ON FUNCTION "public"."check_and_award_unit_completion_bonus"("profile_
 
 
 
+GRANT ALL ON FUNCTION "public"."check_audiobook_ownership"("p_profile_id" "uuid", "p_book_id" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."check_audiobook_ownership"("p_profile_id" "uuid", "p_book_id" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."check_audiobook_ownership"("p_profile_id" "uuid", "p_book_id" integer) TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."cleanup_user_subscriptions"("user_profile_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."cleanup_user_subscriptions"("user_profile_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."cleanup_user_subscriptions"("user_profile_id" "uuid") TO "service_role";
@@ -4100,6 +4755,12 @@ GRANT ALL ON FUNCTION "public"."cleanup_user_subscriptions"("user_profile_id" "u
 GRANT ALL ON FUNCTION "public"."expire_partnership_trials"() TO "anon";
 GRANT ALL ON FUNCTION "public"."expire_partnership_trials"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."expire_partnership_trials"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_user_audiobook_purchases"("p_profile_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_audiobook_purchases"("p_profile_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_audiobook_purchases"("p_profile_id" "uuid") TO "service_role";
 
 
 
@@ -4124,6 +4785,12 @@ GRANT ALL ON FUNCTION "public"."get_user_highest_tier"("user_profile_id" "uuid")
 GRANT ALL ON FUNCTION "public"."get_user_progression_status"("profile_id_param" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_user_progression_status"("profile_id_param" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_user_progression_status"("profile_id_param" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."handle_new_chapter_added"() TO "anon";
+GRANT ALL ON FUNCTION "public"."handle_new_chapter_added"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."handle_new_chapter_added"() TO "service_role";
 
 
 
@@ -4181,9 +4848,33 @@ GRANT ALL ON FUNCTION "public"."process_word_practice_attempt"("profile_id_param
 
 
 
+GRANT ALL ON FUNCTION "public"."redeem_partnership_invitation"("p_token" "uuid", "p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."redeem_partnership_invitation"("p_token" "uuid", "p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."redeem_partnership_invitation"("p_token" "uuid", "p_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_audiobook_duration"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_audiobook_duration"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_audiobook_duration"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."update_chapter_progress"("p_profile_id" "uuid", "p_book_id" integer, "p_chapter_id" integer, "p_position_seconds" numeric, "p_chapter_duration_seconds" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."update_chapter_progress"("p_profile_id" "uuid", "p_book_id" integer, "p_chapter_id" integer, "p_position_seconds" numeric, "p_chapter_duration_seconds" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_chapter_progress"("p_profile_id" "uuid", "p_book_id" integer, "p_chapter_id" integer, "p_position_seconds" numeric, "p_chapter_duration_seconds" integer) TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."update_user_subscription_tier"("user_profile_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_user_subscription_tier"("user_profile_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_user_subscription_tier"("user_profile_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."upsert_audiobook_purchase"("p_stripe_invoice_id" "text", "p_stripe_customer_id" "text", "p_invoice_data" "jsonb") TO "anon";
+GRANT ALL ON FUNCTION "public"."upsert_audiobook_purchase"("p_stripe_invoice_id" "text", "p_stripe_customer_id" "text", "p_invoice_data" "jsonb") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."upsert_audiobook_purchase"("p_stripe_invoice_id" "text", "p_stripe_customer_id" "text", "p_invoice_data" "jsonb") TO "service_role";
 
 
 
@@ -4220,21 +4911,15 @@ GRANT ALL ON FUNCTION "public"."upsert_stripe_subscription"("p_stripe_subscripti
 
 
 
-GRANT ALL ON SEQUENCE "public"."audiobook_alignment_alignment_id_seq" TO "anon";
-GRANT ALL ON SEQUENCE "public"."audiobook_alignment_alignment_id_seq" TO "authenticated";
-GRANT ALL ON SEQUENCE "public"."audiobook_alignment_alignment_id_seq" TO "service_role";
-
-
-
 GRANT ALL ON TABLE "public"."audiobook_alignment" TO "anon";
 GRANT ALL ON TABLE "public"."audiobook_alignment" TO "authenticated";
 GRANT ALL ON TABLE "public"."audiobook_alignment" TO "service_role";
 
 
 
-GRANT ALL ON SEQUENCE "public"."audiobook_chapters_chapter_id_seq" TO "anon";
-GRANT ALL ON SEQUENCE "public"."audiobook_chapters_chapter_id_seq" TO "authenticated";
-GRANT ALL ON SEQUENCE "public"."audiobook_chapters_chapter_id_seq" TO "service_role";
+GRANT ALL ON SEQUENCE "public"."audiobook_alignment_alignment_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."audiobook_alignment_alignment_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."audiobook_alignment_alignment_id_seq" TO "service_role";
 
 
 
@@ -4244,15 +4929,21 @@ GRANT ALL ON TABLE "public"."audiobook_chapters" TO "service_role";
 
 
 
-GRANT ALL ON SEQUENCE "public"."audiobooks_book_id_seq" TO "anon";
-GRANT ALL ON SEQUENCE "public"."audiobooks_book_id_seq" TO "authenticated";
-GRANT ALL ON SEQUENCE "public"."audiobooks_book_id_seq" TO "service_role";
+GRANT ALL ON SEQUENCE "public"."audiobook_chapters_chapter_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."audiobook_chapters_chapter_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."audiobook_chapters_chapter_id_seq" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."audiobooks" TO "anon";
 GRANT ALL ON TABLE "public"."audiobooks" TO "authenticated";
 GRANT ALL ON TABLE "public"."audiobooks" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."audiobooks_book_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."audiobooks_book_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."audiobooks_book_id_seq" TO "service_role";
 
 
 
@@ -4550,9 +5241,15 @@ GRANT ALL ON SEQUENCE "public"."units_unit_id_seq" TO "service_role";
 
 
 
-GRANT ALL ON SEQUENCE "public"."user_audiobook_progress_progress_id_seq" TO "anon";
-GRANT ALL ON SEQUENCE "public"."user_audiobook_progress_progress_id_seq" TO "authenticated";
-GRANT ALL ON SEQUENCE "public"."user_audiobook_progress_progress_id_seq" TO "service_role";
+GRANT ALL ON TABLE "public"."user_audiobook_chapter_progress" TO "anon";
+GRANT ALL ON TABLE "public"."user_audiobook_chapter_progress" TO "authenticated";
+GRANT ALL ON TABLE "public"."user_audiobook_chapter_progress" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."user_audiobook_chapter_progress_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."user_audiobook_chapter_progress_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."user_audiobook_chapter_progress_id_seq" TO "service_role";
 
 
 
@@ -4562,15 +5259,21 @@ GRANT ALL ON TABLE "public"."user_audiobook_progress" TO "service_role";
 
 
 
-GRANT ALL ON SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" TO "anon";
-GRANT ALL ON SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" TO "authenticated";
-GRANT ALL ON SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" TO "service_role";
+GRANT ALL ON SEQUENCE "public"."user_audiobook_progress_progress_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."user_audiobook_progress_progress_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."user_audiobook_progress_progress_id_seq" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."user_audiobook_purchases" TO "anon";
 GRANT ALL ON TABLE "public"."user_audiobook_purchases" TO "authenticated";
 GRANT ALL ON TABLE "public"."user_audiobook_purchases" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" TO "service_role";
 
 
 
@@ -4683,9 +5386,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQ
 
 
 
-
-
-
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "authenticated";
@@ -4693,16 +5393,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 
-
-
-
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "service_role";
-
-
-
 
 
 
