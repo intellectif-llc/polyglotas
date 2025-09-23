@@ -24,26 +24,66 @@ export async function GET(
   }
 
   try {
+    console.log(`[API] Starting lessons fetch for unit ${parsedUnitId}`);
+    
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
+      console.log('[API] No authenticated user found');
       return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
+    
+    console.log(`[API] User authenticated: ${user.id}`);
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("student_profiles")
       .select("current_target_language_code")
       .eq("profile_id", user.id)
       .single();
 
+    if (profileError) {
+      console.log('[API] Profile fetch error:', profileError);
+    }
+    
     const targetLanguage = profile?.current_target_language_code || "en";
+    console.log(`[API] Target language: ${targetLanguage}`);
 
-    // 1. Fetch all lessons for the unit with translations
+    // 1. First check if unit exists
+    const { data: unitCheck, error: unitCheckError } = await supabase
+      .from("units")
+      .select("unit_id, level")
+      .eq("unit_id", parsedUnitId)
+      .single();
+      
+    console.log(`[API] Unit check:`, { unitCheck, unitCheckError });
+    
+    if (unitCheckError || !unitCheck) {
+      console.log('[API] Unit not found');
+      return NextResponse.json({ lessons: [], unit: null, error: 'Unit not found' });
+    }
+    
+    // 2. Check if user can access this unit
+    const { data: canAccess, error: accessError } = await supabase
+      .rpc('can_user_access_unit', {
+        profile_id_param: user.id,
+        unit_id_param: parsedUnitId
+      });
+      
+    console.log(`[API] Access check:`, { canAccess, accessError });
+    
+    if (accessError || !canAccess) {
+      console.log('[API] User cannot access unit');
+      return NextResponse.json({ lessons: [], unit: null, error: 'Access denied' });
+    }
+    
+    // 3. Fetch all lessons for the unit with translations and phrase count
+    console.log(`[API] Fetching lessons for unit ${parsedUnitId} in language ${targetLanguage}`);
+    
     const { data: lessons, error: lessonsError } = await supabase
       .from("lessons")
       .select(
@@ -51,24 +91,30 @@ export async function GET(
         lesson_id,
         unit_id,
         lesson_order,
-        total_phrases,
         lesson_translations(
           lesson_title,
           language_code
-        )
+        ),
+        lesson_phrases(phrase_id)
       `
       )
       .eq("unit_id", parsedUnitId)
       .eq("lesson_translations.language_code", targetLanguage)
       .order("lesson_order", { ascending: true });
+      
+    console.log(`[API] Lessons query result:`, { lessons, lessonsError });
 
     if (lessonsError) {
+      console.log('[API] Lessons fetch error:', lessonsError);
       throw lessonsError;
     }
 
     if (!lessons || lessons.length === 0) {
+      console.log('[API] No lessons found for unit');
       return NextResponse.json({ lessons: [], unit: null });
     }
+    
+    console.log(`[API] Found ${lessons.length} lessons`);
 
     const lessonIds = lessons.map((l) => l.lesson_id);
 
@@ -135,7 +181,7 @@ export async function GET(
           lesson_id: lesson.lesson_id,
           unit_id: lesson.unit_id,
           lesson_order: lesson.lesson_order,
-          total_phrases: lesson.total_phrases,
+          total_phrases: lesson.lesson_phrases?.length || 0,
           lesson_title:
             lesson.lesson_translations?.[0]?.lesson_title ||
             `Lesson ${lesson.lesson_order}`,
@@ -146,14 +192,22 @@ export async function GET(
     );
 
     // 6. Fetch unit details for the breadcrumb
-    const { data: unitData } = await supabase
+    console.log(`[API] Fetching unit details for unit ${parsedUnitId}`);
+    
+    const { data: unitData, error: unitError } = await supabase
       .from("units")
       .select("level, unit_translations!inner(unit_title, language_code)")
       .eq("unit_id", parsedUnitId)
       .eq("unit_translations.language_code", targetLanguage)
       .single();
+      
+    if (unitError) {
+      console.log('[API] Unit fetch error:', unitError);
+    }
+    
+    console.log('[API] Unit data:', unitData);
 
-    return NextResponse.json({
+    const response = {
       lessons: formattedLessons,
       unit: {
         unit_id: unitId,
@@ -161,7 +215,10 @@ export async function GET(
         unit_title: (unitData as UnitDataFromDB | null)?.unit_translations[0]
           ?.unit_title,
       },
-    });
+    };
+    
+    console.log('[API] Returning response:', JSON.stringify(response, null, 2));
+    return NextResponse.json(response);
   } catch (err: unknown) {
     const errorMessage =
       err instanceof Error ? err.message : "An unknown error occurred";
