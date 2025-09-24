@@ -84,7 +84,7 @@ export type Database = {
       }
       audiobook_chapters: {
         Row: {
-          audio_url: string | null
+          audio_url: string
           book_id: number
           chapter_id: number
           chapter_order: number
@@ -92,10 +92,9 @@ export type Database = {
           created_at: string | null
           duration_seconds: number | null
           is_free_sample: boolean | null
-          video_url: string | null
         }
         Insert: {
-          audio_url?: string | null
+          audio_url: string
           book_id: number
           chapter_id?: number
           chapter_order: number
@@ -103,10 +102,9 @@ export type Database = {
           created_at?: string | null
           duration_seconds?: number | null
           is_free_sample?: boolean | null
-          video_url?: string | null
         }
         Update: {
-          audio_url?: string | null
+          audio_url?: string
           book_id?: number
           chapter_id?: number
           chapter_order?: number
@@ -114,7 +112,6 @@ export type Database = {
           created_at?: string | null
           duration_seconds?: number | null
           is_free_sample?: boolean | null
-          video_url?: string | null
         }
         Relationships: [
           {
@@ -174,14 +171,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "audiobooks_language_code_fkey"
+            foreignKeyName: "fk_audiobooks_language"
             columns: ["language_code"]
             isOneToOne: false
             referencedRelation: "languages"
             referencedColumns: ["language_code"]
           },
           {
-            foreignKeyName: "audiobooks_level_code_fkey"
+            foreignKeyName: "fk_audiobooks_level"
             columns: ["level_code"]
             isOneToOne: false
             referencedRelation: "language_levels"
@@ -429,8 +426,8 @@ export type Database = {
             foreignKeyName: "dictation_attempts_phrase_id_fkey"
             columns: ["phrase_id"]
             isOneToOne: false
-            referencedRelation: "vocabulary_phrases"
-            referencedColumns: ["id"]
+            referencedRelation: "phrases"
+            referencedColumns: ["phrase_id"]
           },
           {
             foreignKeyName: "dictation_attempts_profile_id_fkey"
@@ -913,8 +910,8 @@ export type Database = {
             foreignKeyName: "phrase_versions_phrase_id_fkey"
             columns: ["phrase_id"]
             isOneToOne: false
-            referencedRelation: "vocabulary_phrases"
-            referencedColumns: ["id"]
+            referencedRelation: "phrases"
+            referencedColumns: ["phrase_id"]
           },
         ]
       }
@@ -986,26 +983,22 @@ export type Database = {
       products: {
         Row: {
           active: boolean | null
-          book_id: number | null
           created_at: string | null
           description: string | null
           id: number
           metadata: Json | null
           name: string
-          product_type: string | null
           stripe_product_id: string
           tier_key: Database["public"]["Enums"]["subscription_tier_enum"] | null
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
-          book_id?: number | null
           created_at?: string | null
           description?: string | null
           id?: number
           metadata?: Json | null
           name: string
-          product_type?: string | null
           stripe_product_id: string
           tier_key?:
             | Database["public"]["Enums"]["subscription_tier_enum"]
@@ -1014,28 +1007,18 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
-          book_id?: number | null
           created_at?: string | null
           description?: string | null
           id?: number
           metadata?: Json | null
           name?: string
-          product_type?: string | null
           stripe_product_id?: string
           tier_key?:
             | Database["public"]["Enums"]["subscription_tier_enum"]
             | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "products_book_id_fkey"
-            columns: ["book_id"]
-            isOneToOne: false
-            referencedRelation: "audiobooks"
-            referencedColumns: ["book_id"]
-          },
-        ]
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -1146,8 +1129,8 @@ export type Database = {
             foreignKeyName: "speech_attempts_phrase_id_fkey"
             columns: ["phrase_id"]
             isOneToOne: false
-            referencedRelation: "vocabulary_phrases"
-            referencedColumns: ["id"]
+            referencedRelation: "phrases"
+            referencedColumns: ["phrase_id"]
           },
           {
             foreignKeyName: "speech_attempts_profile_id_fkey"
@@ -1170,7 +1153,6 @@ export type Database = {
           native_language_code: string | null
           partnership_id: number | null
           points: number
-          preferences: Json | null
           profile_id: string
           selected_level_code: Database["public"]["Enums"]["level_enum"] | null
           status: Database["public"]["Enums"]["account_status_enum"]
@@ -1189,7 +1171,6 @@ export type Database = {
           native_language_code?: string | null
           partnership_id?: number | null
           points?: number
-          preferences?: Json | null
           profile_id: string
           selected_level_code?: Database["public"]["Enums"]["level_enum"] | null
           status: Database["public"]["Enums"]["account_status_enum"]
@@ -1208,7 +1189,6 @@ export type Database = {
           native_language_code?: string | null
           partnership_id?: number | null
           points?: number
-          preferences?: Json | null
           profile_id?: string
           selected_level_code?: Database["public"]["Enums"]["level_enum"] | null
           status?: Database["public"]["Enums"]["account_status_enum"]
@@ -1577,6 +1557,7 @@ export type Database = {
           },
         ]
       }
+
       user_audiobook_progress: {
         Row: {
           book_id: number
@@ -1858,8 +1839,8 @@ export type Database = {
             foreignKeyName: "user_phrase_progress_phrase_id_fkey"
             columns: ["phrase_id"]
             isOneToOne: false
-            referencedRelation: "vocabulary_phrases"
-            referencedColumns: ["id"]
+            referencedRelation: "phrases"
+            referencedColumns: ["phrase_id"]
           },
           {
             foreignKeyName: "user_phrase_progress_profile_id_fkey"
@@ -1867,6 +1848,64 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "student_profiles"
             referencedColumns: ["profile_id"]
+          },
+        ]
+      }
+      user_srs_data: {
+        Row: {
+          user_srs_data_id: number
+          profile_id: string
+          phrase_id: number
+          due_at: string
+          interval: number
+          ease_factor: number
+          repetitions: number
+          last_reviewed_at: string | null
+          language_code: string
+        }
+        Insert: {
+          user_srs_data_id?: never
+          profile_id: string
+          phrase_id: number
+          due_at?: string
+          interval?: number
+          ease_factor?: number
+          repetitions?: number
+          last_reviewed_at?: string | null
+          language_code: string
+        }
+        Update: {
+          user_srs_data_id?: never
+          profile_id?: string
+          phrase_id?: number
+          due_at?: string
+          interval?: number
+          ease_factor?: number
+          repetitions?: number
+          last_reviewed_at?: string | null
+          language_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_srs_data_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "student_profiles"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "user_srs_data_phrase_id_fkey"
+            columns: ["phrase_id"]
+            isOneToOne: false
+            referencedRelation: "phrases"
+            referencedColumns: ["phrase_id"]
+          },
+          {
+            foreignKeyName: "fk_user_srs_data_lang"
+            columns: ["language_code"]
+            isOneToOne: false
+            referencedRelation: "languages"
+            referencedColumns: ["language_code"]
           },
         ]
       }
@@ -1942,8 +1981,8 @@ export type Database = {
             foreignKeyName: "user_points_log_related_phrase_id_fkey"
             columns: ["related_phrase_id"]
             isOneToOne: false
-            referencedRelation: "vocabulary_phrases"
-            referencedColumns: ["id"]
+            referencedRelation: "phrases"
+            referencedColumns: ["phrase_id"]
           },
         ]
       }
@@ -2121,40 +2160,59 @@ export type Database = {
           },
         ]
       }
-      vocabulary_phrases: {
+      lesson_phrases: {
         Row: {
-          concept_description: string | null
-          created_at: string | null
-          id: number
+          lesson_phrase_id: number
           lesson_id: number
+          phrase_id: number
           phrase_order: number
-          updated_at: string | null
         }
         Insert: {
-          concept_description?: string | null
-          created_at?: string | null
-          id?: number
+          lesson_phrase_id?: never
           lesson_id: number
+          phrase_id: number
           phrase_order: number
-          updated_at?: string | null
         }
         Update: {
-          concept_description?: string | null
-          created_at?: string | null
-          id?: number
+          lesson_phrase_id?: never
           lesson_id?: number
+          phrase_id?: number
           phrase_order?: number
-          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "vocabulary_phrases_lesson_id_fkey"
+            foreignKeyName: "lesson_phrases_lesson_id_fkey"
             columns: ["lesson_id"]
             isOneToOne: false
             referencedRelation: "lessons"
             referencedColumns: ["lesson_id"]
           },
+          {
+            foreignKeyName: "lesson_phrases_phrase_id_fkey"
+            columns: ["phrase_id"]
+            isOneToOne: false
+            referencedRelation: "phrases"
+            referencedColumns: ["phrase_id"]
+          },
         ]
+      }
+      phrases: {
+        Row: {
+          phrase_id: number
+          concept_description: string | null
+          created_at: string | null
+        }
+        Insert: {
+          phrase_id?: never
+          concept_description?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          phrase_id?: never
+          concept_description?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {

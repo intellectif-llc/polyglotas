@@ -603,6 +603,7 @@ CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCE
 | level_enum                    | B1                   | 3             |
 | level_enum                    | B2                   | 4             |
 | level_enum                    | C1                   | 5             |
+| level_enum                    | C2                   | 6             |
 | price_billing_interval_enum   | day                  | 1             |
 | price_billing_interval_enum   | week                 | 2             |
 | price_billing_interval_enum   | month                | 3             |
