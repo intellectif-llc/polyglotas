@@ -2160,6 +2160,102 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          ticket_id: number
+          profile_id: string
+          assigned_to_profile_id: string | null
+          status: Database["public"]["Enums"]["ticket_status_enum"]
+          reason: Database["public"]["Enums"]["contact_reason_enum"]
+          subject: string
+          created_at: string
+          updated_at: string
+          resolved_at: string | null
+          last_message_at: string | null
+        }
+        Insert: {
+          ticket_id?: number
+          profile_id: string
+          assigned_to_profile_id?: string | null
+          status?: Database["public"]["Enums"]["ticket_status_enum"]
+          reason: Database["public"]["Enums"]["contact_reason_enum"]
+          subject: string
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+          last_message_at?: string | null
+        }
+        Update: {
+          ticket_id?: number
+          profile_id?: string
+          assigned_to_profile_id?: string | null
+          status?: Database["public"]["Enums"]["ticket_status_enum"]
+          reason?: Database["public"]["Enums"]["contact_reason_enum"]
+          subject?: string
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+          last_message_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "student_profiles"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "support_tickets_assigned_to_profile_id_fkey"
+            columns: ["assigned_to_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ticket_messages: {
+        Row: {
+          message_id: number
+          ticket_id: number
+          sender_profile_id: string
+          message_text: string
+          attachment_url: string | null
+          created_at: string
+        }
+        Insert: {
+          message_id?: number
+          ticket_id: number
+          sender_profile_id: string
+          message_text: string
+          attachment_url?: string | null
+          created_at?: string
+        }
+        Update: {
+          message_id?: number
+          ticket_id?: number
+          sender_profile_id?: string
+          message_text?: string
+          attachment_url?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "support_ticket_messages_sender_profile_id_fkey"
+            columns: ["sender_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lesson_phrases: {
         Row: {
           lesson_phrase_id: number
@@ -2471,7 +2567,9 @@ export type Database = {
         | "paused"
       subscription_tier_enum: "free" | "starter" | "pro"
       tour_progress_status: "pending" | "in_progress" | "completed"
-      user_role_enum: "student" | "partnership_manager" | "admin"
+      user_role_enum: "student" | "partnership_manager" | "admin" | "support"
+      ticket_status_enum: "open" | "in_progress" | "resolved" | "closed"
+      contact_reason_enum: "billing_issue" | "partnership_benefits" | "technical_issue" | "feature_request" | "content_error" | "account_question" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2638,7 +2736,9 @@ export const Constants = {
       ],
       subscription_tier_enum: ["free", "starter", "pro"],
       tour_progress_status: ["pending", "in_progress", "completed"],
-      user_role_enum: ["student", "partnership_manager", "admin"],
+      user_role_enum: ["student", "partnership_manager", "admin", "support"],
+      ticket_status_enum: ["open", "in_progress", "resolved", "closed"],
+      contact_reason_enum: ["billing_issue", "partnership_benefits", "technical_issue", "feature_request", "content_error", "account_question", "other"],
     },
   },
 } as const

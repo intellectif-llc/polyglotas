@@ -15,6 +15,7 @@ import {
   Users,
   PlayCircle,
   Headphones,
+  HelpCircle,
 } from "lucide-react";
 import { useContinueLearning } from "@/hooks/useContinueLearning";
 import { useUserStats } from "@/hooks/useUserProfile";
@@ -128,6 +129,12 @@ const NavigationSection: React.FC<NavigationSectionProps> = ({
           label: "Purchases",
           icon: Headphones,
           isActive: pathname.startsWith("/account/purchases"),
+        },
+        {
+          href: "/account/support",
+          label: "Support",
+          icon: HelpCircle,
+          isActive: pathname.startsWith("/account/support"),
         },
         {
           href: "/account/settings",

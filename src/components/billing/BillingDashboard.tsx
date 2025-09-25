@@ -189,16 +189,16 @@ export default function BillingDashboard() {
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
           <a
-            href="mailto:support@polyglotas.com"
+            href="/account/support"
             className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
           >
             Contact Support
           </a>
           <a
-            href="/help/billing"
+            href="/account/support"
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
           >
-            View Billing FAQ
+            View Support Tickets
           </a>
         </div>
       </div>
