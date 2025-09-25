@@ -581,6 +581,32 @@ CONSTRAINT user_word_spelling_pkey PRIMARY KEY (id),
 CONSTRAINT fk_user_word_spelling_lang FOREIGN KEY (language_code) REFERENCES public.languages(language_code),
 CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
 );
+CREATE TABLE public.support_tickets (
+ticket_id bigint NOT NULL DEFAULT nextval('support_tickets_ticket_id_seq'::regclass),
+profile_id uuid NOT NULL,
+assigned_to_profile_id uuid,
+status USER-DEFINED NOT NULL DEFAULT 'open'::ticket_status_enum,
+reason USER-DEFINED NOT NULL,
+subject text NOT NULL CHECK (subject <> ''::text),
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+resolved_at timestamp with time zone,
+last_message_at timestamp with time zone,
+CONSTRAINT support_tickets_pkey PRIMARY KEY (ticket_id),
+CONSTRAINT support_tickets_assigned_to_profile_id_fkey FOREIGN KEY (assigned_to_profile_id) REFERENCES public.profiles(id),
+CONSTRAINT support_tickets_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.student_profiles(profile_id)
+);
+CREATE TABLE public.support_ticket_messages (
+message_id bigint NOT NULL DEFAULT nextval('support_ticket_messages_message_id_seq'::regclass),
+ticket_id bigint NOT NULL,
+sender_profile_id uuid NOT NULL,
+message_text text NOT NULL,
+attachment_url text,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT support_ticket_messages_pkey PRIMARY KEY (message_id),
+CONSTRAINT support_ticket_messages_sender_profile_id_fkey FOREIGN KEY (sender_profile_id) REFERENCES public.profiles(id),
+CONSTRAINT support_ticket_messages_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.support_tickets(ticket_id) ON DELETE CASCADE
+);
 
 # Enums
 
@@ -635,8 +661,20 @@ CONSTRAINT user_word_spelling_profile_id_fkey FOREIGN KEY (profile_id) REFERENCE
 | user_role_enum                | student              | 1             |
 | user_role_enum                | partnership_manager  | 2             |
 | user_role_enum                | admin                | 3             |
+| user_role_enum                | support              | 4             |
 | purchase_type_enum            | points               | 1             |
 | purchase_type_enum            | money                | 2             |
+| ticket_status_enum            | open                 | 1             |
+| ticket_status_enum            | in_progress          | 2             |
+| ticket_status_enum            | resolved             | 3             |
+| ticket_status_enum            | closed               | 4             |
+| contact_reason_enum           | billing_issue        | 1             |
+| contact_reason_enum           | partnership_benefits | 2             |
+| contact_reason_enum           | technical_issue      | 3             |
+| contact_reason_enum           | feature_request      | 4             |
+| contact_reason_enum           | content_error        | 5             |
+| contact_reason_enum           | account_question     | 6             |
+| contact_reason_enum           | other                | 7             |
 
 # Database auth schema
 
