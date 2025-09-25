@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import PronunciationDashboard from "@/components/pronunciation/dashboard/PronunciationDashboard";
-import WordsPracticeList from "@/components/pronunciation/practice/WordsPracticeList";
+import WordsPracticeList from "@/components/pronunciation/pronunciation/WordsPracticeList";
 
 export default function LearnPage() {
   const searchParams = useSearchParams();

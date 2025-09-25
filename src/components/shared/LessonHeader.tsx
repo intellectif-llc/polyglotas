@@ -10,7 +10,7 @@ interface LessonHeaderProps {
   level?: string;
   onBack: () => void;
   collapsible?: boolean;
-  activity?: 'practice' | 'dictation' | 'chat' | 'word-practice';
+  activity?: 'pronunciation' | 'dictation' | 'chat' | 'word-practice';
 }
 
 export default function LessonHeader({
@@ -31,7 +31,7 @@ export default function LessonHeader({
   // Activity-based color themes
   const getActivityTheme = () => {
     switch (activity) {
-      case 'practice':
+      case 'pronunciation':
         return {
           gradient: 'from-blue-50 to-indigo-50',
           border: 'border-blue-100',

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useLessonPhrases } from "@/hooks/pronunciation/usePronunciationData";
 import { useDictation } from "@/hooks/dictation/useDictation";
 import { useLastDictationAttempt } from "@/hooks/dictation/useLastDictationAttempt";
-import PhraseStepper from "../practice/PhraseStepper";
+import PhraseStepper from "../pronunciation/PhraseStepper";
 import DictationInterface from "./DictationInterface";
 import DictationResults from "./DictationResults";
 import { DictationAttempt } from "@/types/pronunciation";
@@ -207,7 +207,7 @@ export default function LessonDictationView() {
                   (!canAdvancedPrevious && currentPhraseIndex === 0) ||
                   isSubmitting
                 }
-                className="flex items-center justify-center sm:justify-start px-3 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px] touch-manipulation"
+                className="flex items-center justify-center sm:justify-start px-3 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px] touch-manipulation cursor-pointer"
               >
                 <ChevronLeft className="h-5 w-5 mr-2 pointer-events-none" />
                 <span className="pointer-events-none">Previous</span>
@@ -221,7 +221,7 @@ export default function LessonDictationView() {
                     currentPhraseIndex >= totalPhrases - 1) ||
                   isSubmitting
                 }
-                className="flex items-center justify-center sm:justify-start px-3 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px] touch-manipulation"
+                className="flex items-center justify-center sm:justify-start px-3 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px] touch-manipulation cursor-pointer"
               >
                 <span className="pointer-events-none">Next</span>
                 <ChevronRight className="h-5 w-5 ml-2 pointer-events-none" />

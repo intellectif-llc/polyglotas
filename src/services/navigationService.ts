@@ -1,7 +1,7 @@
 import { Unit, Lesson, Phrase } from "@/types/pronunciation";
 import { TierPermissions } from "@/hooks/useSubscriptionTier";
 
-export type ActivityType = "dictation" | "practice" | "chat";
+export type ActivityType = "dictation" | "pronunciation" | "chat";
 
 export interface NavigationPosition {
   unitId: string;
@@ -24,7 +24,7 @@ export class NavigationService {
     const activities: ActivityType[] = ["dictation"];
     
     if (permissions.canAccessPractice) {
-      activities.push("practice");
+      activities.push("pronunciation");
     }
     
     if (permissions.canAccessChat) {

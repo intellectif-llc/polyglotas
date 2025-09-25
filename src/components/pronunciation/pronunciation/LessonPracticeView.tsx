@@ -71,13 +71,10 @@ export default function LessonPracticeView() {
   ]);
 
   // Auto-save attempt completion callback
-  const handleRecognitionComplete = useCallback(
-    () => {
-      // Note: Auto-saving is handled by useSpeechRecognition hook
-      // This callback is just for UI updates
-    },
-    []
-  );
+  const handleRecognitionComplete = useCallback(() => {
+    // Note: Auto-saving is handled by useSpeechRecognition hook
+    // This callback is just for UI updates
+  }, []);
 
   // Speech recognition hook - matching sample project parameters
   const { startRecording, stopRecording, cleanupRecognizer } =
@@ -103,12 +100,12 @@ export default function LessonPracticeView() {
     canNavigateNext: canAdvancedNext,
     canNavigatePrevious: canAdvancedPrevious,
     navigateNext: advancedNext,
-    navigatePrevious: advancedPrevious
+    navigatePrevious: advancedPrevious,
   } = useAdvancedNavigation({
     unitId,
     lessonId,
-    activity: "practice",
-    phraseIndex: currentPhraseIndex
+    activity: "pronunciation",
+    phraseIndex: currentPhraseIndex,
   });
 
   const handleNext = async () => {
@@ -117,7 +114,7 @@ export default function LessonPracticeView() {
       setCurrentPhraseIndex(currentPhraseIndex + 1);
       return;
     }
-    
+
     // If at last phrase, use advanced navigation for cross-activity/lesson navigation
     if (canAdvancedNext) {
       await advancedNext();
@@ -130,7 +127,7 @@ export default function LessonPracticeView() {
       setCurrentPhraseIndex(currentPhraseIndex - 1);
       return;
     }
-    
+
     // If at first phrase, use advanced navigation for cross-activity/lesson navigation
     if (canAdvancedPrevious) {
       await advancedPrevious();
@@ -190,7 +187,7 @@ export default function LessonPracticeView() {
         unitTitle={data.lesson?.unit_title || unitId}
         level={data.lesson?.level}
         onBack={() => router.push(`/learn/${unitId}`)}
-        activity="practice"
+        activity="pronunciation"
         collapsible
       />
 
@@ -200,7 +197,7 @@ export default function LessonPracticeView() {
         <ActivitySwitcher
           unitId={unitId}
           lessonId={lessonId}
-          currentActivity="practice"
+          currentActivity="pronunciation"
         />
 
         {/* Phrase Stepper */}
@@ -250,7 +247,7 @@ export default function LessonPracticeView() {
                 uiState === UIState.Listening ||
                 uiState === UIState.Processing
               }
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
               Previous

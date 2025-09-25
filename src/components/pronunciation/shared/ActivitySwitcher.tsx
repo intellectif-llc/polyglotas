@@ -8,7 +8,7 @@ import { Lock } from "lucide-react";
 interface ActivitySwitcherProps {
   unitId: string;
   lessonId: string;
-  currentActivity: "dictation" | "practice" | "chat";
+  currentActivity: "dictation" | "pronunciation" | "chat";
 }
 
 export default function ActivitySwitcher({
@@ -27,9 +27,9 @@ export default function ActivitySwitcher({
       canAccess: permissions.canAccessDictation,
     },
     {
-      key: "practice" as const,
+      key: "pronunciation" as const,
       label: "Pronunciation",
-      path: `/learn/${unitId}/lesson/${lessonId}/practice`,
+      path: `/learn/${unitId}/lesson/${lessonId}/pronunciation`,
       canAccess: permissions.canAccessPractice,
     },
     {

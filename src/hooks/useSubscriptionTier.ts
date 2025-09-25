@@ -6,7 +6,7 @@ export interface TierPermissions {
   canAccessDictation: boolean;
   canAccessPractice: boolean;
   canAccessChat: boolean;
-  requiredActivitiesForCompletion: ("dictation" | "practice" | "chat")[];
+  requiredActivitiesForCompletion: ("dictation" | "pronunciation" | "chat")[];
 }
 
 const TIER_PERMISSIONS: Record<SubscriptionTier, TierPermissions> = {
@@ -20,13 +20,13 @@ const TIER_PERMISSIONS: Record<SubscriptionTier, TierPermissions> = {
     canAccessDictation: true,
     canAccessPractice: true,
     canAccessChat: false,
-    requiredActivitiesForCompletion: ["dictation", "practice"],
+    requiredActivitiesForCompletion: ["dictation", "pronunciation"],
   },
   pro: {
     canAccessDictation: true,
     canAccessPractice: true,
     canAccessChat: true,
-    requiredActivitiesForCompletion: ["dictation", "practice", "chat"],
+    requiredActivitiesForCompletion: ["dictation", "pronunciation", "chat"],
   },
 };
 
@@ -42,11 +42,11 @@ export const useSubscriptionTier = () => {
     isLoading,
     error,
     // Helper functions
-    canAccessActivity: (activity: "dictation" | "practice" | "chat") => {
+    canAccessActivity: (activity: "dictation" | "pronunciation" | "chat") => {
       switch (activity) {
         case "dictation":
           return permissions.canAccessDictation;
-        case "practice":
+        case "pronunciation":
           return permissions.canAccessPractice;
         case "chat":
           return permissions.canAccessChat;
