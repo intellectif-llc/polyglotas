@@ -17,6 +17,7 @@ import { usePartnership } from "@/hooks/usePartnership";
 import { useUserStats } from "@/hooks/useUserProfile";
 import { useRealtimeUserStats } from "@/hooks/useRealtimeUserStats";
 import { CompactAnimatedStats } from "./CompactAnimatedStats";
+import TryProButton from "../billing/TryProButton";
 import Image from "next/image";
 
 interface HeaderProps {
@@ -137,6 +138,11 @@ const Header: React.FC<HeaderProps> = ({
               points={userStats.totalPoints}
             />
           </div>
+        )}
+
+        {/* Try Pro Button */}
+        {user && (
+          <TryProButton size="sm" />
         )}
 
         {user ? (
