@@ -175,6 +175,9 @@ export async function GET() {
               current_period_end,
               cancel_at_period_end,
               quantity,
+              trial_start_at,
+              trial_end_at,
+              metadata,
               prices!inner(
                 stripe_price_id
               )
@@ -189,6 +192,9 @@ export async function GET() {
             current_period_start: sub.current_period_start,
             current_period_end: sub.current_period_end,
             cancel_at_period_end: sub.cancel_at_period_end,
+            trial_start_at: sub.trial_start_at,
+            trial_end_at: sub.trial_end_at,
+            metadata: sub.metadata,
             items: [{
               price: sub.prices[0]?.stripe_price_id,
               quantity: sub.quantity || 1,

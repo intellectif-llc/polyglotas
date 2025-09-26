@@ -17,6 +17,9 @@ interface BillingInfo {
     current_period_start: number;
     current_period_end: number;
     cancel_at_period_end: boolean;
+    trial_start_at?: string | null;
+    trial_end_at?: string | null;
+    metadata?: Record<string, unknown> | null;
     items: Array<{
       price: string;
       quantity: number;

@@ -18,6 +18,9 @@ interface Subscription {
   current_period_start: number | string;
   current_period_end: number | string;
   cancel_at_period_end: boolean;
+  trial_start_at?: string | null;
+  trial_end_at?: string | null;
+  metadata?: Record<string, unknown> | null;
   items: Array<{
     price: string;
     quantity: number;
@@ -66,6 +69,24 @@ export default function SubscriptionCard({
     });
   };
 
+  const getTrialInfo = (subscription: Subscription) => {
+    if (subscription.status !== 'trialing' || !subscription.trial_end_at) {
+      return null;
+    }
+
+    const trialEndDate = new Date(subscription.trial_end_at);
+    const now = new Date();
+    const daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    const isExpired = trialEndDate <= now;
+
+    return {
+      daysRemaining,
+      isExpired,
+      trialEndDate,
+      isStandardTrial: subscription.metadata?.trial_type === 'standard_trial',
+    };
+  };
+
   const getTierInfo = (tier: string) => {
     switch (tier) {
       case "pro":
@@ -106,7 +127,7 @@ export default function SubscriptionCard({
         };
       case "trialing":
         return {
-          label: "Trial",
+          label: "Free Trial",
           icon: Calendar,
           color: "text-blue-600 dark:text-blue-400",
           bgColor: "bg-blue-100 dark:bg-blue-900/20",
@@ -184,31 +205,70 @@ export default function SubscriptionCard({
         )}
       </div>
 
-      {subscription && (
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Current Period
-            </p>
-            <p className="text-lg font-medium text-gray-900 dark:text-white">
-              {formatDate(subscription.current_period_start)} -{" "}
-              {formatDate(subscription.current_period_end)}
-            </p>
+      {subscription && (() => {
+        const trialInfo = getTrialInfo(subscription);
+        
+        return (
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {trialInfo ? (
+              // Trial-specific display
+              <>
+                <div>
+                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                    Trial Period
+                  </p>
+                  <p className="text-lg font-medium text-gray-900 dark:text-white">
+                    {trialInfo.daysRemaining} day{trialInfo.daysRemaining !== 1 ? 's' : ''} remaining
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Ends {formatDate(subscription.trial_end_at)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    After Trial
+                  </p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {trialInfo.daysRemaining > 0 ? 'Billing starts' : 'Billing started'} {(() => {
+                      const trialEndDate = new Date(subscription.trial_end_at!);
+                      const billingStartDate = new Date(trialEndDate);
+                      billingStartDate.setDate(billingStartDate.getDate() + 1);
+                      return formatDate(billingStartDate.toISOString());
+                    })()}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Cancel anytime before trial ends
+                  </p>
+                </div>
+              </>
+            ) : (
+              // Regular subscription display
+              <>
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Current Period
+                  </p>
+                  <p className="text-lg font-medium text-gray-900 dark:text-white">
+                    {formatDate(subscription.current_period_start)} -{" "}
+                    {formatDate(subscription.current_period_end)}
+                  </p>
+                </div>
+                {subscription.cancel_at_period_end && (
+                  <div>
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      Cancels at period end
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Your subscription will end on{" "}
+                      {formatDate(subscription.current_period_end)}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-
-          {subscription.cancel_at_period_end && (
-            <div>
-              <p className="text-sm text-red-600 dark:text-red-400">
-                Cancels at period end
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Your subscription will end on{" "}
-                {formatDate(subscription.current_period_end)}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {!subscription && currentTier === "free" && (
         <div className="mt-4">
