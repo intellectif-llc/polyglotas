@@ -94,6 +94,20 @@ CREATE TYPE "public"."activity_type_enum" AS ENUM (
 ALTER TYPE "public"."activity_type_enum" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."contact_reason_enum" AS ENUM (
+    'billing_issue',
+    'partnership_benefits',
+    'technical_issue',
+    'feature_request',
+    'content_error',
+    'account_question',
+    'other'
+);
+
+
+ALTER TYPE "public"."contact_reason_enum" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."invoice_status_enum" AS ENUM (
     'draft',
     'open',
@@ -195,6 +209,17 @@ CREATE TYPE "public"."subscription_tier_enum" AS ENUM (
 ALTER TYPE "public"."subscription_tier_enum" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."ticket_status_enum" AS ENUM (
+    'open',
+    'in_progress',
+    'resolved',
+    'closed'
+);
+
+
+ALTER TYPE "public"."ticket_status_enum" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."tour_progress_status" AS ENUM (
     'pending',
     'in_progress',
@@ -208,7 +233,8 @@ ALTER TYPE "public"."tour_progress_status" OWNER TO "postgres";
 CREATE TYPE "public"."user_role_enum" AS ENUM (
     'student',
     'partnership_manager',
-    'admin'
+    'admin',
+    'support'
 );
 
 
@@ -1858,7 +1884,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."audiobook_alignment_alignment_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."audiobook_alignment_alignment_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."audiobook_alignment_alignment_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."audiobook_alignment_alignment_id_seq" OWNED BY "public"."audiobook_alignment"."alignment_id";
@@ -1890,7 +1916,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."audiobook_chapters_chapter_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."audiobook_chapters_chapter_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."audiobook_chapters_chapter_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."audiobook_chapters_chapter_id_seq" OWNED BY "public"."audiobook_chapters"."chapter_id";
@@ -1926,7 +1952,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."audiobooks_book_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."audiobooks_book_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."audiobooks_book_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."audiobooks_book_id_seq" OWNED BY "public"."audiobooks"."book_id";
@@ -1975,7 +2001,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."conversation_messages_message_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."conversation_messages_message_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."conversation_messages_message_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."conversation_messages_message_id_seq" OWNED BY "public"."conversation_messages"."message_id";
@@ -2010,7 +2036,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."conversation_prompt_status_prompt_status
     CACHE 1;
 
 
-ALTER TABLE "public"."conversation_prompt_status_prompt_status_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."conversation_prompt_status_prompt_status_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."conversation_prompt_status_prompt_status_id_seq" OWNED BY "public"."conversation_prompt_status"."prompt_status_id";
@@ -2043,7 +2069,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."conversation_starter_translations_starte
     CACHE 1;
 
 
-ALTER TABLE "public"."conversation_starter_translations_starter_translation_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."conversation_starter_translations_starter_translation_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."conversation_starter_translations_starter_translation_id_seq" OWNED BY "public"."conversation_starter_translations"."starter_translation_id";
@@ -2074,7 +2100,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."conversation_starters_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."conversation_starters_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."conversation_starters_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."conversation_starters_id_seq" OWNED BY "public"."conversation_starters"."id";
@@ -2125,7 +2151,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."dictation_attempts_attempt_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."dictation_attempts_attempt_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."dictation_attempts_attempt_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."dictation_attempts_attempt_id_seq" OWNED BY "public"."dictation_attempts"."attempt_id";
@@ -2171,7 +2197,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."invoices_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."invoices_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."invoices_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."invoices_id_seq" OWNED BY "public"."invoices"."id";
@@ -2240,7 +2266,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."learning_outcome_translations_outcome_tr
     CACHE 1;
 
 
-ALTER TABLE "public"."learning_outcome_translations_outcome_translation_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."learning_outcome_translations_outcome_translation_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."learning_outcome_translations_outcome_translation_id_seq" OWNED BY "public"."learning_outcome_translations"."outcome_translation_id";
@@ -2270,7 +2296,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."learning_outcomes_outcome_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."learning_outcomes_outcome_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."learning_outcomes_outcome_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."learning_outcomes_outcome_id_seq" OWNED BY "public"."learning_outcomes"."outcome_id";
@@ -2307,10 +2333,32 @@ CREATE SEQUENCE IF NOT EXISTS "public"."lesson_chat_conversations_conversation_i
     CACHE 1;
 
 
-ALTER TABLE "public"."lesson_chat_conversations_conversation_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."lesson_chat_conversations_conversation_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."lesson_chat_conversations_conversation_id_seq" OWNED BY "public"."lesson_chat_conversations"."conversation_id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."lesson_phrases" (
+    "lesson_phrase_id" integer NOT NULL,
+    "lesson_id" integer NOT NULL,
+    "phrase_id" integer NOT NULL,
+    "phrase_order" integer NOT NULL
+);
+
+
+ALTER TABLE "public"."lesson_phrases" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."lesson_phrases" ALTER COLUMN "lesson_phrase_id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "public"."lesson_phrases_lesson_phrase_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 
@@ -2341,7 +2389,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."lesson_translations_lesson_translation_i
     CACHE 1;
 
 
-ALTER TABLE "public"."lesson_translations_lesson_translation_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."lesson_translations_lesson_translation_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."lesson_translations_lesson_translation_id_seq" OWNED BY "public"."lesson_translations"."lesson_translation_id";
@@ -2352,7 +2400,6 @@ CREATE TABLE IF NOT EXISTS "public"."lessons" (
     "lesson_id" integer NOT NULL,
     "unit_id" integer NOT NULL,
     "lesson_order" integer NOT NULL,
-    "total_phrases" integer DEFAULT 0 NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "has_dictation" boolean DEFAULT true NOT NULL,
@@ -2377,7 +2424,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."lessons_lesson_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."lessons_lesson_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."lessons_lesson_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."lessons_lesson_id_seq" OWNED BY "public"."lessons"."lesson_id";
@@ -2475,10 +2522,31 @@ CREATE SEQUENCE IF NOT EXISTS "public"."phrase_versions_phrase_version_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."phrase_versions_phrase_version_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."phrase_versions_phrase_version_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."phrase_versions_phrase_version_id_seq" OWNED BY "public"."phrase_versions"."phrase_version_id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."phrases" (
+    "phrase_id" integer NOT NULL,
+    "concept_description" "text",
+    "created_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."phrases" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."phrases" ALTER COLUMN "phrase_id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "public"."phrases_phrase_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 
@@ -2524,7 +2592,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."prices_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."prices_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."prices_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."prices_id_seq" OWNED BY "public"."prices"."id";
@@ -2566,7 +2634,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."products_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."products_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."products_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."products_id_seq" OWNED BY "public"."products"."id";
@@ -2643,7 +2711,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."speech_attempts_attempt_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."speech_attempts_attempt_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."speech_attempts_attempt_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."speech_attempts_attempt_id_seq" OWNED BY "public"."speech_attempts"."attempt_id";
@@ -2780,7 +2848,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."student_subscriptions_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."student_subscriptions_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."student_subscriptions_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."student_subscriptions_id_seq" OWNED BY "public"."student_subscriptions"."id";
@@ -2798,6 +2866,67 @@ ALTER TABLE "public"."student_target_languages" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."student_target_languages" IS 'Stores all languages a student intends to learn or has learned.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."support_ticket_messages" (
+    "message_id" bigint NOT NULL,
+    "ticket_id" bigint NOT NULL,
+    "sender_profile_id" "uuid" NOT NULL,
+    "message_text" "text" NOT NULL,
+    "attachment_url" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."support_ticket_messages" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."support_ticket_messages_message_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE "public"."support_ticket_messages_message_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."support_ticket_messages_message_id_seq" OWNED BY "public"."support_ticket_messages"."message_id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."support_tickets" (
+    "ticket_id" bigint NOT NULL,
+    "profile_id" "uuid" NOT NULL,
+    "assigned_to_profile_id" "uuid",
+    "status" "public"."ticket_status_enum" DEFAULT 'open'::"public"."ticket_status_enum" NOT NULL,
+    "reason" "public"."contact_reason_enum" NOT NULL,
+    "subject" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "resolved_at" timestamp with time zone,
+    "last_message_at" timestamp with time zone,
+    CONSTRAINT "support_tickets_subject_check" CHECK (("subject" <> ''::"text"))
+);
+
+
+ALTER TABLE "public"."support_tickets" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "public"."support_tickets_ticket_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE "public"."support_tickets_ticket_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "public"."support_tickets_ticket_id_seq" OWNED BY "public"."support_tickets"."ticket_id";
 
 
 
@@ -2881,7 +3010,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."unit_translations_unit_translation_id_se
     CACHE 1;
 
 
-ALTER TABLE "public"."unit_translations_unit_translation_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."unit_translations_unit_translation_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."unit_translations_unit_translation_id_seq" OWNED BY "public"."unit_translations"."unit_translation_id";
@@ -2913,7 +3042,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."units_unit_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."units_unit_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."units_unit_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."units_unit_id_seq" OWNED BY "public"."units"."unit_id";
@@ -2946,7 +3075,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_audiobook_chapter_progress_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."user_audiobook_chapter_progress_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."user_audiobook_chapter_progress_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."user_audiobook_chapter_progress_id_seq" OWNED BY "public"."user_audiobook_chapter_progress"."id";
@@ -2980,7 +3109,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_audiobook_progress_progress_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."user_audiobook_progress_progress_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."user_audiobook_progress_progress_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."user_audiobook_progress_progress_id_seq" OWNED BY "public"."user_audiobook_progress"."progress_id";
@@ -3010,7 +3139,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_audiobook_purchases_purchase_id_seq
     CACHE 1;
 
 
-ALTER TABLE "public"."user_audiobook_purchases_purchase_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" OWNED BY "public"."user_audiobook_purchases"."purchase_id";
@@ -3070,7 +3199,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_lesson_progress_progress_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."user_lesson_progress_progress_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."user_lesson_progress_progress_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."user_lesson_progress_progress_id_seq" OWNED BY "public"."user_lesson_progress"."progress_id";
@@ -3140,7 +3269,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_phrase_progress_phrase_progress_id_
     CACHE 1;
 
 
-ALTER TABLE "public"."user_phrase_progress_phrase_progress_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."user_phrase_progress_phrase_progress_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."user_phrase_progress_phrase_progress_id_seq" OWNED BY "public"."user_phrase_progress"."phrase_progress_id";
@@ -3186,10 +3315,37 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_points_log_log_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."user_points_log_log_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."user_points_log_log_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."user_points_log_log_id_seq" OWNED BY "public"."user_points_log"."log_id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."user_srs_data" (
+    "user_srs_data_id" integer NOT NULL,
+    "profile_id" "uuid" NOT NULL,
+    "phrase_id" integer NOT NULL,
+    "language_code" character varying NOT NULL,
+    "due_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "interval" real DEFAULT 0 NOT NULL,
+    "ease_factor" real DEFAULT 2.5 NOT NULL,
+    "repetitions" integer DEFAULT 0 NOT NULL,
+    "last_reviewed_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."user_srs_data" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."user_srs_data" ALTER COLUMN "user_srs_data_id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "public"."user_srs_data_user_srs_data_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 
@@ -3248,7 +3404,7 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_word_pronunciation_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."user_word_pronunciation_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."user_word_pronunciation_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."user_word_pronunciation_id_seq" OWNED BY "public"."user_word_pronunciation"."id";
@@ -3298,47 +3454,10 @@ CREATE SEQUENCE IF NOT EXISTS "public"."user_word_spelling_id_seq"
     CACHE 1;
 
 
-ALTER TABLE "public"."user_word_spelling_id_seq" OWNER TO "postgres";
+ALTER SEQUENCE "public"."user_word_spelling_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."user_word_spelling_id_seq" OWNED BY "public"."user_word_spelling"."id";
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."vocabulary_phrases" (
-    "id" integer NOT NULL,
-    "lesson_id" integer NOT NULL,
-    "phrase_order" integer NOT NULL,
-    "concept_description" "text",
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"()
-);
-
-
-ALTER TABLE "public"."vocabulary_phrases" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."vocabulary_phrases" IS 'Stores language-agnostic phrase concepts, ordered within a lesson. Actual text/audio are in phrase_versions.';
-
-
-
-COMMENT ON COLUMN "public"."vocabulary_phrases"."concept_description" IS 'Optional language-neutral description of the phrase''s meaning or concept.';
-
-
-
-CREATE SEQUENCE IF NOT EXISTS "public"."vocabulary_phrases_id_seq"
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE "public"."vocabulary_phrases_id_seq" OWNER TO "postgres";
-
-
-ALTER SEQUENCE "public"."vocabulary_phrases_id_seq" OWNED BY "public"."vocabulary_phrases"."id";
 
 
 
@@ -3418,6 +3537,14 @@ ALTER TABLE ONLY "public"."student_subscriptions" ALTER COLUMN "id" SET DEFAULT 
 
 
 
+ALTER TABLE ONLY "public"."support_ticket_messages" ALTER COLUMN "message_id" SET DEFAULT "nextval"('"public"."support_ticket_messages_message_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "public"."support_tickets" ALTER COLUMN "ticket_id" SET DEFAULT "nextval"('"public"."support_tickets_ticket_id_seq"'::"regclass");
+
+
+
 ALTER TABLE ONLY "public"."unit_translations" ALTER COLUMN "unit_translation_id" SET DEFAULT "nextval"('"public"."unit_translations_unit_translation_id_seq"'::"regclass");
 
 
@@ -3455,10 +3582,6 @@ ALTER TABLE ONLY "public"."user_word_pronunciation" ALTER COLUMN "id" SET DEFAUL
 
 
 ALTER TABLE ONLY "public"."user_word_spelling" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."user_word_spelling_id_seq"'::"regclass");
-
-
-
-ALTER TABLE ONLY "public"."vocabulary_phrases" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."vocabulary_phrases_id_seq"'::"regclass");
 
 
 
@@ -3582,6 +3705,11 @@ ALTER TABLE ONLY "public"."lesson_chat_conversations"
 
 
 
+ALTER TABLE ONLY "public"."lesson_phrases"
+    ADD CONSTRAINT "lesson_phrases_pkey" PRIMARY KEY ("lesson_phrase_id");
+
+
+
 ALTER TABLE ONLY "public"."lesson_translations"
     ADD CONSTRAINT "lesson_translations_lesson_id_language_code_key" UNIQUE ("lesson_id", "language_code");
 
@@ -3629,6 +3757,11 @@ ALTER TABLE ONLY "public"."phrase_versions"
 
 ALTER TABLE ONLY "public"."phrase_versions"
     ADD CONSTRAINT "phrase_versions_pkey" PRIMARY KEY ("phrase_version_id");
+
+
+
+ALTER TABLE ONLY "public"."phrases"
+    ADD CONSTRAINT "phrases_pkey" PRIMARY KEY ("phrase_id");
 
 
 
@@ -3692,6 +3825,16 @@ ALTER TABLE ONLY "public"."student_target_languages"
 
 
 
+ALTER TABLE ONLY "public"."support_ticket_messages"
+    ADD CONSTRAINT "support_ticket_messages_pkey" PRIMARY KEY ("message_id");
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_pkey" PRIMARY KEY ("ticket_id");
+
+
+
 ALTER TABLE ONLY "public"."tour_steps"
     ADD CONSTRAINT "tour_steps_pkey" PRIMARY KEY ("step_id");
 
@@ -3709,6 +3852,21 @@ ALTER TABLE ONLY "public"."tours"
 
 ALTER TABLE ONLY "public"."tours"
     ADD CONSTRAINT "tours_tour_key_key" UNIQUE ("tour_key");
+
+
+
+ALTER TABLE ONLY "public"."lesson_phrases"
+    ADD CONSTRAINT "unique_phrase_in_lesson" UNIQUE ("lesson_id", "phrase_id");
+
+
+
+ALTER TABLE ONLY "public"."phrase_versions"
+    ADD CONSTRAINT "unique_text_per_language" UNIQUE ("language_code", "phrase_text");
+
+
+
+ALTER TABLE ONLY "public"."user_srs_data"
+    ADD CONSTRAINT "unique_user_phrase_language_srs" UNIQUE ("profile_id", "phrase_id", "language_code");
 
 
 
@@ -3802,6 +3960,11 @@ ALTER TABLE ONLY "public"."user_points_log"
 
 
 
+ALTER TABLE ONLY "public"."user_srs_data"
+    ADD CONSTRAINT "user_srs_data_pkey" PRIMARY KEY ("user_srs_data_id");
+
+
+
 ALTER TABLE ONLY "public"."user_tour_progress"
     ADD CONSTRAINT "user_tour_progress_pkey" PRIMARY KEY ("profile_id", "tour_id");
 
@@ -3829,16 +3992,6 @@ ALTER TABLE ONLY "public"."user_word_spelling"
 
 ALTER TABLE ONLY "public"."user_word_spelling"
     ADD CONSTRAINT "user_word_spelling_profile_id_word_text_language_code_key" UNIQUE ("profile_id", "word_text", "language_code");
-
-
-
-ALTER TABLE ONLY "public"."vocabulary_phrases"
-    ADD CONSTRAINT "vocabulary_phrases_lesson_id_phrase_order_key" UNIQUE ("lesson_id", "phrase_order");
-
-
-
-ALTER TABLE ONLY "public"."vocabulary_phrases"
-    ADD CONSTRAINT "vocabulary_phrases_pkey" PRIMARY KEY ("id");
 
 
 
@@ -3926,6 +4079,26 @@ CREATE INDEX "idx_user_level_completion_profile_id" ON "public"."user_level_comp
 
 
 
+CREATE INDEX "support_ticket_messages_sender_profile_id_idx" ON "public"."support_ticket_messages" USING "btree" ("sender_profile_id");
+
+
+
+CREATE INDEX "support_ticket_messages_ticket_id_idx" ON "public"."support_ticket_messages" USING "btree" ("ticket_id");
+
+
+
+CREATE INDEX "support_tickets_assigned_to_profile_id_idx" ON "public"."support_tickets" USING "btree" ("assigned_to_profile_id");
+
+
+
+CREATE INDEX "support_tickets_profile_id_idx" ON "public"."support_tickets" USING "btree" ("profile_id");
+
+
+
+CREATE INDEX "support_tickets_status_idx" ON "public"."support_tickets" USING "btree" ("status");
+
+
+
 CREATE OR REPLACE TRIGGER "trigger_new_chapter_added" AFTER INSERT ON "public"."audiobook_chapters" FOR EACH ROW EXECUTE FUNCTION "public"."handle_new_chapter_added"();
 
 
@@ -4000,7 +4173,7 @@ ALTER TABLE ONLY "public"."dictation_attempts"
 
 
 ALTER TABLE ONLY "public"."dictation_attempts"
-    ADD CONSTRAINT "dictation_attempts_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."vocabulary_phrases"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "dictation_attempts_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."phrases"("phrase_id") ON DELETE SET NULL;
 
 
 
@@ -4134,6 +4307,16 @@ ALTER TABLE ONLY "public"."lesson_chat_conversations"
 
 
 
+ALTER TABLE ONLY "public"."lesson_phrases"
+    ADD CONSTRAINT "lesson_phrases_lesson_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "public"."lessons"("lesson_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."lesson_phrases"
+    ADD CONSTRAINT "lesson_phrases_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."phrases"("phrase_id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."lesson_translations"
     ADD CONSTRAINT "lesson_translations_lesson_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "public"."lessons"("lesson_id") ON DELETE CASCADE;
 
@@ -4155,7 +4338,7 @@ ALTER TABLE ONLY "public"."partnership_invitations"
 
 
 ALTER TABLE ONLY "public"."phrase_versions"
-    ADD CONSTRAINT "phrase_versions_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."vocabulary_phrases"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "phrase_versions_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."phrases"("phrase_id") ON DELETE CASCADE;
 
 
 
@@ -4185,7 +4368,7 @@ ALTER TABLE ONLY "public"."speech_attempts"
 
 
 ALTER TABLE ONLY "public"."speech_attempts"
-    ADD CONSTRAINT "speech_attempts_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."vocabulary_phrases"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "speech_attempts_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."phrases"("phrase_id") ON DELETE SET NULL;
 
 
 
@@ -4216,6 +4399,26 @@ ALTER TABLE ONLY "public"."student_subscriptions"
 
 ALTER TABLE ONLY "public"."student_target_languages"
     ADD CONSTRAINT "student_target_languages_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "public"."student_profiles"("profile_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."support_ticket_messages"
+    ADD CONSTRAINT "support_ticket_messages_sender_profile_id_fkey" FOREIGN KEY ("sender_profile_id") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."support_ticket_messages"
+    ADD CONSTRAINT "support_ticket_messages_ticket_id_fkey" FOREIGN KEY ("ticket_id") REFERENCES "public"."support_tickets"("ticket_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_assigned_to_profile_id_fkey" FOREIGN KEY ("assigned_to_profile_id") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "public"."student_profiles"("profile_id");
 
 
 
@@ -4300,7 +4503,7 @@ ALTER TABLE ONLY "public"."user_phrase_progress"
 
 
 ALTER TABLE ONLY "public"."user_phrase_progress"
-    ADD CONSTRAINT "user_phrase_progress_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."vocabulary_phrases"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "user_phrase_progress_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."phrases"("phrase_id") ON DELETE CASCADE;
 
 
 
@@ -4320,7 +4523,22 @@ ALTER TABLE ONLY "public"."user_points_log"
 
 
 ALTER TABLE ONLY "public"."user_points_log"
-    ADD CONSTRAINT "user_points_log_related_phrase_id_fkey" FOREIGN KEY ("related_phrase_id") REFERENCES "public"."vocabulary_phrases"("id") ON DELETE SET NULL;
+    ADD CONSTRAINT "user_points_log_related_phrase_id_fkey" FOREIGN KEY ("related_phrase_id") REFERENCES "public"."phrases"("phrase_id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."user_srs_data"
+    ADD CONSTRAINT "user_srs_data_language_code_fkey" FOREIGN KEY ("language_code") REFERENCES "public"."languages"("language_code") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."user_srs_data"
+    ADD CONSTRAINT "user_srs_data_phrase_id_fkey" FOREIGN KEY ("phrase_id") REFERENCES "public"."phrases"("phrase_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."user_srs_data"
+    ADD CONSTRAINT "user_srs_data_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "public"."student_profiles"("profile_id") ON DELETE CASCADE;
 
 
 
@@ -4341,11 +4559,6 @@ ALTER TABLE ONLY "public"."user_word_pronunciation"
 
 ALTER TABLE ONLY "public"."user_word_spelling"
     ADD CONSTRAINT "user_word_spelling_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "public"."student_profiles"("profile_id") ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."vocabulary_phrases"
-    ADD CONSTRAINT "vocabulary_phrases_lesson_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "public"."lessons"("lesson_id") ON DELETE CASCADE;
 
 
 
@@ -4911,9 +5124,9 @@ GRANT ALL ON FUNCTION "public"."upsert_stripe_subscription"("p_stripe_subscripti
 
 
 
-GRANT ALL ON TABLE "public"."audiobook_alignment" TO "anon";
-GRANT ALL ON TABLE "public"."audiobook_alignment" TO "authenticated";
-GRANT ALL ON TABLE "public"."audiobook_alignment" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobook_alignment" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobook_alignment" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobook_alignment" TO "service_role";
 
 
 
@@ -4923,9 +5136,9 @@ GRANT ALL ON SEQUENCE "public"."audiobook_alignment_alignment_id_seq" TO "servic
 
 
 
-GRANT ALL ON TABLE "public"."audiobook_chapters" TO "anon";
-GRANT ALL ON TABLE "public"."audiobook_chapters" TO "authenticated";
-GRANT ALL ON TABLE "public"."audiobook_chapters" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobook_chapters" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobook_chapters" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobook_chapters" TO "service_role";
 
 
 
@@ -4935,9 +5148,9 @@ GRANT ALL ON SEQUENCE "public"."audiobook_chapters_chapter_id_seq" TO "service_r
 
 
 
-GRANT ALL ON TABLE "public"."audiobooks" TO "anon";
-GRANT ALL ON TABLE "public"."audiobooks" TO "authenticated";
-GRANT ALL ON TABLE "public"."audiobooks" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobooks" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobooks" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."audiobooks" TO "service_role";
 
 
 
@@ -4949,7 +5162,7 @@ GRANT ALL ON SEQUENCE "public"."audiobooks_book_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."conversation_messages" TO "anon";
 GRANT ALL ON TABLE "public"."conversation_messages" TO "authenticated";
-GRANT ALL ON TABLE "public"."conversation_messages" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."conversation_messages" TO "service_role";
 
 
 
@@ -4961,7 +5174,7 @@ GRANT ALL ON SEQUENCE "public"."conversation_messages_message_id_seq" TO "servic
 
 GRANT ALL ON TABLE "public"."conversation_prompt_status" TO "anon";
 GRANT ALL ON TABLE "public"."conversation_prompt_status" TO "authenticated";
-GRANT ALL ON TABLE "public"."conversation_prompt_status" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."conversation_prompt_status" TO "service_role";
 
 
 
@@ -4973,7 +5186,7 @@ GRANT ALL ON SEQUENCE "public"."conversation_prompt_status_prompt_status_id_seq"
 
 GRANT ALL ON TABLE "public"."conversation_starter_translations" TO "anon";
 GRANT ALL ON TABLE "public"."conversation_starter_translations" TO "authenticated";
-GRANT ALL ON TABLE "public"."conversation_starter_translations" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."conversation_starter_translations" TO "service_role";
 
 
 
@@ -4985,7 +5198,7 @@ GRANT ALL ON SEQUENCE "public"."conversation_starter_translations_starter_transl
 
 GRANT ALL ON TABLE "public"."conversation_starters" TO "anon";
 GRANT ALL ON TABLE "public"."conversation_starters" TO "authenticated";
-GRANT ALL ON TABLE "public"."conversation_starters" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."conversation_starters" TO "service_role";
 
 
 
@@ -4997,7 +5210,7 @@ GRANT ALL ON SEQUENCE "public"."conversation_starters_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."dictation_attempts" TO "anon";
 GRANT ALL ON TABLE "public"."dictation_attempts" TO "authenticated";
-GRANT ALL ON TABLE "public"."dictation_attempts" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."dictation_attempts" TO "service_role";
 
 
 
@@ -5009,7 +5222,7 @@ GRANT ALL ON SEQUENCE "public"."dictation_attempts_attempt_id_seq" TO "service_r
 
 GRANT ALL ON TABLE "public"."invoices" TO "anon";
 GRANT ALL ON TABLE "public"."invoices" TO "authenticated";
-GRANT ALL ON TABLE "public"."invoices" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."invoices" TO "service_role";
 
 
 
@@ -5021,19 +5234,19 @@ GRANT ALL ON SEQUENCE "public"."invoices_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."language_levels" TO "anon";
 GRANT ALL ON TABLE "public"."language_levels" TO "authenticated";
-GRANT ALL ON TABLE "public"."language_levels" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."language_levels" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."languages" TO "anon";
 GRANT ALL ON TABLE "public"."languages" TO "authenticated";
-GRANT ALL ON TABLE "public"."languages" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."languages" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."learning_outcome_translations" TO "anon";
 GRANT ALL ON TABLE "public"."learning_outcome_translations" TO "authenticated";
-GRANT ALL ON TABLE "public"."learning_outcome_translations" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."learning_outcome_translations" TO "service_role";
 
 
 
@@ -5045,7 +5258,7 @@ GRANT ALL ON SEQUENCE "public"."learning_outcome_translations_outcome_translatio
 
 GRANT ALL ON TABLE "public"."learning_outcomes" TO "anon";
 GRANT ALL ON TABLE "public"."learning_outcomes" TO "authenticated";
-GRANT ALL ON TABLE "public"."learning_outcomes" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."learning_outcomes" TO "service_role";
 
 
 
@@ -5057,7 +5270,7 @@ GRANT ALL ON SEQUENCE "public"."learning_outcomes_outcome_id_seq" TO "service_ro
 
 GRANT ALL ON TABLE "public"."lesson_chat_conversations" TO "anon";
 GRANT ALL ON TABLE "public"."lesson_chat_conversations" TO "authenticated";
-GRANT ALL ON TABLE "public"."lesson_chat_conversations" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."lesson_chat_conversations" TO "service_role";
 
 
 
@@ -5067,9 +5280,21 @@ GRANT ALL ON SEQUENCE "public"."lesson_chat_conversations_conversation_id_seq" T
 
 
 
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."lesson_phrases" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."lesson_phrases" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."lesson_phrases" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."lesson_phrases_lesson_phrase_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."lesson_phrases_lesson_phrase_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."lesson_phrases_lesson_phrase_id_seq" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."lesson_translations" TO "anon";
 GRANT ALL ON TABLE "public"."lesson_translations" TO "authenticated";
-GRANT ALL ON TABLE "public"."lesson_translations" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."lesson_translations" TO "service_role";
 
 
 
@@ -5081,7 +5306,7 @@ GRANT ALL ON SEQUENCE "public"."lesson_translations_lesson_translation_id_seq" T
 
 GRANT ALL ON TABLE "public"."lessons" TO "anon";
 GRANT ALL ON TABLE "public"."lessons" TO "authenticated";
-GRANT ALL ON TABLE "public"."lessons" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."lessons" TO "service_role";
 
 
 
@@ -5093,7 +5318,7 @@ GRANT ALL ON SEQUENCE "public"."lessons_lesson_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."partnership_invitations" TO "anon";
 GRANT ALL ON TABLE "public"."partnership_invitations" TO "authenticated";
-GRANT ALL ON TABLE "public"."partnership_invitations" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."partnership_invitations" TO "service_role";
 
 
 
@@ -5105,7 +5330,7 @@ GRANT ALL ON SEQUENCE "public"."partnership_invitations_id_seq" TO "service_role
 
 GRANT ALL ON TABLE "public"."partnerships" TO "anon";
 GRANT ALL ON TABLE "public"."partnerships" TO "authenticated";
-GRANT ALL ON TABLE "public"."partnerships" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."partnerships" TO "service_role";
 
 
 
@@ -5117,7 +5342,7 @@ GRANT ALL ON SEQUENCE "public"."partnerships_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."phrase_versions" TO "anon";
 GRANT ALL ON TABLE "public"."phrase_versions" TO "authenticated";
-GRANT ALL ON TABLE "public"."phrase_versions" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."phrase_versions" TO "service_role";
 
 
 
@@ -5127,9 +5352,21 @@ GRANT ALL ON SEQUENCE "public"."phrase_versions_phrase_version_id_seq" TO "servi
 
 
 
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."phrases" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."phrases" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."phrases" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."phrases_phrase_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."phrases_phrase_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."phrases_phrase_id_seq" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."prices" TO "anon";
 GRANT ALL ON TABLE "public"."prices" TO "authenticated";
-GRANT ALL ON TABLE "public"."prices" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."prices" TO "service_role";
 
 
 
@@ -5141,7 +5378,7 @@ GRANT ALL ON SEQUENCE "public"."prices_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."products" TO "anon";
 GRANT ALL ON TABLE "public"."products" TO "authenticated";
-GRANT ALL ON TABLE "public"."products" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."products" TO "service_role";
 
 
 
@@ -5153,13 +5390,13 @@ GRANT ALL ON SEQUENCE "public"."products_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."profiles" TO "anon";
 GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
-GRANT ALL ON TABLE "public"."profiles" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."profiles" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."speech_attempts" TO "anon";
 GRANT ALL ON TABLE "public"."speech_attempts" TO "authenticated";
-GRANT ALL ON TABLE "public"."speech_attempts" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."speech_attempts" TO "service_role";
 
 
 
@@ -5171,13 +5408,13 @@ GRANT ALL ON SEQUENCE "public"."speech_attempts_attempt_id_seq" TO "service_role
 
 GRANT ALL ON TABLE "public"."student_profiles" TO "anon";
 GRANT ALL ON TABLE "public"."student_profiles" TO "authenticated";
-GRANT ALL ON TABLE "public"."student_profiles" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."student_profiles" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."student_subscriptions" TO "anon";
 GRANT ALL ON TABLE "public"."student_subscriptions" TO "authenticated";
-GRANT ALL ON TABLE "public"."student_subscriptions" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."student_subscriptions" TO "service_role";
 
 
 
@@ -5189,13 +5426,37 @@ GRANT ALL ON SEQUENCE "public"."student_subscriptions_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."student_target_languages" TO "anon";
 GRANT ALL ON TABLE "public"."student_target_languages" TO "authenticated";
-GRANT ALL ON TABLE "public"."student_target_languages" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."student_target_languages" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."tour_steps" TO "anon";
-GRANT ALL ON TABLE "public"."tour_steps" TO "authenticated";
-GRANT ALL ON TABLE "public"."tour_steps" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."support_ticket_messages" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."support_ticket_messages" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."support_ticket_messages" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."support_ticket_messages_message_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."support_ticket_messages_message_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."support_ticket_messages_message_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."support_tickets" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."support_tickets" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."support_tickets" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."support_tickets_ticket_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."support_tickets_ticket_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."support_tickets_ticket_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tour_steps" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tour_steps" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tour_steps" TO "service_role";
 
 
 
@@ -5205,9 +5466,9 @@ GRANT ALL ON SEQUENCE "public"."tour_steps_step_id_seq" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."tours" TO "anon";
-GRANT ALL ON TABLE "public"."tours" TO "authenticated";
-GRANT ALL ON TABLE "public"."tours" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tours" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tours" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."tours" TO "service_role";
 
 
 
@@ -5219,7 +5480,7 @@ GRANT ALL ON SEQUENCE "public"."tours_tour_id_seq" TO "service_role";
 
 GRANT ALL ON TABLE "public"."unit_translations" TO "anon";
 GRANT ALL ON TABLE "public"."unit_translations" TO "authenticated";
-GRANT ALL ON TABLE "public"."unit_translations" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."unit_translations" TO "service_role";
 
 
 
@@ -5231,7 +5492,7 @@ GRANT ALL ON SEQUENCE "public"."unit_translations_unit_translation_id_seq" TO "s
 
 GRANT ALL ON TABLE "public"."units" TO "anon";
 GRANT ALL ON TABLE "public"."units" TO "authenticated";
-GRANT ALL ON TABLE "public"."units" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."units" TO "service_role";
 
 
 
@@ -5241,9 +5502,9 @@ GRANT ALL ON SEQUENCE "public"."units_unit_id_seq" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."user_audiobook_chapter_progress" TO "anon";
-GRANT ALL ON TABLE "public"."user_audiobook_chapter_progress" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_audiobook_chapter_progress" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_chapter_progress" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_chapter_progress" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_chapter_progress" TO "service_role";
 
 
 
@@ -5253,9 +5514,9 @@ GRANT ALL ON SEQUENCE "public"."user_audiobook_chapter_progress_id_seq" TO "serv
 
 
 
-GRANT ALL ON TABLE "public"."user_audiobook_progress" TO "anon";
-GRANT ALL ON TABLE "public"."user_audiobook_progress" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_audiobook_progress" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_progress" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_progress" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_progress" TO "service_role";
 
 
 
@@ -5265,9 +5526,9 @@ GRANT ALL ON SEQUENCE "public"."user_audiobook_progress_progress_id_seq" TO "ser
 
 
 
-GRANT ALL ON TABLE "public"."user_audiobook_purchases" TO "anon";
-GRANT ALL ON TABLE "public"."user_audiobook_purchases" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_audiobook_purchases" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_purchases" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_purchases" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_audiobook_purchases" TO "service_role";
 
 
 
@@ -5279,7 +5540,7 @@ GRANT ALL ON SEQUENCE "public"."user_audiobook_purchases_purchase_id_seq" TO "se
 
 GRANT ALL ON TABLE "public"."user_lesson_activity_progress" TO "anon";
 GRANT ALL ON TABLE "public"."user_lesson_activity_progress" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_lesson_activity_progress" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_lesson_activity_progress" TO "service_role";
 
 
 
@@ -5291,7 +5552,7 @@ GRANT ALL ON SEQUENCE "public"."user_lesson_activity_progress_activity_progress_
 
 GRANT ALL ON TABLE "public"."user_lesson_progress" TO "anon";
 GRANT ALL ON TABLE "public"."user_lesson_progress" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_lesson_progress" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_lesson_progress" TO "service_role";
 
 
 
@@ -5301,15 +5562,15 @@ GRANT ALL ON SEQUENCE "public"."user_lesson_progress_progress_id_seq" TO "servic
 
 
 
-GRANT ALL ON TABLE "public"."user_level_completion" TO "anon";
-GRANT ALL ON TABLE "public"."user_level_completion" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_level_completion" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_level_completion" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_level_completion" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_level_completion" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."user_phrase_progress" TO "anon";
 GRANT ALL ON TABLE "public"."user_phrase_progress" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_phrase_progress" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_phrase_progress" TO "service_role";
 
 
 
@@ -5321,7 +5582,7 @@ GRANT ALL ON SEQUENCE "public"."user_phrase_progress_phrase_progress_id_seq" TO 
 
 GRANT ALL ON TABLE "public"."user_points_log" TO "anon";
 GRANT ALL ON TABLE "public"."user_points_log" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_points_log" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_points_log" TO "service_role";
 
 
 
@@ -5331,15 +5592,27 @@ GRANT ALL ON SEQUENCE "public"."user_points_log_log_id_seq" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."user_tour_progress" TO "anon";
-GRANT ALL ON TABLE "public"."user_tour_progress" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_tour_progress" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_srs_data" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_srs_data" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_srs_data" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."user_srs_data_user_srs_data_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."user_srs_data_user_srs_data_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."user_srs_data_user_srs_data_id_seq" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_tour_progress" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_tour_progress" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_tour_progress" TO "service_role";
 
 
 
 GRANT ALL ON TABLE "public"."user_word_pronunciation" TO "anon";
 GRANT ALL ON TABLE "public"."user_word_pronunciation" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_word_pronunciation" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_word_pronunciation" TO "service_role";
 
 
 
@@ -5351,7 +5624,7 @@ GRANT ALL ON SEQUENCE "public"."user_word_pronunciation_id_seq" TO "service_role
 
 GRANT ALL ON TABLE "public"."user_word_spelling" TO "anon";
 GRANT ALL ON TABLE "public"."user_word_spelling" TO "authenticated";
-GRANT ALL ON TABLE "public"."user_word_spelling" TO "service_role";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."user_word_spelling" TO "service_role";
 
 
 
@@ -5361,42 +5634,30 @@ GRANT ALL ON SEQUENCE "public"."user_word_spelling_id_seq" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."vocabulary_phrases" TO "anon";
-GRANT ALL ON TABLE "public"."vocabulary_phrases" TO "authenticated";
-GRANT ALL ON TABLE "public"."vocabulary_phrases" TO "service_role";
-
-
-
-GRANT ALL ON SEQUENCE "public"."vocabulary_phrases_id_seq" TO "anon";
-GRANT ALL ON SEQUENCE "public"."vocabulary_phrases_id_seq" TO "authenticated";
-GRANT ALL ON SEQUENCE "public"."vocabulary_phrases_id_seq" TO "service_role";
 
 
 
 
 
 
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
 
 
 
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "authenticated";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "service_role";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "service_role";
 
 
 
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "authenticated";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "service_role";
-
-
-
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "authenticated";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "service_role";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "postgres";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
 
 
 
