@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useLanguages } from "@/hooks/useLanguages";
@@ -29,9 +29,36 @@ export default function OnboardingModal({
     nativeLanguage: initialData?.nativeLanguage || "",
     targetLanguage: initialData?.targetLanguage || "",
   });
+  
+  const [showLanguageWarning, setShowLanguageWarning] = useState(false);
 
   const { data: languages = [] } = useLanguages();
   const queryClient = useQueryClient();
+  
+  // Set default languages when languages are loaded
+  useEffect(() => {
+    if (languages.length > 0 && !initialData?.nativeLanguage && !initialData?.targetLanguage) {
+      const spanish = languages.find(lang => lang.language_code === 'es');
+      const english = languages.find(lang => lang.language_code === 'en');
+      
+      if (spanish && english) {
+        setFormData(prev => ({
+          ...prev,
+          nativeLanguage: spanish.language_code,
+          targetLanguage: english.language_code,
+        }));
+      }
+    }
+  }, [languages, initialData]);
+  
+  // Check for same language selection
+  useEffect(() => {
+    if (formData.nativeLanguage && formData.targetLanguage) {
+      setShowLanguageWarning(formData.nativeLanguage === formData.targetLanguage);
+    } else {
+      setShowLanguageWarning(false);
+    }
+  }, [formData.nativeLanguage, formData.targetLanguage]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: OnboardingData) => {
@@ -83,6 +110,13 @@ export default function OnboardingModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent submission if same language is selected
+    if (formData.nativeLanguage === formData.targetLanguage) {
+      setShowLanguageWarning(true);
+      return;
+    }
+    
     if (
       formData.firstName &&
       formData.lastName &&
@@ -161,7 +195,7 @@ export default function OnboardingModal({
               htmlFor="nativeLanguage"
               className="block text-sm font-semibold text-gray-800 mb-2"
             >
-              🏠 Native Language
+              🏠 Tu idioma nativo
             </label>
             <select
               id="nativeLanguage"
@@ -172,7 +206,11 @@ export default function OnboardingModal({
                   nativeLanguage: e.target.value,
                 }))
               }
-              className="w-full px-4 py-3 bg-gray-50/80 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white focus:border-blue-300/50 hover:bg-gray-100/60 hover:border-gray-300/60 transition-all duration-200 text-gray-900 appearance-none cursor-pointer"
+              className={`w-full px-4 py-3 bg-gray-50/80 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white hover:bg-gray-100/60 transition-all duration-200 text-gray-900 appearance-none cursor-pointer ${
+                showLanguageWarning && formData.nativeLanguage === formData.targetLanguage
+                  ? "border-red-300 focus:border-red-300/50 hover:border-red-300/60"
+                  : "border-gray-200/50 focus:border-blue-300/50 hover:border-gray-300/60"
+              }`}
               required
             >
               <option value="">Select your native language</option>
@@ -189,7 +227,7 @@ export default function OnboardingModal({
               htmlFor="targetLanguage"
               className="block text-sm font-semibold text-gray-800 mb-2"
             >
-              🎯 Language to Learn
+              🎯 El idioma que quieres aprender
             </label>
             <select
               id="targetLanguage"
@@ -200,7 +238,11 @@ export default function OnboardingModal({
                   targetLanguage: e.target.value,
                 }))
               }
-              className="w-full px-4 py-3 bg-gray-50/80 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white focus:border-blue-300/50 hover:bg-gray-100/60 hover:border-gray-300/60 transition-all duration-200 text-gray-900 appearance-none cursor-pointer"
+              className={`w-full px-4 py-3 bg-gray-50/80 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white hover:bg-gray-100/60 transition-all duration-200 text-gray-900 appearance-none cursor-pointer ${
+                showLanguageWarning && formData.nativeLanguage === formData.targetLanguage
+                  ? "border-red-300 focus:border-red-300/50 hover:border-red-300/60"
+                  : "border-gray-200/50 focus:border-blue-300/50 hover:border-gray-300/60"
+              }`}
               required
             >
               <option value="">Select language to learn</option>
@@ -211,6 +253,27 @@ export default function OnboardingModal({
               ))}
             </select>
           </div>
+
+          {/* Same Language Warning */}
+          {showLanguageWarning && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0">
+                  <span className="text-amber-600 text-lg">⚠️</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-amber-800 mb-1">
+                    Same Language Selected
+                  </h4>
+                  <p className="text-sm text-amber-700 leading-relaxed">
+                    You&apos;ve selected the same language for both native and target languages. 
+                    Our translation system requires different languages to work properly. 
+                    Please select a different target language to continue.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
