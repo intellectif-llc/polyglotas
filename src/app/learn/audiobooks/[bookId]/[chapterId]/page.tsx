@@ -387,7 +387,12 @@ export default function ChapterPlayerPage() {
           </div>
         ) : displayMode === 'video' ? (
           <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8 text-center">
-            <p className="text-gray-500 text-sm sm:text-base">No video available for this chapter</p>
+            <div className="max-w-md mx-auto">
+              <p className="text-gray-500 text-sm sm:text-base mb-3">No video available for this chapter</p>
+              <p className="text-gray-400 text-xs sm:text-sm">
+                Switch to Text Mode above to enjoy the audiobook with synchronized text highlighting.
+              </p>
+            </div>
           </div>
         ) : (
           <AudioPlayer

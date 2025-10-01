@@ -13,7 +13,8 @@ export default function DisplayModeToggle({
   hasVideo, 
   onModeChange 
 }: DisplayModeToggleProps) {
-  if (!hasVideo) return null;
+  // Always show toggle if user is in video mode, even without video
+  if (!hasVideo && currentMode !== 'video') return null;
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
@@ -33,10 +34,13 @@ export default function DisplayModeToggle({
           
           <button
             onClick={() => onModeChange('video')}
+            disabled={!hasVideo}
             className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-md transition-all duration-200 ${
               currentMode === 'video'
                 ? 'bg-white text-indigo-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-800'
+                : hasVideo 
+                  ? 'text-gray-600 hover:text-gray-800'
+                  : 'text-gray-400 cursor-not-allowed'
             }`}
           >
             <Video className="h-4 w-4 flex-shrink-0" />
