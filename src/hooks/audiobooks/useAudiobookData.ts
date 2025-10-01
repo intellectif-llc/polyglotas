@@ -39,7 +39,7 @@ export function useAudiobookData(): UseAudiobookDataReturn {
       ] = await Promise.all([
         supabase
           .from('audiobook_chapters')
-          .select('chapter_id, book_id, chapter_title, audio_url, video_url, duration_seconds, is_free_sample, chapter_order, created_at')
+          .select('chapter_id, book_id, chapter_title, audio_url, video_url, pic_url, duration_seconds, is_free_sample, chapter_order, created_at')
           .eq('chapter_id', parseInt(chapterId))
           .single(),
         supabase
@@ -53,7 +53,7 @@ export function useAudiobookData(): UseAudiobookDataReturn {
           .single(),
         supabase
           .from('audiobook_chapters')
-          .select('chapter_id, book_id, chapter_title, audio_url, video_url, duration_seconds, is_free_sample, chapter_order, created_at')
+          .select('chapter_id, book_id, chapter_title, audio_url, video_url, pic_url, duration_seconds, is_free_sample, chapter_order, created_at')
           .eq('book_id', parseInt(bookId))
           .order('chapter_order'),
         supabase

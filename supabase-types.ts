@@ -92,6 +92,7 @@ export type Database = {
           created_at: string | null
           duration_seconds: number | null
           is_free_sample: boolean | null
+          pic_url: string | null
         }
         Insert: {
           audio_url: string
@@ -102,6 +103,7 @@ export type Database = {
           created_at?: string | null
           duration_seconds?: number | null
           is_free_sample?: boolean | null
+          pic_url?: string | null
         }
         Update: {
           audio_url?: string
@@ -112,6 +114,7 @@ export type Database = {
           created_at?: string | null
           duration_seconds?: number | null
           is_free_sample?: boolean | null
+          pic_url?: string | null
         }
         Relationships: [
           {
