@@ -27,6 +27,10 @@ const ImageUploadPanel = dynamic(
   () => import("@/components/admin/audiobooks/ImageUploadPanel"),
   { ssr: false }
 );
+const VideoUploadPanel = dynamic(
+  () => import("@/components/admin/audiobooks/VideoUploadPanel"),
+  { ssr: false }
+);
 
 
 export default function ChapterPlayerPage() {
@@ -404,7 +408,7 @@ export default function ChapterPlayerPage() {
         )}
 
         {editMode && userRole === "admin" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <AudioGenerationPanel
               bookId={bookId}
               chapterId={chapterId}
@@ -431,6 +435,15 @@ export default function ChapterPlayerPage() {
               onSuccess={() => {
                 loadChapterData();
                 alert("Image uploaded successfully!");
+              }}
+            />
+            <VideoUploadPanel
+              bookId={bookId}
+              chapterId={chapterId}
+              currentVideoUrl={chapter?.video_url}
+              onSuccess={() => {
+                loadChapterData();
+                alert("Video uploaded successfully!");
               }}
             />
           </div>
