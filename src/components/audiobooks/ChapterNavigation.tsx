@@ -28,9 +28,9 @@ export default function ChapterNavigation({
       <button
         onClick={() => prevChapter && onNavigate(prevChapter.chapter_id)}
         disabled={!prevChapter || !canAccessChapter(prevChapter)}
-        className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg transition-colors flex-shrink-0 cursor-pointer ${
+        className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg transition-colors flex-shrink-0 ${
           prevChapter && canAccessChapter(prevChapter)
-            ? "bg-white hover:bg-gray-50 text-gray-700"
+            ? "bg-white hover:bg-gray-50 text-gray-700 cursor-pointer"
             : "bg-gray-100 text-gray-400 cursor-not-allowed"
         }`}
       >
@@ -63,9 +63,9 @@ export default function ChapterNavigation({
       <button
         onClick={() => nextChapter && onNavigate(nextChapter.chapter_id)}
         disabled={!nextChapter || !canAccessChapter(nextChapter)}
-        className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg transition-colors flex-shrink-0 cursor-pointer ${
+        className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg transition-colors flex-shrink-0 ${
           nextChapter && canAccessChapter(nextChapter)
-            ? "bg-white hover:bg-gray-50 text-gray-700"
+            ? "bg-white hover:bg-gray-50 text-gray-700 cursor-pointer"
             : "bg-gray-100 text-gray-400 cursor-not-allowed"
         }`}
       >
