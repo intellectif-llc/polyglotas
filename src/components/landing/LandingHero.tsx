@@ -120,7 +120,8 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
                 href="/auth"
                 className="group relative px-8 py-4 bg-brand-gradient hover:shadow-2xl hover:shadow-purple-500/25 rounded-xl text-white font-semibold transition-all duration-300 flex items-center space-x-3 transform hover:scale-105 cursor-pointer border border-white/10 shadow-lg animate-pulse hover:animate-none"
                 style={{
-                  boxShadow: '0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(236, 72, 153, 0.2), 0 0 60px rgba(99, 102, 241, 0.1)'
+                  boxShadow:
+                    "0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(236, 72, 153, 0.2), 0 0 60px rgba(99, 102, 241, 0.1)",
                 }}
               >
                 <span className="relative z-10">Get Started</span>
@@ -128,7 +129,7 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
                 <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </a>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-4">
               <button
                 onClick={() => onSignIn("google")}
@@ -190,7 +191,7 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
               <div className="flex justify-center items-center space-x-8 opacity-60">
                 <div className="text-2xl font-bold text-white">10K+</div>
                 <div className="text-gray-400">|</div>
-                <div className="text-2xl font-bold text-white">50+</div>
+                <div className="text-2xl font-bold text-white">14+</div>
                 <div className="text-gray-400">|</div>
                 <div className="text-2xl font-bold text-white">95%</div>
               </div>
