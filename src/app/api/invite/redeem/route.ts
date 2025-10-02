@@ -113,34 +113,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User profile not properly initialized' }, { status: 500 });
     }
 
-    // Mark invitation as redeemed
-    console.log('[INVITE_REDEEM] Marking invitation as redeemed', { invitationId: invitation.id, userId: user.id });
-    const { error: redeemError } = await serviceSupabase
-      .from('partnership_invitations')
-      .update({
-        status: 'redeemed',
-        redeemed_by_profile_id: user.id,
-        redeemed_at: new Date().toISOString(),
-      })
-      .eq('id', invitation.id);
+    // Use database function to handle redemption and discount application
+    console.log('[INVITE_REDEEM] Calling redeem_partnership_invitation function', { token, userId: user.id });
+    const { data: redemptionResult, error: redeemError } = await serviceSupabase
+      .rpc('redeem_partnership_invitation', {
+        p_token: token,
+        p_user_id: user.id
+      });
+
+    console.log('[INVITE_REDEEM] Redemption function result', { 
+      success: redemptionResult?.success, 
+      error: redeemError || redemptionResult?.error 
+    });
     
-    console.log('[INVITE_REDEEM] Invitation redemption result', { success: !redeemError, error: redeemError });
-    
-    if (redeemError) {
-      console.error('[INVITE_REDEEM] ERROR: Failed to mark invitation as redeemed:', redeemError);
+    if (redeemError || !redemptionResult?.success) {
+      console.error('[INVITE_REDEEM] ERROR: Failed to redeem invitation:', redeemError, redemptionResult);
       return NextResponse.json({ error: 'Failed to redeem invitation' }, { status: 500 });
     }
-
-    // Update user's profile with partnership benefits
-    console.log('[INVITE_REDEEM] Updating user profile with partnership', { userId: user.id, partnershipId: invitation.partnership_id });
-    const { error: profileUpdateError } = await serviceSupabase
-      .from('profiles')
-      .update({
-        partnership_id: invitation.partnership_id,
-      })
-      .eq('id', user.id);
-    
-    console.log('[INVITE_REDEEM] Profile update result', { success: !profileUpdateError, error: profileUpdateError });
 
     // Get monthly price record for the trial tier
     console.log('[INVITE_REDEEM] Fetching trial price', { trialTier: invitation.partnership.trial_tier });
@@ -211,27 +200,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create trial subscription' }, { status: 500 });
     }
 
-    // Update student profile with partnership benefits
-    console.log('[INVITE_REDEEM] Updating student profile tier', { 
-      userId: user.id, 
-      newTier: invitation.partnership.trial_tier,
-      partnershipId: invitation.partnership_id 
-    });
-    
-    const { error: studentProfileError } = await serviceSupabase
-      .from('student_profiles')
-      .update({
-        subscription_tier: invitation.partnership.trial_tier,
-        partnership_id: invitation.partnership_id,
-      })
-      .eq('profile_id', user.id);
+    // Note: Partnership discount already applied by redeem_partnership_invitation function
+    console.log('[INVITE_REDEEM] Partnership discount applied via database function');
 
-    console.log('[INVITE_REDEEM] Student profile update result', { 
-      success: !studentProfileError, 
-      error: studentProfileError 
-    });
-
-    // CRITICAL: Call the database function to properly calculate subscription tier
+    // Update subscription tier after trial subscription creation
     console.log('[INVITE_REDEEM] Calling update_user_subscription_tier function', { userId: user.id });
     const { data: tierUpdateResult, error: tierUpdateError } = await serviceSupabase
       .rpc('update_user_subscription_tier', {

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import { InvitationRedemption } from "@/components/invitation/InvitationRedemption";
+import { InvitationTokenSetter } from "@/components/invitation/InvitationTokenSetter";
 
 interface PageProps {
   params: Promise<{
@@ -63,10 +64,13 @@ export default async function InvitePage({ params }: PageProps) {
   }
 
   return (
-    <InvitationRedemption
-      invitation={invitation}
-      partnership={invitation.partnership}
-      token={token}
-    />
+    <>
+      <InvitationTokenSetter token={token} />
+      <InvitationRedemption
+        invitation={invitation}
+        partnership={invitation.partnership}
+        token={token}
+      />
+    </>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   storeInvitationToken,
-  getOAuthRedirectUrl,
+  getInvitationToken,
 } from "@/lib/invitation/client";
 import AuthForm from "@/components/auth/AuthForm";
 import Image from "next/image";
@@ -39,13 +39,13 @@ export function InvitationRedemption({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Store invitation token in localStorage for later redemption
+  // Store invitation token in cookie for later redemption
   useEffect(() => {
-    console.log('[INVITATION_COMPONENT] Storing invitation token', { token });
+    console.log('[INVITATION_COMPONENT] Storing invitation token in cookie', { token });
     storeInvitationToken(token);
     
     // Verify token was stored
-    const storedToken = localStorage.getItem('invitation_token');
+    const storedToken = getInvitationToken();
     console.log('[INVITATION_COMPONENT] Token storage verification', { 
       originalToken: token,
       storedToken,
@@ -128,11 +128,6 @@ export function InvitationRedemption({
           <AuthForm
             onSuccess={handleSuccess}
             onError={handleError}
-            redirectUrl={(() => {
-              const redirectUrl = getOAuthRedirectUrl();
-              console.log('[INVITATION_COMPONENT] OAuth redirect URL generated', { redirectUrl });
-              return redirectUrl;
-            })()}
           />
 
           <div className="mt-6 text-center">

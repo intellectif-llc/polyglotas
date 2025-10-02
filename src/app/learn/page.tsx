@@ -18,8 +18,9 @@ export default function LearnPage() {
     
     // Handle invitation token cleanup
     if (clearToken === 'true') {
-      console.log('[LEARN_PAGE] Clearing invitation token as requested');
-      localStorage.removeItem('invitation_token');
+      console.log('[LEARN_PAGE] Clearing invitation token cookie as requested');
+      // Clear cookie client-side
+      document.cookie = 'invitation_token=; Path=/; SameSite=Lax; Max-Age=0';
     }
     
     if (invitationRedeemed === 'true') {

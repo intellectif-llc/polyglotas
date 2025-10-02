@@ -22,9 +22,17 @@ export default function AuthForm({
   const getRedirectUrl = () => {
     if (redirectUrl) return redirectUrl;
 
-    // For OAuth flows, we can't reliably check auth state synchronously
-    // Instead, rely on the auth page's redirect logic for already-logged-in users
-    const invitationToken = localStorage.getItem("invitation_token");
+    // Get invitation token from cookie
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        return parts.pop()?.split(';').shift() || null;
+      }
+      return null;
+    };
+
+    const invitationToken = getCookie("invitation_token");
     return invitationToken
       ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?invitation_token=${invitationToken}`
       : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;

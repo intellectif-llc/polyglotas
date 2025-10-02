@@ -1,39 +1,51 @@
-// Client-side invitation token management
+// Client-side invitation token management using cookies
 
-export function storeInvitationToken(token: string) {
-  if (typeof window !== 'undefined') {
-    console.log('[INVITATION_CLIENT] Storing invitation token', { token });
-    localStorage.setItem('invitation_token', token);
-  } else {
-    console.log('[INVITATION_CLIENT] Cannot store token - window undefined');
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    return parts.pop()?.split(';').shift() || null;
   }
-}
-
-export function getInvitationToken(): string | null {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('invitation_token');
-    console.log('[INVITATION_CLIENT] Retrieved invitation token', { token, hasToken: !!token });
-    return token;
-  }
-  console.log('[INVITATION_CLIENT] Cannot retrieve token - window undefined');
   return null;
 }
 
+function setCookie(name: string, value: string, maxAge: number = 3600) {
+  if (typeof document === 'undefined') return;
+  
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${name}=${value}; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+}
+
+function deleteCookie(name: string) {
+  if (typeof document === 'undefined') return;
+  
+  document.cookie = `${name}=; Path=/; SameSite=Lax; Max-Age=0`;
+}
+
+export function storeInvitationToken(token: string) {
+  console.log('[INVITATION_CLIENT] Storing invitation token in cookie', { token });
+  setCookie('invitation_token', token, 3600); // 1 hour
+}
+
+export function getInvitationToken(): string | null {
+  const token = getCookie('invitation_token');
+  console.log('[INVITATION_CLIENT] Retrieved invitation token from cookie', { token, hasToken: !!token });
+  return token;
+}
+
 export function clearInvitationToken() {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('invitation_token');
-  }
+  console.log('[INVITATION_CLIENT] Clearing invitation token cookie');
+  deleteCookie('invitation_token');
 }
 
 export function getOAuthRedirectUrl(): string {
-  if (typeof window === 'undefined') {
-    const url = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
-    console.log('[INVITATION_CLIENT] Server-side OAuth URL', { url });
-    return url;
-  }
+  const baseUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/auth/callback`
+    : `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
   
   const token = getInvitationToken();
-  const baseUrl = `${window.location.origin}/auth/callback`;
   
   if (token) {
     const urlWithToken = `${baseUrl}?invitation_token=${token}`;

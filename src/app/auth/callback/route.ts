@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { unstable_noStore as noStore } from "next/cache";
+import { getInvitationToken } from "@/lib/invitation/server";
 
 export async function GET(request: NextRequest) {
   noStore(); // Ensure dynamic execution
@@ -42,11 +43,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if there's an invitation token to redeem
-    const invitationToken = requestUrl.searchParams.get("invitation_token");
+    // Check for invitation token from URL params or cookies
+    let invitationToken = requestUrl.searchParams.get("invitation_token");
+    
+    // If not in URL, check cookies (server-side)
+    if (!invitationToken) {
+      invitationToken = await getInvitationToken();
+    }
+    
     console.log('[AUTH_CALLBACK] Checking for invitation token', { 
       hasToken: !!invitationToken, 
       token: invitationToken,
+      source: requestUrl.searchParams.get("invitation_token") ? 'url' : 'cookie',
       fullUrl: requestUrl.toString()
     });
 
