@@ -191,7 +191,7 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
               <div className="flex justify-center items-center space-x-8 opacity-60">
                 <div className="text-2xl font-bold text-white">10K+</div>
                 <div className="text-gray-400">|</div>
-                <div className="text-2xl font-bold text-white">14+</div>
+                <div className="text-2xl font-bold text-white">13+</div>
                 <div className="text-gray-400">|</div>
                 <div className="text-2xl font-bold text-white">95%</div>
               </div>
