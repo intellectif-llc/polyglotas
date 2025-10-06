@@ -189,14 +189,11 @@ export default function LandingHero({ onSignIn }: LandingHeroProps) {
                 Trusted by language learners worldwide
               </p>
               <div className="flex justify-center items-center space-x-8 opacity-60">
-                <div className="text-2xl font-bold text-white">10K+</div>
-                <div className="text-gray-400">|</div>
                 <div className="text-2xl font-bold text-white">13+</div>
                 <div className="text-gray-400">|</div>
                 <div className="text-2xl font-bold text-white">95%</div>
               </div>
               <div className="flex justify-center items-center space-x-8 text-sm text-gray-400 mt-2">
-                <span>Active Users</span>
                 <span>Languages</span>
                 <span>Accuracy Rate</span>
               </div>
