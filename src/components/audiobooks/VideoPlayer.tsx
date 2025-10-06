@@ -79,12 +79,13 @@ export default function VideoPlayer({
     }
   }, [onDurationChange, currentTime]);
 
-  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     if (!videoRef.current || duration === 0) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const percentage = clickX / rect.width;
+    const clientX = 'touches' in e ? e.touches[0]?.clientX || e.changedTouches[0]?.clientX : e.clientX;
+    const clickX = clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, clickX / rect.width));
     const newTime = percentage * duration;
     
     videoRef.current.currentTime = newTime;
@@ -164,26 +165,26 @@ export default function VideoPlayer({
       <div 
         ref={subtitleRef}
         data-subtitle-container
-        className={`absolute left-4 right-4 text-center pointer-events-auto z-10 ${
-          isFullscreen ? 'bottom-16' : 'bottom-20'
+        className={`absolute left-2 right-2 sm:left-4 sm:right-4 text-center pointer-events-auto z-10 ${
+          isFullscreen ? 'bottom-12 sm:bottom-16' : 'bottom-16 sm:bottom-20'
         }`}
       >
-        <div className={`inline-block bg-black bg-opacity-75 rounded-lg px-4 py-3 backdrop-blur-sm ${
-          isFullscreen ? 'max-w-6xl' : 'max-w-4xl'
+        <div className={`inline-block bg-black bg-opacity-75 rounded-lg px-2 py-2 sm:px-4 sm:py-3 backdrop-blur-sm ${
+          isFullscreen ? 'max-w-6xl' : 'max-w-xs sm:max-w-4xl'
         }`}>
           <div 
             className={`text-white font-medium leading-relaxed ${
-              isFullscreen ? 'text-xl md:text-2xl' : 'text-lg md:text-xl'
+              isFullscreen ? 'text-base sm:text-xl md:text-2xl' : 'text-sm sm:text-lg md:text-xl'
             }`}
             style={{ 
               userSelect: 'text',
-              lineHeight: '1.6',
-              minHeight: '3.2em', // Fixed height for 2 lines
+              lineHeight: '1.4',
+              minHeight: isFullscreen ? '3.2em' : '2.8em', // Smaller on mobile
               display: 'flex',
               flexWrap: 'wrap',
               justifyContent: 'center',
               alignItems: 'center',
-              gap: '0.25rem'
+              gap: '0.15rem'
             }}
           >
             {visibleWords.map((word, idx) => {
@@ -198,7 +199,7 @@ export default function VideoPlayer({
                     e.stopPropagation();
                     onWordClick(word.text, e.currentTarget as HTMLElement);
                   }}
-                  className={`transition-all duration-200 cursor-pointer hover:bg-blue-400 hover:text-black px-1 py-0.5 rounded ${
+                  className={`transition-all duration-200 cursor-pointer hover:bg-blue-400 hover:text-black px-1 py-0.5 rounded text-xs sm:text-sm md:text-base ${
                     isActive
                       ? 'bg-yellow-400 text-black font-bold'
                       : isPast
@@ -207,7 +208,7 @@ export default function VideoPlayer({
                   }`}
                   style={{
                     display: 'inline-block',
-                    margin: '0 2px'
+                    margin: '0 1px'
                   }}
                 >
                   {word.text}
@@ -239,7 +240,9 @@ export default function VideoPlayer({
     const resetTimeout = () => {
       setShowControls(true);
       clearTimeout(timeout);
-      timeout = setTimeout(() => setShowControls(false), 3000);
+      // Longer timeout on mobile for better UX
+      const hideDelay = window.innerWidth < 768 ? 5000 : 3000;
+      timeout = setTimeout(() => setShowControls(false), hideDelay);
     };
 
     resetTimeout();
@@ -248,7 +251,7 @@ export default function VideoPlayer({
   }, [currentTime, isPlaying]);
 
   return (
-    <div className="relative bg-black rounded-xl overflow-hidden shadow-2xl">
+    <div className="relative bg-black rounded-lg sm:rounded-xl overflow-hidden shadow-2xl">
       <video
         ref={videoRef}
         className="w-full aspect-video bg-gray-900"
@@ -265,6 +268,13 @@ export default function VideoPlayer({
           const target = e.target as HTMLVideoElement;
           if (target.error) {
             console.warn('Video failed to load:', target.src);
+          }
+        }}
+        onTouchStart={(e) => {
+          setShowControls(true);
+          // Prevent default to avoid unwanted behaviors
+          if (e.target === videoRef.current) {
+            e.preventDefault();
           }
         }}
         playsInline
@@ -288,50 +298,56 @@ export default function VideoPlayer({
           showControls ? 'opacity-100' : 'opacity-0'
         }`}
         onMouseMove={() => setShowControls(true)}
+        onTouchStart={(e) => {
+          setShowControls(true);
+          e.stopPropagation();
+        }}
+        onClick={() => setShowControls(true)}
       >
         {/* Progress Bar */}
-        <div className="absolute bottom-16 left-4 right-4">
-          <div className="flex items-center gap-2 text-white text-sm mb-2">
+        <div className="absolute bottom-12 sm:bottom-16 left-2 right-2 sm:left-4 sm:right-4">
+          <div className="flex items-center gap-2 text-white text-xs sm:text-sm mb-1 sm:mb-2">
             <span>{formatTime(currentTime)}</span>
             <span>/</span>
             <span>{formatTime(duration)}</span>
           </div>
           <div 
-            className="w-full bg-white/20 rounded-full h-2 cursor-pointer hover:h-3 transition-all duration-200"
+            className="w-full bg-white/20 rounded-full h-1.5 sm:h-2 cursor-pointer hover:h-2 sm:hover:h-3 transition-all duration-200 touch-manipulation"
             onClick={handleSeek}
+            onTouchEnd={handleSeek}
           >
             <div
-              className="bg-red-500 h-2 rounded-full transition-all duration-300 hover:h-3"
+              className="bg-red-500 h-1.5 sm:h-2 rounded-full transition-all duration-300 hover:h-2 sm:hover:h-3"
               style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
             />
           </div>
         </div>
 
         {/* Control Buttons */}
-        <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="absolute bottom-2 sm:bottom-4 left-2 right-2 sm:left-4 sm:right-4 flex items-center justify-between">
+          <div className="flex items-center gap-1 sm:gap-3">
             <button
               onClick={() => skipTime(-10)}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+              className="p-1.5 sm:p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
             >
-              <SkipBack className="h-5 w-5" />
+              <SkipBack className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
             
             <button
               onClick={onPlayPause}
-              className="p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors"
+              className="p-2 sm:p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors"
             >
-              {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+              {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6" />}
             </button>
             
             <button
               onClick={() => skipTime(10)}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+              className="p-1.5 sm:p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
             >
-              <SkipForward className="h-5 w-5" />
+              <SkipForward className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
 
-            <div className="flex items-center gap-2 ml-4">
+            <div className="hidden sm:flex items-center gap-2 ml-4">
               <button
                 onClick={toggleMute}
                 className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
@@ -350,19 +366,26 @@ export default function VideoPlayer({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
+            <button
+              onClick={toggleMute}
+              className="sm:hidden p-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+            >
+              <Volume2 className="h-4 w-4" />
+            </button>
+            
             <button
               onClick={onToggleSubtitles}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+              className="p-1.5 sm:p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
             >
-              {showSubtitles ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showSubtitles ? <EyeOff className="h-3 w-3 sm:h-4 sm:w-4" /> : <Eye className="h-3 w-3 sm:h-4 sm:w-4" />}
             </button>
             
             <button
               onClick={toggleFullscreen}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+              className="p-1.5 sm:p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
             >
-              <Maximize className="h-4 w-4" />
+              <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
             </button>
           </div>
         </div>

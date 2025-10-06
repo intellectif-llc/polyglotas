@@ -317,7 +317,8 @@ export default function ChapterPlayerPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="container mx-auto">
+        <div className="px-2 sm:px-4 lg:px-8 py-2 sm:py-4 lg:py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
@@ -366,8 +367,10 @@ export default function ChapterPlayerPage() {
           onModeChange={handleDisplayModeChange}
         />
 
+        </div>
+        
         {displayMode === 'video' && chapter.video_url ? (
-          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="bg-white mx-2 sm:mx-4 lg:mx-8 rounded-xl shadow-lg p-1 sm:p-4 lg:p-6 mb-4 sm:mb-6 lg:mb-8">
             <VideoPlayer
               videoUrl={chapter.video_url}
               currentTime={currentTime}
@@ -386,7 +389,7 @@ export default function ChapterPlayerPage() {
             />
           </div>
         ) : displayMode === 'video' ? (
-          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8 text-center">
+          <div className="bg-white mx-2 sm:mx-4 lg:mx-8 rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 lg:mb-8 text-center">
             <div className="max-w-md mx-auto">
               <p className="text-gray-500 text-sm sm:text-base mb-3">No video available for this chapter</p>
               <p className="text-gray-400 text-xs sm:text-sm">
@@ -395,7 +398,8 @@ export default function ChapterPlayerPage() {
             </div>
           </div>
         ) : (
-          <AudioPlayer
+          <div className="px-2 sm:px-4 lg:px-8">
+            <AudioPlayer
             audioUrl={chapter.audio_url}
             currentTime={currentTime}
             duration={duration}
@@ -410,8 +414,10 @@ export default function ChapterPlayerPage() {
             onUpdateHighlighting={updateHighlighting}
             onDurationChange={handleDurationChange}
           />
+          </div>
         )}
 
+        <div className="px-2 sm:px-4 lg:px-8">
         {editMode && userRole === "admin" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <AudioGenerationPanel
@@ -489,6 +495,7 @@ export default function ChapterPlayerPage() {
             onClose={closeDictionaryTooltip}
           />
         )}
+        </div>
       </div>
     </div>
   );
