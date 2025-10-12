@@ -15,6 +15,7 @@ export interface LessonContext {
   detectedUserLanguage?: string;
   languageSwitchingAllowed?: boolean;
   encourageTargetLanguage?: boolean;
+  userName?: string;
 }
 
 export interface ConversationPrompt {
@@ -31,7 +32,12 @@ export async function generateAIResponse(
   lessonContext: LessonContext,
   conversationPrompts: ConversationPrompt[] = [],
   detectedLanguage?: string,
-  languageSwitch?: { switched: boolean; fromLanguage: string; toLanguage: string; confidence: number }
+  languageSwitch?: {
+    switched: boolean;
+    fromLanguage: string;
+    toLanguage: string;
+    confidence: number;
+  }
 ): Promise<string> {
   try {
     const model = getTextGenerationModel();
@@ -69,10 +75,11 @@ export async function generateAIResponse(
     if (detectedLanguage && detectedLanguage !== lessonContext.targetLanguage) {
       languageContext = `\r\n\r\nIMPORTANT: The user just spoke in ${detectedLanguage} instead of ${lessonContext.targetLanguage}. `;
       if (languageSwitch?.switched) {
-        languageContext += "Gently encourage them to practice in their target language while still being helpful. ";
+        languageContext +=
+          "Gently encourage them to practice in their target language while still being helpful. ";
       }
     }
-    
+
     // Send the user message and get response with structured format
     const structuredPrompt = `${userMessage}${languageContext}
 
@@ -92,8 +99,9 @@ For suggested_answer: Create a natural, complete sentence that directly answers 
     console.error("Error generating AI response:", error);
     // Fallback to simple text response
     return JSON.stringify({
-      response: "I'm here to help you practice. What would you like to talk about?",
-      suggested_answer: "I'd like to practice conversation"
+      response:
+        "I'm here to help you practice. What would you like to talk about?",
+      suggested_answer: "I'd like to practice conversation",
     });
   }
 }
@@ -137,7 +145,7 @@ For suggested_answer: Create a natural, complete sentence that directly answers 
     // Fallback greeting with structured format
     return JSON.stringify({
       response: `Hello! Welcome to ${lessonContext.lessonTitle}. I'm here to help you practice your ${lessonContext.targetLanguage}. What would you like to talk about?`,
-      suggested_answer: "I'd like to practice conversation"
+      suggested_answer: "I'd like to practice conversation",
     });
   }
 }
@@ -156,6 +164,16 @@ function buildSystemPrompt(
           .join("\n")}`
       : "";
 
+  const userNameContext = lessonContext.userName
+    ? `\n- Student's Name: ${lessonContext.userName}`
+    : "";
+
+  const nameGuidelines = lessonContext.userName
+    ? `\n- When transcribing audio, if you hear something similar to "${lessonContext.userName}", transcribe it as the student's actual name
+- Use the student's name naturally in conversation when appropriate, but don't overuse it
+- If a conversation starter asks about the student's name, don not include their name in the question (e.g., say "What's your name?" not "What's your name, ${lessonContext.userName}?")`
+    : "";
+
   return `You are a helpful language learning assistant for a ${lessonContext.targetLanguage} lesson. 
 
 Context:
@@ -163,7 +181,7 @@ Context:
 - Unit: ${lessonContext.unitTitle}
 - Level: ${lessonContext.level}
 - Target Language: ${lessonContext.targetLanguage}
-- Student's Native Language: ${lessonContext.nativeLanguage}
+- Student's Native Language: ${lessonContext.nativeLanguage}${userNameContext}
 
 Your role:
 1. Help the student practice conversational ${lessonContext.targetLanguage}
@@ -181,7 +199,7 @@ Guidelines:
 - Ask questions to engage the student
 - Provide gentle corrections when needed
 - If student uses their native language (${lessonContext.nativeLanguage}), gently encourage ${lessonContext.targetLanguage} practice
-- Understand both ${lessonContext.targetLanguage} and ${lessonContext.nativeLanguage} but respond primarily in ${lessonContext.targetLanguage}${promptsText}`;
+- Understand both ${lessonContext.targetLanguage} and ${lessonContext.nativeLanguage} but respond primarily in ${lessonContext.targetLanguage}${nameGuidelines}${promptsText}`;
 }
 
 /**
@@ -193,7 +211,10 @@ export function checkPromptsCompletion(
 ): boolean {
   if (conversationPrompts.length === 0) return true;
 
-  const addressedPrompts = getAddressedPrompts(conversationHistory, conversationPrompts);
+  const addressedPrompts = getAddressedPrompts(
+    conversationHistory,
+    conversationPrompts
+  );
   return addressedPrompts.length === conversationPrompts.length;
 }
 
@@ -217,21 +238,59 @@ export function getAddressedPrompts(
       .replace(/[?!.,]/g, "")
       .split(" ")
       .filter((word) => word.length > 2);
-    
+
     // Look for semantic matches, not just keyword matches
-    const keyWords = promptWords.filter(word => 
-      !['what', 'how', 'when', 'where', 'why', 'who', 'do', 'does', 'did', 
-       'can', 'could', 'would', 'should', 'will', 'are', 'is', 'was', 'were',
-       'the', 'and', 'or', 'but', 'for', 'with', 'about', 'your', 'you', 'like',
-       'have', 'has', 'had', 'this', 'that', 'these', 'those', 'some', 'any'].includes(word)
+    const keyWords = promptWords.filter(
+      (word) =>
+        ![
+          "what",
+          "how",
+          "when",
+          "where",
+          "why",
+          "who",
+          "do",
+          "does",
+          "did",
+          "can",
+          "could",
+          "would",
+          "should",
+          "will",
+          "are",
+          "is",
+          "was",
+          "were",
+          "the",
+          "and",
+          "or",
+          "but",
+          "for",
+          "with",
+          "about",
+          "your",
+          "you",
+          "like",
+          "have",
+          "has",
+          "had",
+          "this",
+          "that",
+          "these",
+          "those",
+          "some",
+          "any",
+        ].includes(word)
     );
-    
+
     if (keyWords.length === 0) return false;
-    
+
     // Check if at least 30% of key words appear in conversation (lowered threshold)
-    const matchedWords = keyWords.filter(word => conversationText.includes(word));
+    const matchedWords = keyWords.filter((word) =>
+      conversationText.includes(word)
+    );
     const matchRatio = matchedWords.length / keyWords.length;
-    
+
     return matchRatio >= 0.3;
   });
 }
@@ -246,8 +305,10 @@ export async function detectAddressedPromptsWithAI(
 ): Promise<number[]> {
   try {
     const model = getTextGenerationModel();
-    
-    const unaddressedPrompts = conversationPrompts.filter(p => !previouslyAddressedIds.includes(p.id));
+
+    const unaddressedPrompts = conversationPrompts.filter(
+      (p) => !previouslyAddressedIds.includes(p.id)
+    );
     if (unaddressedPrompts.length === 0) return [];
 
     const analysisPrompt = `Analyze if this user message addresses any of the conversation starters below.
@@ -255,7 +316,7 @@ export async function detectAddressedPromptsWithAI(
 User message: "${userMessage}"
 
 Conversation starters:
-${unaddressedPrompts.map(p => `${p.id}: ${p.starter_text}`).join('\n')}
+${unaddressedPrompts.map((p) => `${p.id}: ${p.starter_text}`).join("\n")}
 
 Return ONLY a JSON array of IDs that were addressed by the user's message. If none were addressed, return [].
 Example: [1, 3] or []`;
@@ -263,15 +324,18 @@ Example: [1, 3] or []`;
     const result = await model.generateContent(analysisPrompt);
     const response = await result.response;
     const text = response.text().trim();
-    
+
     // Extract JSON from markdown code blocks if present
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/\[.*\]/);
-    const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text;
-    
+    const jsonMatch =
+      text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/\[.*\]/);
+    const jsonText = jsonMatch ? jsonMatch[1] || jsonMatch[0] : text;
+
     const addressedIds = JSON.parse(jsonText);
-    return Array.isArray(addressedIds) ? addressedIds.filter(id => typeof id === 'number') : [];
+    return Array.isArray(addressedIds)
+      ? addressedIds.filter((id) => typeof id === "number")
+      : [];
   } catch (error) {
-    console.error('AI prompt detection failed:', error);
+    console.error("AI prompt detection failed:", error);
     return [];
   }
 }
@@ -285,8 +349,13 @@ export function detectNewlyAddressedPrompts(
   conversationPrompts: ConversationPrompt[],
   previouslyAddressedIds: number[]
 ): number[] {
-  const userMessages = conversationHistory.filter(msg => msg.role === 'user');
-  const currentlyAddressed = getAddressedPrompts(userMessages, conversationPrompts);
-  const currentlyAddressedIds = currentlyAddressed.map(p => p.id);
-  return currentlyAddressedIds.filter(id => !previouslyAddressedIds.includes(id));
+  const userMessages = conversationHistory.filter((msg) => msg.role === "user");
+  const currentlyAddressed = getAddressedPrompts(
+    userMessages,
+    conversationPrompts
+  );
+  const currentlyAddressedIds = currentlyAddressed.map((p) => p.id);
+  return currentlyAddressedIds.filter(
+    (id) => !previouslyAddressedIds.includes(id)
+  );
 }

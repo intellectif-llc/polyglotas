@@ -6,7 +6,7 @@ export interface EnhancedSpeechRecognitionOptions {
   nativeLanguage: string;
   lessonLevel: string;
   allowNativeLanguage?: boolean;
-  preferredProvider?: 'elevenlabs' | 'azure' | 'auto';
+  preferredProvider?: "elevenlabs" | "azure" | "auto";
   confidenceThreshold?: number;
 }
 
@@ -27,7 +27,9 @@ export interface EnhancedSpeechResult {
 /**
  * Enhanced speech recognition hook with multilingual support and smart fallbacks
  */
-export function useEnhancedSpeechRecognition(options: EnhancedSpeechRecognitionOptions) {
+export function useEnhancedSpeechRecognition(
+  options: EnhancedSpeechRecognitionOptions
+) {
   const [isListening, setIsListening] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [result, setResult] = React.useState<EnhancedSpeechResult | null>(null);
@@ -41,7 +43,7 @@ export function useEnhancedSpeechRecognition(options: EnhancedSpeechRecognitionO
   // Initialize STT router
   React.useEffect(() => {
     sttRouterRef.current = new SmartSTTRouter({
-      preferredProvider: options.preferredProvider || 'auto',
+      preferredProvider: options.preferredProvider || "auto",
       confidenceThreshold: options.confidenceThreshold || 0.7,
     });
   }, [options.preferredProvider, options.confidenceThreshold]);
@@ -59,17 +61,17 @@ export function useEnhancedSpeechRecognition(options: EnhancedSpeechRecognitionO
 
     try {
       // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-        }
+        },
       });
 
       // Setup MediaRecorder
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType: "audio/webm;codecs=opus",
       });
       mediaRecorderRef.current = mediaRecorder;
 
@@ -80,14 +82,13 @@ export function useEnhancedSpeechRecognition(options: EnhancedSpeechRecognitionO
       };
 
       mediaRecorder.onstop = async () => {
-        console.log('🎤 MediaRecorder stopped, transitioning to processing');
         setIsListening(false);
         setIsProcessing(true);
 
         try {
           // Create audio blob from recorded chunks
-          const audioBlob = new Blob(audioChunksRef.current, { 
-            type: 'audio/webm;codecs=opus' 
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: "audio/webm;codecs=opus",
           });
 
           if (audioBlob.size === 0) {
@@ -104,23 +105,26 @@ export function useEnhancedSpeechRecognition(options: EnhancedSpeechRecognitionO
 
           // Use server-side STT API for better audio format handling
           const formData = new FormData();
-          formData.append('audio', audioBlob, 'audio.webm');
-          formData.append('options', JSON.stringify({
-            targetLanguage: context.targetLanguage,
-            nativeLanguage: context.nativeLanguage,
-            lessonLevel: context.lessonLevel,
-            allowNativeLanguage: context.allowNativeLanguage,
-            preferredProvider: options.preferredProvider || 'elevenlabs',
-          }));
+          formData.append("audio", audioBlob, "audio.webm");
+          formData.append(
+            "options",
+            JSON.stringify({
+              targetLanguage: context.targetLanguage,
+              nativeLanguage: context.nativeLanguage,
+              lessonLevel: context.lessonLevel,
+              allowNativeLanguage: context.allowNativeLanguage,
+              preferredProvider: options.preferredProvider || "elevenlabs",
+            })
+          );
 
-          const response = await fetch('/api/speech/enhanced-stt', {
-            method: 'POST',
+          const response = await fetch("/api/speech/enhanced-stt", {
+            method: "POST",
             body: formData,
           });
 
           if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || 'STT API request failed');
+            throw new Error(errorData.error || "STT API request failed");
           }
 
           const transcriptionResult = await response.json();
@@ -134,19 +138,16 @@ export function useEnhancedSpeechRecognition(options: EnhancedSpeechRecognitionO
             provider: transcriptionResult.provider,
             attempts: transcriptionResult.attempts,
           };
-          
-          console.log('🎤 Setting speech result:', enhancedResult);
           setResult(enhancedResult);
-          console.log("Enhanced speech recognition result:", transcriptionResult);
         } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : 'Unknown transcription error';
+          const errorMessage =
+            err instanceof Error ? err.message : "Unknown transcription error";
           console.error("Enhanced speech recognition error:", errorMessage);
           setError(errorMessage);
         } finally {
-          console.log('🎤 Processing complete, setting isProcessing=false');
           setIsProcessing(false);
           // Clean up stream
-          stream.getTracks().forEach(track => track.stop());
+          stream.getTracks().forEach((track) => track.stop());
         }
       };
 
@@ -155,16 +156,18 @@ export function useEnhancedSpeechRecognition(options: EnhancedSpeechRecognitionO
         setError("Recording failed");
         setIsListening(false);
         setIsProcessing(false);
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       // Start recording
       mediaRecorder.start();
-      console.log("Started enhanced speech recognition");
-
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start recording';
-      console.error("Failed to start enhanced speech recognition:", errorMessage);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to start recording";
+      console.error(
+        "Failed to start enhanced speech recognition:",
+        errorMessage
+      );
       setError(errorMessage);
       setIsListening(false);
       setIsProcessing(false);
@@ -177,7 +180,6 @@ export function useEnhancedSpeechRecognition(options: EnhancedSpeechRecognitionO
       return;
     }
 
-    console.log("Stopping enhanced speech recognition");
     mediaRecorderRef.current.stop();
   }, [isListening]);
 

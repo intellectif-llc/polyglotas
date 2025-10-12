@@ -175,6 +175,13 @@ export async function POST(request: NextRequest) {
       parts: msg.message_text,
     }));
 
+    // Get user's first name for context
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("first_name")
+      .eq("id", subscriptionResult.userId)
+      .single();
+
     // Build lesson context
     const lesson = conversation.lessons[0];
     const lessonContext: LessonContext = {
@@ -190,6 +197,7 @@ export async function POST(request: NextRequest) {
       allowNativeLanguage: true,
       languageSwitchingAllowed: true,
       encourageTargetLanguage: true,
+      userName: userProfile?.first_name || undefined,
     };
 
     // Convert File to Blob
@@ -197,16 +205,67 @@ export async function POST(request: NextRequest) {
       type: audioFile.type,
     });
 
-    console.log('🟡 [Voice Message API] Starting efficient Gemini multimodal processing...');
+    console.log('🟡 [Voice Message API] Starting voice message processing...');
     console.log('🟡 [Voice Message API] Audio size:', audioBlob.size, 'type:', audioBlob.type);
 
-    // Use efficient single-request multimodal approach
-    const multimodalResult = await transcribeAndRespondWithGemini(
-      audioBlob,
-      conversationHistory,
-      lessonContext,
-      conversationPrompts
-    );
+    let multimodalResult;
+    try {
+      // Try efficient single-request multimodal approach first
+      multimodalResult = await transcribeAndRespondWithGemini(
+        audioBlob,
+        conversationHistory,
+        lessonContext,
+        conversationPrompts
+      );
+    } catch {
+      console.log('🟡 [Voice Message API] Multimodal failed, falling back to STT + conversation approach');
+      
+      // Fallback to STT + separate conversation approach
+      const sttResponse = await fetch('/api/speech/enhanced-stt', {
+        method: 'POST',
+        body: (() => {
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'audio.webm');
+          formData.append('options', JSON.stringify({
+            targetLanguage: lessonContext.targetLanguage,
+            nativeLanguage: lessonContext.nativeLanguage,
+            lessonLevel: lessonContext.level,
+            allowNativeLanguage: true,
+            preferredProvider: 'elevenlabs',
+          }));
+          return formData;
+        })()
+      });
+
+      if (!sttResponse.ok) {
+        throw new Error('STT fallback failed');
+      }
+
+      const sttResult = await sttResponse.json();
+      
+      // Generate AI response using existing conversation function
+      const { generateAIResponse } = await import('@/lib/gemini/conversation');
+      const aiResponseText = await generateAIResponse(
+        sttResult.transcript,
+        conversationHistory,
+        lessonContext,
+        conversationPrompts
+      );
+
+      // Parse AI response
+      const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { response: aiResponseText, suggested_answer: null };
+
+      multimodalResult = {
+        transcript: sttResult.transcript,
+        aiResponse: parsed.response || aiResponseText,
+        suggestedAnswer: parsed.suggested_answer || null,
+        detectedLanguage: sttResult.detectedLanguage,
+        confidence: sttResult.confidence,
+        languageSwitch: sttResult.languageSwitch,
+        provider: `${sttResult.provider}-fallback`,
+      };
+    }
 
     console.log('✅ [Voice Message API] Multimodal result received:', {
       transcript: multimodalResult.transcript,

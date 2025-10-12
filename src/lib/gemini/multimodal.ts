@@ -163,6 +163,16 @@ function buildSystemPrompt(
           .join("\n")}`
       : "";
 
+  const userNameContext = lessonContext.userName 
+    ? `\n- Student's Name: ${lessonContext.userName}` 
+    : "";
+
+  const nameGuidelines = lessonContext.userName
+    ? `\n- When transcribing audio, if you hear something similar to "${lessonContext.userName}", transcribe it as the student's actual name
+- Use the student's name naturally in conversation when appropriate, but don't overuse it
+- If a conversation starter asks about the student's name, don't include their name in the question (e.g., say "What's your name?" not "What's your name, ${lessonContext.userName}?")`
+    : "";
+
   return `You are a helpful language learning assistant for a ${lessonContext.targetLanguage} lesson. 
 
 Context:
@@ -170,7 +180,7 @@ Context:
 - Unit: ${lessonContext.unitTitle}
 - Level: ${lessonContext.level}
 - Target Language: ${lessonContext.targetLanguage}
-- Student's Native Language: ${lessonContext.nativeLanguage}
+- Student's Native Language: ${lessonContext.nativeLanguage}${userNameContext}
 
 Your role:
 1. Help the student practice conversational ${lessonContext.targetLanguage}
@@ -188,5 +198,5 @@ Guidelines:
 - Ask questions to engage the student
 - Provide gentle corrections when needed
 - If student uses their native language (${lessonContext.nativeLanguage}), gently encourage ${lessonContext.targetLanguage} practice
-- Understand both ${lessonContext.targetLanguage} and ${lessonContext.nativeLanguage} but respond primarily in ${lessonContext.targetLanguage}${promptsText}`;
+- Understand both ${lessonContext.targetLanguage} and ${lessonContext.nativeLanguage} but respond primarily in ${lessonContext.targetLanguage}${nameGuidelines}${promptsText}`;
 }
