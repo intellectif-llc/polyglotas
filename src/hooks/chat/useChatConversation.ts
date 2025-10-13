@@ -12,6 +12,12 @@ export interface ChatMessage {
   suggested_answer?: string | null;
 }
 
+interface MessagesResponse {
+  messages: ChatMessage[];
+  hasMore: boolean;
+  oldestMessageOrder: number | null;
+}
+
 export interface ChatPrompt {
   id: number;
   starter_text: string;
@@ -44,6 +50,10 @@ export function useChatConversation(lessonId: string) {
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [loadingAudioId, setLoadingAudioId] = useState<string | null>(null);
   const [loadingTimeouts, setLoadingTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
+  const [allMessages, setAllMessages] = useState<ChatMessage[]>([]);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [oldestMessageOrder, setOldestMessageOrder] = useState<number | null>(null);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
 
   // Stop playing audio when component unmounts
   useEffect(() => {
@@ -88,13 +98,11 @@ export function useChatConversation(lessonId: string) {
     }
   }, [conversation]);
 
-  // Fetch messages for the conversation
-  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<
-    ChatMessage[]
-  >({
+  // Fetch initial messages for the conversation
+  const { data: messagesData, isLoading: isLoadingMessages } = useQuery<MessagesResponse>({
     queryKey: ["chatMessages", conversationId],
     queryFn: async () => {
-      if (!conversationId) return [];
+      if (!conversationId) return { messages: [], hasMore: false, oldestMessageOrder: null };
       const response = await axios.get(
         `/api/chat/conversations/${conversationId}/messages`
       );
@@ -102,6 +110,15 @@ export function useChatConversation(lessonId: string) {
     },
     enabled: !!conversationId,
   });
+
+  // Update local state when messages data changes
+  useEffect(() => {
+    if (messagesData) {
+      setAllMessages(messagesData.messages);
+      setHasMoreMessages(messagesData.hasMore);
+      setOldestMessageOrder(messagesData.oldestMessageOrder);
+    }
+  }, [messagesData]);
 
   // Fetch addressed prompts status
   const { data: promptStatuses = [] } = useQuery<PromptStatus[]>({
@@ -142,18 +159,15 @@ export function useChatConversation(lessonId: string) {
       return response.data as SendMessageResponse;
     },
     onSuccess: (data) => {
-      // Update messages cache with new messages
-      queryClient.setQueryData<ChatMessage[]>(
-        ["chatMessages", conversationId],
-        (oldMessages = []) => [
-          ...oldMessages,
-          data.user_message,
-          {
-            ...data.ai_message,
-            suggested_answer: data.ai_message.suggested_answer || null,
-          },
-        ]
-      );
+      // Update local messages state with new messages
+      setAllMessages(prev => [
+        ...prev,
+        data.user_message,
+        {
+          ...data.ai_message,
+          suggested_answer: data.ai_message.suggested_answer || null,
+        },
+      ]);
 
       // Update addressed prompt IDs
       if (data.conversation_status.addressed_prompt_ids) {
@@ -278,50 +292,75 @@ export function useChatConversation(lessonId: string) {
   // Initialize messages with initial AI message if present and auto-play
   useEffect(() => {
     if (conversation?.initial_ai_message && conversationId) {
-      queryClient.setQueryData<ChatMessage[]>(
-        ["chatMessages", conversationId],
-        (oldMessages = []) => {
-          // Only add if not already present
-          const hasInitialMessage = oldMessages.some(
-            (msg) =>
-              msg.message_id === conversation.initial_ai_message?.message_id
-          );
+      setAllMessages(prev => {
+        // Only add if not already present
+        const hasInitialMessage = prev.some(
+          (msg) => msg.message_id === conversation.initial_ai_message?.message_id
+        );
 
-          if (!hasInitialMessage && conversation.initial_ai_message) {
-            // Auto-play the initial AI message
-            setTimeout(() => {
-              playAudioForMessage(
-                conversation.initial_ai_message!.message_id,
-                conversation.initial_ai_message!.message_text
-              );
-            }, 500); // Small delay to ensure UI is ready
+        if (!hasInitialMessage && conversation.initial_ai_message) {
+          // Auto-play the initial AI message
+          setTimeout(() => {
+            playAudioForMessage(
+              conversation.initial_ai_message!.message_id,
+              conversation.initial_ai_message!.message_text
+            );
+          }, 500);
 
-            return [conversation.initial_ai_message, ...oldMessages];
-          }
-
-          return oldMessages;
+          return [conversation.initial_ai_message, ...prev];
         }
-      );
+
+        return prev;
+      });
     }
-  }, [conversation, conversationId, queryClient, playAudioForMessage]);
+  }, [conversation, conversationId, playAudioForMessage]);
+
+  // Function to load older messages
+  const loadOlderMessages = useCallback(async () => {
+    if (!conversationId || !hasMoreMessages || isLoadingOlderMessages || !oldestMessageOrder) {
+      return;
+    }
+
+    setIsLoadingOlderMessages(true);
+    try {
+      const response = await axios.get(
+        `/api/chat/conversations/${conversationId}/messages?before=${oldestMessageOrder}`
+      );
+      const data: MessagesResponse = response.data;
+      
+      setAllMessages(prev => [...data.messages, ...prev]);
+      setHasMoreMessages(data.hasMore);
+      setOldestMessageOrder(data.oldestMessageOrder);
+    } catch (error) {
+      console.error('Failed to load older messages:', error);
+    } finally {
+      setIsLoadingOlderMessages(false);
+    }
+  }, [conversationId, hasMoreMessages, isLoadingOlderMessages, oldestMessageOrder]);
 
   return {
     conversation,
     conversationId,
-    messages,
+    messages: allMessages,
     prompts,
     addressedPromptIds,
     isLoading: isLoadingConversation || isLoadingMessages || isLoadingPrompts,
-    error: null, // Could be enhanced with proper error handling
+    error: null,
     sendMessage: sendMessageMutation.mutateAsync,
     isSendingMessage: sendMessageMutation.isPending,
     playingMessageId,
     loadingAudioId,
     playAudioForMessage,
-    // Expose query client for efficient voice message integration
+    hasMoreMessages,
+    loadOlderMessages,
+    isLoadingOlderMessages,
     invalidateQueries: () => {
       queryClient.invalidateQueries({ queryKey: ["chatMessages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["promptStatuses", conversationId] });
+      // Reset local state to force refetch
+      setAllMessages([]);
+      setHasMoreMessages(false);
+      setOldestMessageOrder(null);
     },
   };
 }

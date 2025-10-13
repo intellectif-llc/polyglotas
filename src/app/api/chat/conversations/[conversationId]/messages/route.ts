@@ -78,12 +78,13 @@ export async function GET(
     const url = new URL(request.url);
     const limit = Math.min(
       parseInt(url.searchParams.get("limit") || "50"),
-      100
+      200
     );
-    const offset = Math.max(parseInt(url.searchParams.get("offset") || "0"), 0);
+    const beforeMessageOrder = url.searchParams.get("before") ? 
+      parseInt(url.searchParams.get("before")!) : null;
 
-    // Fetch messages for the conversation
-    const { data: messages, error: messagesError } = await supabase
+    // Build query for messages
+    let query = supabase
       .from("conversation_messages")
       .select(
         `
@@ -97,8 +98,15 @@ export async function GET(
       `
       )
       .eq("conversation_id", conversationId)
-      .order("message_order", { ascending: true })
-      .range(offset, offset + limit - 1);
+      .order("message_order", { ascending: false })
+      .limit(limit);
+
+    // If beforeMessageOrder is provided, fetch messages before that order
+    if (beforeMessageOrder !== null) {
+      query = query.lt("message_order", beforeMessageOrder);
+    }
+
+    const { data: messages, error: messagesError } = await query;
 
     if (messagesError) {
       console.error("Error fetching messages:", messagesError);
@@ -108,18 +116,25 @@ export async function GET(
       );
     }
 
-    // Transform messages to match expected format
-    const chatMessages: ChatMessage[] = (messages || []).map((msg) => ({
-      message_id: msg.message_id.toString(),
-      message_text: msg.message_text,
-      sender_type: msg.sender_type as "user" | "ai",
-      message_order: msg.message_order,
-      created_at: msg.created_at,
-      related_prompt_id: msg.related_prompt_id || undefined,
-      suggested_answer: msg.suggested_answer || undefined,
-    }));
+    // Transform messages to match expected format and reverse order for display
+    const chatMessages: ChatMessage[] = (messages || [])
+      .map((msg) => ({
+        message_id: msg.message_id.toString(),
+        message_text: msg.message_text,
+        sender_type: msg.sender_type as "user" | "ai",
+        message_order: msg.message_order,
+        created_at: msg.created_at,
+        related_prompt_id: msg.related_prompt_id || undefined,
+        suggested_answer: msg.suggested_answer || undefined,
+      }))
+      .reverse(); // Reverse to show oldest first in the UI
 
-    return NextResponse.json(chatMessages);
+    return NextResponse.json({
+      messages: chatMessages,
+      hasMore: messages && messages.length === limit,
+      oldestMessageOrder: messages && messages.length > 0 ? 
+        Math.min(...messages.map(m => m.message_order)) : null
+    });
   } catch (error) {
     console.error("Unhandled error in get messages endpoint:", error);
     return new NextResponse(
