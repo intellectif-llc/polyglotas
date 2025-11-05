@@ -327,12 +327,14 @@ export async function POST(
       };
       
       // Generate AI response with suggested answer and multilingual support
+      console.log('🤖 [API] Generating AI response for message:', text_message.substring(0, 50) + '...');
       const aiResponseRaw = await generateAIResponse(
         text_message.trim(),
         conversationHistory,
         enhancedLessonContext,
         conversationPrompts
       );
+      console.log('✅ [API] AI response generated successfully');
       
       // Parse JSON response or fallback to plain text
       let aiResponseText: string;

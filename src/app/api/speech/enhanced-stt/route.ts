@@ -79,81 +79,60 @@ async function transcribeWithGeminiAPI(
   languageConfidence: number;
   provider: string;
 }> {
-
+  console.log('🟡 [STT] Starting Gemini direct transcription...');
 
   if (!process.env.GEMINI_API_KEY) {
     throw new Error("Gemini API key not configured");
   }
 
   try {
+    // Import the enhanced client
+    const { geminiManager } = await import('@/lib/gemini/client');
+    
     // Convert audio blob to base64
-
     const arrayBuffer = await audioBlob.arrayBuffer();
     const base64Audio = Buffer.from(arrayBuffer).toString("base64");
 
-
-    // Prepare the request payload for Gemini
-    const requestBody = {
-      contents: [
-        {
-          parts: [
-            {
-              text: `Please transcribe this audio file. The expected language is ${context.targetLanguage}. Return only the transcribed text without any additional formatting or explanation.`,
-            },
-            {
-              inline_data: {
-                mime_type: audioBlob.type || "audio/webm",
-                data: base64Audio,
-              },
-            },
-          ],
-        },
-      ],
+    // Generate content with enhanced error handling
+    const config = {
+      model: 'gemini-2.0-flash',
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 1000,
       },
     };
 
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    const params = [
       {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+        text: `Please transcribe this audio file. The expected language is ${context.targetLanguage}. Return only the transcribed text without any additional formatting or explanation.`,
+      },
+      {
+        inlineData: {
+          mimeType: audioBlob.type || "audio/webm",
+          data: base64Audio,
         },
-        body: JSON.stringify(requestBody),
-      }
-    );
+      },
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
+    const result = await geminiManager.generateContent(config, { contents: [{ role: 'user', parts: params }] }, 'stt_only_transcription');
 
-      throw new Error(`Gemini API failed: ${response.status} ${errorText}`);
-    }
-
-    const result = await response.json();
-
-
-    // Extract text from Gemini response
-    const transcript =
-      result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-
+    const response = await result.response;
+    const transcript = response.text()?.trim() || "";
 
     if (!transcript) {
       throw new Error("No transcript found in Gemini response");
     }
 
+    console.log('✅ [STT] Gemini transcription successful');
     return {
       text: transcript,
-      detectedLanguage: context.targetLanguage, // Gemini doesn't provide language detection
-      confidence: 0.85, // Estimated confidence for Gemini
+      detectedLanguage: context.targetLanguage,
+      confidence: 0.85,
       languageConfidence: 0.9,
       provider: "gemini",
     };
   } catch (error) {
-
+    console.error('❌ [STT] Gemini transcription failed:', error instanceof Error ? error.message : 'Unknown error');
     throw error;
   }
 }

@@ -1,4 +1,4 @@
-import { getTextGenerationModel } from "./client";
+import { geminiManager, SAFETY_SETTINGS } from "./client";
 import type { ConversationMessage, LessonContext, ConversationPrompt } from "./conversation";
 
 export interface MultimodalGeminiResult {
@@ -33,7 +33,16 @@ export async function transcribeAndRespondWithGemini(
   }
 
   try {
-    const model = getTextGenerationModel();
+    const config = {
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 1000,
+      },
+      safetySettings: SAFETY_SETTINGS,
+    };
 
     // Convert audio blob to base64
     console.log('🟡 Gemini Multimodal: Converting audio to base64...');
@@ -69,36 +78,47 @@ Respond with ONLY a JSON object in this exact format:
 
 For suggested_answer: Create a natural, complete sentence that directly answers your question. Use simple ${lessonContext.level} level vocabulary in ${lessonContext.targetLanguage}.`;
 
-    // Start a chat session with history
-    const chat = model.startChat({
-      history: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt }],
-        },
-        {
-          role: "model",
-          parts: [
-            {
-              text: "I understand. I'm ready to help you practice your language skills in this lesson context.",
-            },
-          ],
-        },
-        ...history,
-      ],
-    });
-
-    // Send multimodal request with audio and prompt
-    console.log('🟡 Gemini Multimodal: Sending combined transcription + conversation request...');
-    const result = await chat.sendMessage([
-      { text: multimodalPrompt },
+    // Build full history for stateless call
+    const fullHistory = [
       {
-        inlineData: {
-          mimeType: audioBlob.type || 'audio/webm',
-          data: base64Audio
-        }
+        role: "user",
+        parts: [{ text: systemPrompt }],
+      },
+      {
+        role: "model",
+        parts: [
+          {
+            text: "I understand. I'm ready to help you practice your language skills in this lesson context.",
+          },
+        ],
+      },
+      ...history,
+    ];
+
+    // Construct final request with audio
+    const contents = [
+      ...fullHistory,
+      {
+        role: "user",
+        parts: [
+          { text: multimodalPrompt },
+          {
+            inlineData: {
+              mimeType: audioBlob.type || 'audio/webm',
+              data: base64Audio
+            }
+          }
+        ]
       }
-    ]);
+    ];
+
+    // Use ROBUST geminiManager.generateContent method
+    console.log('🟡 Gemini Multimodal: Sending combined request via generateContent...');
+    const result = await geminiManager.generateContent(
+      config, 
+      { contents }, 
+      'multimodal_transcription_and_response'
+    );
 
     const response = await result.response;
     const responseText = response.text();

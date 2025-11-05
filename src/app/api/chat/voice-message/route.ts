@@ -217,8 +217,9 @@ export async function POST(request: NextRequest) {
         lessonContext,
         conversationPrompts
       );
-    } catch {
-      console.log('🟡 [Voice Message API] Multimodal failed, falling back to STT + conversation approach');
+    } catch (error) {
+      console.error('🟡 [Voice Message API] Multimodal failed:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('🟡 [Voice Message API] Falling back to STT + conversation approach');
       
       // Fallback to STT + separate conversation approach
       const sttResponse = await fetch('/api/speech/enhanced-stt', {
@@ -244,6 +245,7 @@ export async function POST(request: NextRequest) {
       const sttResult = await sttResponse.json();
       
       // Generate AI response using existing conversation function
+      console.log('🤖 [Voice Message API] Generating AI response via fallback method');
       const { generateAIResponse } = await import('@/lib/gemini/conversation');
       const aiResponseText = await generateAIResponse(
         sttResult.transcript,
@@ -251,6 +253,7 @@ export async function POST(request: NextRequest) {
         lessonContext,
         conversationPrompts
       );
+      console.log('✅ [Voice Message API] AI response generated via fallback');
 
       // Parse AI response
       const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);

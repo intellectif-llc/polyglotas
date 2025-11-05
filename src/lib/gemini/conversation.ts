@@ -1,4 +1,4 @@
-import { getTextGenerationModel } from "./client";
+import { generateTextContent } from "./client";
 
 export interface ConversationMessage {
   role: "user" | "model";
@@ -40,35 +40,27 @@ export async function generateAIResponse(
   }
 ): Promise<string> {
   try {
-    const model = getTextGenerationModel();
-
-    // Build the system prompt with lesson context
     const systemPrompt = buildSystemPrompt(lessonContext, conversationPrompts);
 
-    // Prepare conversation history for Gemini
-    const history = conversationHistory.map((msg) => ({
-      role: msg.role,
-      parts: [{ text: msg.parts }],
-    }));
-
-    // Start a chat session with history
-    const chat = model.startChat({
-      history: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt }],
-        },
-        {
-          role: "model",
-          parts: [
-            {
-              text: "I understand. I'm ready to help you practice your language skills in this lesson context.",
-            },
-          ],
-        },
-        ...history,
-      ],
-    });
+    // Build the full history for stateless call
+    const history = [
+      {
+        role: "user",
+        parts: [{ text: systemPrompt }],
+      },
+      {
+        role: "model",
+        parts: [
+          {
+            text: "I understand. I'm ready to help you practice your language skills in this lesson context.",
+          },
+        ],
+      },
+      ...conversationHistory.map((msg) => ({
+        role: msg.role,
+        parts: [{ text: msg.parts }],
+      })),
+    ];
 
     // Build language context for the prompt
     let languageContext = "";
@@ -80,7 +72,6 @@ export async function generateAIResponse(
       }
     }
 
-    // Send the user message and get response with structured format
     const structuredPrompt = `${userMessage}${languageContext}
 
 Respond with ONLY a JSON object in this exact format:
@@ -91,13 +82,18 @@ Respond with ONLY a JSON object in this exact format:
 
 For suggested_answer: Create a natural, complete sentence that directly answers your question. Use simple ${lessonContext.level} level vocabulary in ${lessonContext.targetLanguage}. Example: if you ask "What's your favorite food?", suggest "My favorite food is pizza" not just "pizza".`;
 
-    const result = await chat.sendMessage(structuredPrompt);
+    // Use ROBUST generateTextContent with full history
+    const result = await generateTextContent({
+      contents: [
+        ...history,
+        { role: "user", parts: [{ text: structuredPrompt }] },
+      ],
+    });
+    
     const response = await result.response;
-
     return response.text();
   } catch (error) {
     console.error("Error generating AI response:", error);
-    // Fallback to simple text response
     return JSON.stringify({
       response:
         "I'm here to help you practice. What would you like to talk about?",
@@ -114,8 +110,6 @@ export async function generateInitialGreeting(
   conversationPrompts: ConversationPrompt[] = []
 ): Promise<string> {
   try {
-    const model = getTextGenerationModel();
-
     const systemPrompt = buildSystemPrompt(lessonContext, conversationPrompts);
     const greetingPrompt = `
 ${systemPrompt}
@@ -136,7 +130,7 @@ Respond with ONLY a JSON object in this exact format:
 
 For suggested_answer: Create a natural, complete sentence that directly answers your question. Use simple ${lessonContext.level} level vocabulary.`;
 
-    const result = await model.generateContent(greetingPrompt);
+    const result = await generateTextContent({ contents: [{ role: 'user', parts: [{ text: greetingPrompt }] }] });
     const response = await result.response;
 
     return response.text();
@@ -304,8 +298,6 @@ export async function detectAddressedPromptsWithAI(
   previouslyAddressedIds: number[]
 ): Promise<number[]> {
   try {
-    const model = getTextGenerationModel();
-
     const unaddressedPrompts = conversationPrompts.filter(
       (p) => !previouslyAddressedIds.includes(p.id)
     );
@@ -321,7 +313,7 @@ ${unaddressedPrompts.map((p) => `${p.id}: ${p.starter_text}`).join("\n")}
 Return ONLY a JSON array of IDs that were addressed by the user's message. If none were addressed, return [].
 Example: [1, 3] or []`;
 
-    const result = await model.generateContent(analysisPrompt);
+    const result = await generateTextContent({ contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }] });
     const response = await result.response;
     const text = response.text().trim();
 
