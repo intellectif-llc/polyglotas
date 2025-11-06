@@ -17,20 +17,22 @@ export async function GET(
   }
 
   try {
-    console.log(`[PHRASES API] Starting phrases fetch for lesson ${parsedLessonId}`);
-    
+    console.log(
+      `[PHRASES API] Starting phrases fetch for lesson ${parsedLessonId}`
+    );
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
-      console.log('[PHRASES API] No authenticated user found');
+      console.log("[PHRASES API] No authenticated user found");
       return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
-    
+
     console.log(`[PHRASES API] User authenticated: ${user.id}`);
 
     const { data: profile, error: profileError } = await supabase
@@ -40,14 +42,16 @@ export async function GET(
       .single();
 
     if (profileError) {
-      console.log('[PHRASES API] Profile fetch error:', profileError);
+      console.log("[PHRASES API] Profile fetch error:", profileError);
     }
-    
+
     const targetLanguage = profile?.current_target_language_code || "en";
     console.log(`[PHRASES API] Target language: ${targetLanguage}`);
 
-    console.log(`[PHRASES API] Fetching phrases for lesson ${parsedLessonId} in language ${targetLanguage}`);
-    
+    console.log(
+      `[PHRASES API] Fetching phrases for lesson ${parsedLessonId} in language ${targetLanguage}`
+    );
+
     const { data: phrases, error } = await supabase
       .from("lesson_phrases")
       .select(
@@ -58,14 +62,14 @@ export async function GET(
       )
       .eq("lesson_id", parsedLessonId)
       .order("phrase_order", { ascending: true });
-      
+
     if (!phrases || phrases.length === 0) {
-      console.log('[PHRASES API] No lesson_phrases found');
+      console.log("[PHRASES API] No lesson_phrases found");
       return NextResponse.json({ phrases: [], lesson: null });
     }
-    
+
     // Get phrase details separately
-    const phraseIds = phrases.map(p => p.phrase_id);
+    const phraseIds = phrases.map((p) => p.phrase_id);
     const { data: phraseDetails, error: phraseError } = await supabase
       .from("phrases")
       .select(
@@ -81,9 +85,9 @@ export async function GET(
       )
       .in("phrase_id", phraseIds)
       .eq("phrase_versions.language_code", targetLanguage);
-      
+
     if (phraseError) {
-      console.log('[PHRASES API] Phrase details fetch error:', phraseError);
+      console.log("[PHRASES API] Phrase details fetch error:", phraseError);
       return new NextResponse(
         JSON.stringify({
           error: "Failed to fetch phrase details",
@@ -92,38 +96,43 @@ export async function GET(
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
-      
-    console.log(`[PHRASES API] Phrases query result:`, { phrases, error });
+
+    //console.log(`[PHRASES API] Phrases query result:`, { phrases, error });
 
     if (error) {
-      console.log('[PHRASES API] Phrases fetch error:', error);
+      console.log("[PHRASES API] Phrases fetch error:", error);
       return new NextResponse(
         JSON.stringify({
           error: "Failed to fetch phrases",
-          details: (error as Error)?.message || 'Unknown error',
+          details: (error as Error)?.message || "Unknown error",
         }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
-    
+
     console.log(`[PHRASES API] Found ${phrases?.length || 0} lesson phrases`);
-    console.log(`[PHRASES API] Found ${phraseDetails?.length || 0} phrase details`);
+    console.log(
+      `[PHRASES API] Found ${phraseDetails?.length || 0} phrase details`
+    );
 
     // Fetch phrase progress for the user
-    console.log('[PHRASES API] Processing phrases data...');
-    console.log(`[PHRASES API] Extracted phrase IDs:`, phraseIds);
+    //console.log("[PHRASES API] Processing phrases data...");
+    //console.log(`[PHRASES API] Extracted phrase IDs:`, phraseIds);
     const { data: phraseProgressData, error: progressError } = await supabase
       .from("user_phrase_progress")
       .select("phrase_id, pronunciation_completed, dictation_completed")
       .eq("profile_id", user.id)
       .in("phrase_id", phraseIds);
-      
+
     if (progressError) {
-      console.log('[PHRASES API] Progress fetch error:', progressError);
+      console.log("[PHRASES API] Progress fetch error:", progressError);
     }
     console.log(`[PHRASES API] Progress data:`, phraseProgressData);
 
-    const phraseProgressMap = new Map<number, { pronunciation_completed: boolean; dictation_completed: boolean }>();
+    const phraseProgressMap = new Map<
+      number,
+      { pronunciation_completed: boolean; dictation_completed: boolean }
+    >();
     if (phraseProgressData) {
       for (const progress of phraseProgressData) {
         phraseProgressMap.set(progress.phrase_id, {
@@ -133,22 +142,32 @@ export async function GET(
       }
     }
 
-    const formattedPhrases = phrases.map(lessonPhrase => {
-      const phraseData = phraseDetails?.find(p => p.phrase_id === lessonPhrase.phrase_id);
-      if (!phraseData) return null;
-      
-      return {
-        id: phraseData.phrase_id,
-        phrase_order: lessonPhrase.phrase_order,
-        concept_description: phraseData.concept_description,
-        phrase_text: phraseData.phrase_versions[0]?.phrase_text || "",
-        audio_url_normal: phraseData.phrase_versions[0]?.audio_url_normal,
-        audio_url_slow: phraseData.phrase_versions[0]?.audio_url_slow,
-        is_completed: phraseProgressMap.get(phraseData.phrase_id)?.pronunciation_completed || false,
-        dictation_completed: phraseProgressMap.get(phraseData.phrase_id)?.dictation_completed || false,
-        pronunciation_completed: phraseProgressMap.get(phraseData.phrase_id)?.pronunciation_completed || false,
-      };
-    }).filter(Boolean);
+    const formattedPhrases = phrases
+      .map((lessonPhrase) => {
+        const phraseData = phraseDetails?.find(
+          (p) => p.phrase_id === lessonPhrase.phrase_id
+        );
+        if (!phraseData) return null;
+
+        return {
+          id: phraseData.phrase_id,
+          phrase_order: lessonPhrase.phrase_order,
+          concept_description: phraseData.concept_description,
+          phrase_text: phraseData.phrase_versions[0]?.phrase_text || "",
+          audio_url_normal: phraseData.phrase_versions[0]?.audio_url_normal,
+          audio_url_slow: phraseData.phrase_versions[0]?.audio_url_slow,
+          is_completed:
+            phraseProgressMap.get(phraseData.phrase_id)
+              ?.pronunciation_completed || false,
+          dictation_completed:
+            phraseProgressMap.get(phraseData.phrase_id)?.dictation_completed ||
+            false,
+          pronunciation_completed:
+            phraseProgressMap.get(phraseData.phrase_id)
+              ?.pronunciation_completed || false,
+        };
+      })
+      .filter(Boolean);
 
     // Fetch lesson details for the breadcrumb
     const { data: lessonData } = await supabase
@@ -183,8 +202,11 @@ export async function GET(
         level: unitData?.level,
       },
     };
-    
-    console.log('[PHRASES API] Returning response:', JSON.stringify(response, null, 2));
+
+    /*     console.log(
+      "[PHRASES API] Returning response:",
+      JSON.stringify(response, null, 2)
+    ); */
     return NextResponse.json(response);
   } catch (err: unknown) {
     const errorMessage =
