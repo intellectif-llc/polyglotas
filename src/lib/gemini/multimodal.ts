@@ -1,5 +1,9 @@
 import { geminiManager, SAFETY_SETTINGS } from "./client";
-import type { ConversationMessage, LessonContext, ConversationPrompt } from "./conversation";
+import type {
+  ConversationMessage,
+  LessonContext,
+  ConversationPrompt,
+} from "./conversation";
 
 export interface MultimodalGeminiResult {
   transcript: string;
@@ -23,18 +27,24 @@ export async function transcribeAndRespondWithGemini(
   audioBlob: Blob,
   conversationHistory: ConversationMessage[],
   lessonContext: LessonContext,
-  conversationPrompts: ConversationPrompt[] = []
+  conversationPrompts: ConversationPrompt[] = [],
+  addressedPromptIds: number[] = []
 ): Promise<MultimodalGeminiResult> {
-  console.log('🟡 === GEMINI MULTIMODAL REQUEST INITIATED ===');
-  console.log('🟡 Gemini Multimodal: Audio blob info - size:', audioBlob.size, 'type:', audioBlob.type);
-  
+  console.log("🟡 === GEMINI MULTIMODAL REQUEST INITIATED ===");
+  console.log(
+    "🟡 Gemini Multimodal: Audio blob info - size:",
+    audioBlob.size,
+    "type:",
+    audioBlob.type
+  );
+
   if (!process.env.GEMINI_API_KEY) {
-    throw new Error('Gemini API key not configured');
+    throw new Error("Gemini API key not configured");
   }
 
   try {
     const config = {
-      model: 'gemini-2.0-flash',
+      model: "gemini-2.0-flash",
       generationConfig: {
         temperature: 0.7,
         topP: 0.8,
@@ -45,13 +55,21 @@ export async function transcribeAndRespondWithGemini(
     };
 
     // Convert audio blob to base64
-    console.log('🟡 Gemini Multimodal: Converting audio to base64...');
+    console.log("🟡 Gemini Multimodal: Converting audio to base64...");
     const arrayBuffer = await audioBlob.arrayBuffer();
-    const base64Audio = Buffer.from(arrayBuffer).toString('base64');
-    console.log('🟡 Gemini Multimodal: Base64 conversion complete, length:', base64Audio.length);
+    const base64Audio = Buffer.from(arrayBuffer).toString("base64");
+    console.log(
+      "🟡 Gemini Multimodal: Base64 conversion complete, length:",
+      base64Audio.length
+    );
 
     // Build system prompt with lesson context
-    const systemPrompt = buildSystemPrompt(lessonContext, conversationPrompts);
+    const systemPrompt = buildSystemPrompt(
+      lessonContext,
+      conversationPrompts,
+      conversationHistory,
+      addressedPromptIds
+    );
 
     // Prepare conversation history for Gemini
     const history = conversationHistory.map((msg) => ({
@@ -104,45 +122,48 @@ For suggested_answer: Create a natural, complete sentence that directly answers 
           { text: multimodalPrompt },
           {
             inlineData: {
-              mimeType: audioBlob.type || 'audio/webm',
-              data: base64Audio
-            }
-          }
-        ]
-      }
+              mimeType: audioBlob.type || "audio/webm",
+              data: base64Audio,
+            },
+          },
+        ],
+      },
     ];
 
     // Use ROBUST geminiManager.generateContent method
-    console.log('🟡 Gemini Multimodal: Sending combined request via generateContent...');
+    console.log(
+      "🟡 Gemini Multimodal: Sending combined request via generateContent..."
+    );
     const result = await geminiManager.generateContent(
-      config, 
-      { contents }, 
-      'multimodal_transcription_and_response'
+      config,
+      { contents },
+      "multimodal_transcription_and_response"
     );
 
     const response = await result.response;
     const responseText = response.text();
-    
-    console.log('🟡 Gemini Multimodal: Raw API response:', responseText);
+
+    console.log("🟡 Gemini Multimodal: Raw API response:", responseText);
 
     // Parse JSON response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error('No JSON found in Gemini multimodal response');
+      throw new Error("No JSON found in Gemini multimodal response");
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const transcript = parsed.transcript?.trim() || '';
-    const aiResponse = parsed.response?.trim() || '';
+    const transcript = parsed.transcript?.trim() || "";
+    const aiResponse = parsed.response?.trim() || "";
     const suggestedAnswer = parsed.suggested_answer?.trim() || null;
-    const detectedLanguage = parsed.detected_language || lessonContext.targetLanguage;
+    const detectedLanguage =
+      parsed.detected_language || lessonContext.targetLanguage;
 
     if (!transcript) {
-      throw new Error('No transcript found in Gemini multimodal response');
+      throw new Error("No transcript found in Gemini multimodal response");
     }
 
     if (!aiResponse) {
-      throw new Error('No AI response found in Gemini multimodal response');
+      throw new Error("No AI response found in Gemini multimodal response");
     }
 
     const multimodalResult: MultimodalGeminiResult = {
@@ -157,14 +178,13 @@ For suggested_answer: Create a natural, complete sentence that directly answers 
         toLanguage: detectedLanguage,
         confidence: 0.9,
       },
-      provider: 'gemini-multimodal',
+      provider: "gemini-multimodal",
     };
 
-    console.log('✅ Gemini Multimodal: Final result:', multimodalResult);
+    console.log("✅ Gemini Multimodal: Final result:", multimodalResult);
     return multimodalResult;
-
   } catch (error) {
-    console.error('🟡 Gemini Multimodal: Error during processing:', error);
+    console.error("🟡 Gemini Multimodal: Error during processing:", error);
     throw error;
   }
 }
@@ -174,7 +194,9 @@ For suggested_answer: Create a natural, complete sentence that directly answers 
  */
 function buildSystemPrompt(
   lessonContext: LessonContext,
-  conversationPrompts: ConversationPrompt[] = []
+  conversationPrompts: ConversationPrompt[] = [],
+  conversationHistory: ConversationMessage[] = [],
+  addressedPromptIds: number[] = []
 ): string {
   const promptsText =
     conversationPrompts.length > 0
@@ -183,8 +205,8 @@ function buildSystemPrompt(
           .join("\n")}`
       : "";
 
-  const userNameContext = lessonContext.userName 
-    ? `\n- Student's Name: ${lessonContext.userName}` 
+  const userNameContext = lessonContext.userName
+    ? `\n- Student's Name: ${lessonContext.userName}`
     : "";
 
   const nameGuidelines = lessonContext.userName
@@ -192,6 +214,36 @@ function buildSystemPrompt(
 - Use the student's name naturally in conversation when appropriate, but don't overuse it
 - If a conversation starter asks about the student's name, don't include their name in the question (e.g., say "What's your name?" not "What's your name, ${lessonContext.userName}?")`
     : "";
+
+  // Enhanced conversation flow management
+  // Enhanced conversation flow management
+  const unaddressedPrompts = conversationPrompts.filter(
+    (p) => !addressedPromptIds.includes(p.id)
+  );
+
+  // Count recent AI responses to gauge conversation depth
+  const recentAIResponses = conversationHistory
+    .slice(-6)
+    .filter((msg) => msg.role === "model").length;
+  const shouldTransition =
+    recentAIResponses >= 3 && unaddressedPrompts.length > 0;
+
+  const flowGuidelines =
+    unaddressedPrompts.length > 0
+      ? `\n\nIMPORTANT CONVERSATION FLOW RULES:
+- You have ${
+          unaddressedPrompts.length
+        } conversation starters still unaddressed: ${unaddressedPrompts
+          .map((p) => `"${p.starter_text}"`)
+          .join(", ")}
+- After addressing a conversation starter, ask maximum 3 follow-up questions before moving to the next unaddressed starter
+- Prioritize covering all conversation starters over deep exploration of one topic
+- Smoothly transition between topics to keep the conversation engaging but comprehensive${
+          shouldTransition
+            ? "\n- IMPORTANT: You have asked enough follow-up questions on the current topic. Smoothly transition to one of the unaddressed conversation starters now."
+            : ""
+        }`
+      : "";
 
   return `You are a helpful language learning assistant for a ${lessonContext.targetLanguage} lesson. 
 
@@ -218,5 +270,5 @@ Guidelines:
 - Ask questions to engage the student
 - Provide gentle corrections when needed
 - If student uses their native language (${lessonContext.nativeLanguage}), gently encourage ${lessonContext.targetLanguage} practice
-- Understand both ${lessonContext.targetLanguage} and ${lessonContext.nativeLanguage} but respond primarily in ${lessonContext.targetLanguage}${nameGuidelines}${promptsText}`;
+- Understand both ${lessonContext.targetLanguage} and ${lessonContext.nativeLanguage} but respond primarily in ${lessonContext.targetLanguage}${nameGuidelines}${promptsText}${flowGuidelines}`;
 }

@@ -205,6 +205,14 @@ export async function POST(request: NextRequest) {
       type: audioFile.type,
     });
 
+    // Get previously addressed prompts for AI context
+    const { data: existingStatuses } = await supabase
+      .from("conversation_prompt_status")
+      .select("prompt_id")
+      .eq("conversation_id", conversationIdNum);
+    
+    const previouslyAddressedIds = (existingStatuses || []).map(s => s.prompt_id);
+
     console.log('🟡 [Voice Message API] Starting voice message processing...');
     console.log('🟡 [Voice Message API] Audio size:', audioBlob.size, 'type:', audioBlob.type);
 
@@ -215,7 +223,8 @@ export async function POST(request: NextRequest) {
         audioBlob,
         conversationHistory,
         lessonContext,
-        conversationPrompts
+        conversationPrompts,
+        previouslyAddressedIds
       );
     } catch (error) {
       console.error('🟡 [Voice Message API] Multimodal failed:', error instanceof Error ? error.message : 'Unknown error');
@@ -251,7 +260,10 @@ export async function POST(request: NextRequest) {
         sttResult.transcript,
         conversationHistory,
         lessonContext,
-        conversationPrompts
+        conversationPrompts,
+        undefined,
+        undefined,
+        previouslyAddressedIds
       );
       console.log('✅ [Voice Message API] AI response generated via fallback');
 
@@ -330,14 +342,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    // Get previously addressed prompts
-    const { data: existingStatuses } = await supabase
-      .from("conversation_prompt_status")
-      .select("prompt_id")
-      .eq("conversation_id", conversationIdNum);
-    
-    const previouslyAddressedIds = (existingStatuses || []).map(s => s.prompt_id);
 
     const newlyAddressedIds = await detectAddressedPromptsWithAI(
       multimodalResult.transcript.trim(),

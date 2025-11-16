@@ -326,13 +326,24 @@ export async function POST(
         encourageTargetLanguage: true,
       };
       
+      // Get previously addressed prompts for AI context
+      const { data: existingStatuses } = await supabase
+        .from("conversation_prompt_status")
+        .select("prompt_id")
+        .eq("conversation_id", conversationId);
+      
+      const previouslyAddressedIds = (existingStatuses || []).map(s => s.prompt_id);
+
       // Generate AI response with suggested answer and multilingual support
       console.log('🤖 [API] Generating AI response for message:', text_message.substring(0, 50) + '...');
       const aiResponseRaw = await generateAIResponse(
         text_message.trim(),
         conversationHistory,
         enhancedLessonContext,
-        conversationPrompts
+        conversationPrompts,
+        undefined,
+        undefined,
+        previouslyAddressedIds
       );
       console.log('✅ [API] AI response generated successfully');
       
@@ -377,14 +388,6 @@ export async function POST(
           { status: 500, headers: { "Content-Type": "application/json" } }
         );
       }
-
-      // Get previously addressed prompts
-      const { data: existingStatuses } = await supabase
-        .from("conversation_prompt_status")
-        .select("prompt_id")
-        .eq("conversation_id", conversationId);
-      
-      const previouslyAddressedIds = (existingStatuses || []).map(s => s.prompt_id);
 
       const newlyAddressedIds = await detectAddressedPromptsWithAI(
         text_message.trim(),
