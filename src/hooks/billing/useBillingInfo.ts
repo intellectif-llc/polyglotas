@@ -4,6 +4,7 @@ interface BillingInfo {
   profile: {
     subscription_tier: string;
     stripe_customer_id: string | null;
+    discount: number | null;
   };
   customer: {
     id: string;

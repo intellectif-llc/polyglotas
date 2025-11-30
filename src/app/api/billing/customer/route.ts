@@ -58,8 +58,7 @@ export async function POST() {
       email: user.email,
       name:
         userProfile && !userProfileError
-          ? `${userProfile.first_name || ""} ${
-              userProfile.last_name || ""
+          ? `${userProfile.first_name || ""} ${userProfile.last_name || ""
             }`.trim()
           : undefined,
       metadata: {
@@ -126,7 +125,7 @@ export async function GET() {
     // Get user's stripe_customer_id and subscription info
     const { data: profile, error: profileError } = await supabase
       .from("student_profiles")
-      .select("stripe_customer_id, subscription_tier")
+      .select("stripe_customer_id, subscription_tier, discount")
       .eq("profile_id", user.id)
       .single();
 
@@ -211,11 +210,12 @@ export async function GET() {
       profile: {
         subscription_tier: profile.subscription_tier,
         stripe_customer_id: profile.stripe_customer_id,
+        discount: profile.discount,
       },
       customer: customerInfo,
       subscriptions,
     };
-    
+
     return NextResponse.json(responseData);
   } catch (error) {
     console.error("Error fetching customer info:", error);

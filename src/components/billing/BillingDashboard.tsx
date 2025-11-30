@@ -101,6 +101,23 @@ export default function BillingDashboard() {
         </p>
       </div>
 
+      {/* Partnership Discount Alert */}
+      {billingInfo?.profile?.discount && billingInfo.profile.discount > 0 && (
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mr-2" />
+            <div>
+              <p className="font-medium text-indigo-900 dark:text-indigo-100">
+                Partnership Benefit Active
+              </p>
+              <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                You have a permanent {billingInfo.profile.discount}% discount on all subscriptions.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success/Cancel Messages */}
       {showSuccessMessage && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">

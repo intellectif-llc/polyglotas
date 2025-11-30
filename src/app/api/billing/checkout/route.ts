@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Get user's profile
     const { data: profile, error: profileError } = await supabase
       .from("student_profiles")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, discount")
       .eq("profile_id", user.id)
       .single();
 
@@ -90,8 +90,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         name:
           userProfile && !userProfileError
-            ? `${userProfile.first_name || ""} ${
-                userProfile.last_name || ""
+            ? `${userProfile.first_name || ""} ${userProfile.last_name || ""
               }`.trim()
             : undefined,
         metadata: {
@@ -109,6 +108,32 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("profile_id", user.id);
+    }
+
+    // Handle Partnership Discount
+    let discounts = undefined;
+    let allowPromotionCodes = true;
+
+    if (profile.discount && profile.discount > 0) {
+      const discountPercent = Number(profile.discount);
+      const couponId = `PARTNER_${discountPercent}_OFF`;
+
+      try {
+        // Check if coupon exists
+        await stripe.coupons.retrieve(couponId);
+      } catch (error) {
+        // Create coupon if it doesn't exist
+        console.log(`Creating new partnership coupon: ${couponId}`);
+        await stripe.coupons.create({
+          id: couponId,
+          percent_off: discountPercent,
+          duration: "forever",
+          name: `Partnership Discount (${discountPercent}% off)`,
+        });
+      }
+
+      discounts = [{ coupon: couponId }];
+      allowPromotionCodes = false; // Cannot use promo codes if a discount is already applied
     }
 
     // Get the correct base URL, prioritizing forwarded host (for ngrok/proxy usage)
@@ -140,7 +165,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         tier_key: Array.isArray(priceData.products) ? priceData.products[0]?.tier_key || "unknown" : "unknown",
       },
-      allow_promotion_codes: true,
+      ...(discounts ? { discounts } : { allow_promotion_codes: true }),
       billing_address_collection: "auto",
       customer_update: {
         address: "auto",
