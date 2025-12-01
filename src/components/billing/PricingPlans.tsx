@@ -25,6 +25,7 @@ export default function PricingPlans() {
   const { createCheckout, isLoading: isCreatingCheckout } = useCreateCheckout();
 
   const currentTier = billingInfo?.profile?.subscription_tier || "free";
+  const discount = billingInfo?.profile?.discount || 0;
 
   const handleSelectPlan = async (priceId: string) => {
     if (isCreatingCheckout) return;
@@ -44,6 +45,11 @@ export default function PricingPlans() {
       currency: currency.toUpperCase(),
       minimumFractionDigits: 0,
     }).format(amount / 100);
+  };
+
+  const getDiscountedPrice = (amount: number) => {
+    if (!discount) return amount;
+    return Math.round(amount * (1 - discount / 100));
   };
 
   const calculateSavings = (monthlyPrice: number, yearlyPrice: number) => {
@@ -139,21 +145,19 @@ export default function PricingPlans() {
         <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
           <button
             onClick={() => setBillingCycle("month")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              billingCycle === "month"
-                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer"
-            }`}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${billingCycle === "month"
+              ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer"
+              }`}
           >
             Monthly
           </button>
           <button
             onClick={() => setBillingCycle("year")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
-              billingCycle === "year"
-                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer"
-            }`}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${billingCycle === "year"
+              ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer"
+              }`}
           >
             Yearly
             {(starterSavings?.percentage || proSavings?.percentage) && (
@@ -172,11 +176,10 @@ export default function PricingPlans() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Free Plan */}
         <div
-          className={`border rounded-xl p-6 relative ${
-            currentTier === "free"
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-              : "border-gray-200 dark:border-gray-700"
-          }`}
+          className={`border rounded-xl p-6 relative ${currentTier === "free"
+            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+            : "border-gray-200 dark:border-gray-700"
+            }`}
         >
           {currentTier === "free" && (
             <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -235,11 +238,10 @@ export default function PricingPlans() {
         {/* Starter Plan */}
         {(starterMonthly || starterYearly) && (
           <div
-            className={`border rounded-xl p-6 relative hover:shadow-lg transition-shadow ${
-              currentTier === "starter"
-                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                : "border-gray-200 dark:border-gray-700"
-            }`}
+            className={`border rounded-xl p-6 relative hover:shadow-lg transition-shadow ${currentTier === "starter"
+              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+              : "border-gray-200 dark:border-gray-700"
+              }`}
           >
             {currentTier === "starter" && (
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -259,22 +261,32 @@ export default function PricingPlans() {
             <div className="mb-6">
               {billingCycle === "month" && starterMonthly ? (
                 <div className="mb-4">
-                  <div className="flex items-baseline mb-2">
-                    <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                      {formatPrice(
-                        starterMonthly.unit_amount,
-                        starterMonthly.currency
-                      )}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400 ml-2">
-                      /month
-                    </span>
+                  <div className="flex flex-col mb-2">
+                    {discount > 0 && (
+                      <span className="text-lg text-gray-500 line-through">
+                        {formatPrice(
+                          starterMonthly.unit_amount,
+                          starterMonthly.currency
+                        )}
+                      </span>
+                    )}
+                    <div className="flex items-baseline">
+                      <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                        {formatPrice(
+                          getDiscountedPrice(starterMonthly.unit_amount),
+                          starterMonthly.currency
+                        )}
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-400 ml-2">
+                        /month
+                      </span>
+                    </div>
                   </div>
                   {starterYearly && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Or{" "}
                       {formatPrice(
-                        starterYearly.unit_amount,
+                        getDiscountedPrice(starterYearly.unit_amount),
                         starterYearly.currency
                       )}
                       /year
@@ -283,22 +295,32 @@ export default function PricingPlans() {
                 </div>
               ) : billingCycle === "year" && starterYearly ? (
                 <div className="mb-4">
-                  <div className="flex items-baseline mb-2">
-                    <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                      {formatPrice(
-                        starterYearly.unit_amount,
-                        starterYearly.currency
-                      )}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400 ml-2">
-                      /year
-                    </span>
+                  <div className="flex flex-col mb-2">
+                    {discount > 0 && (
+                      <span className="text-lg text-gray-500 line-through">
+                        {formatPrice(
+                          starterYearly.unit_amount,
+                          starterYearly.currency
+                        )}
+                      </span>
+                    )}
+                    <div className="flex items-baseline">
+                      <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                        {formatPrice(
+                          getDiscountedPrice(starterYearly.unit_amount),
+                          starterYearly.currency
+                        )}
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-400 ml-2">
+                        /year
+                      </span>
+                    </div>
                   </div>
                   {starterSavings && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
                         {formatPrice(
-                          starterMonthly!.unit_amount * 12,
+                          getDiscountedPrice(starterMonthly!.unit_amount * 12),
                           starterYearly.currency
                         )}
                         /year
@@ -306,7 +328,7 @@ export default function PricingPlans() {
                       <span className="text-sm font-medium text-green-600 dark:text-green-400">
                         Save{" "}
                         {formatPrice(
-                          starterSavings.amount,
+                          getDiscountedPrice(starterSavings.amount),
                           starterYearly.currency
                         )}{" "}
                         ({starterSavings.percentage}%)
@@ -330,9 +352,9 @@ export default function PricingPlans() {
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center cursor-pointer"
               >
                 {selectedPlan ===
-                (billingCycle === "month"
-                  ? starterMonthly?.stripe_price_id
-                  : starterYearly?.stripe_price_id) ? (
+                  (billingCycle === "month"
+                    ? starterMonthly?.stripe_price_id
+                    : starterYearly?.stripe_price_id) ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : null}
                 {currentTier === "starter"
@@ -341,10 +363,10 @@ export default function PricingPlans() {
                     (billingCycle === "month"
                       ? starterMonthly?.stripe_price_id
                       : starterYearly?.stripe_price_id)
-                  ? "Processing..."
-                  : currentTier === "free"
-                  ? "Upgrade to Starter"
-                  : "Switch to Starter"}
+                    ? "Processing..."
+                    : currentTier === "free"
+                      ? "Upgrade to Starter"
+                      : "Switch to Starter"}
               </button>
             </div>
 
@@ -381,11 +403,10 @@ export default function PricingPlans() {
         {/* Pro Plan */}
         {(proMonthly || proYearly) && (
           <div
-            className={`border rounded-xl p-6 relative hover:shadow-lg transition-shadow ${
-              currentTier === "pro"
-                ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                : "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20"
-            }`}
+            className={`border rounded-xl p-6 relative hover:shadow-lg transition-shadow ${currentTier === "pro"
+              ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+              : "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20"
+              }`}
           >
             {currentTier === "pro" ? (
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -412,45 +433,77 @@ export default function PricingPlans() {
             <div className="mb-6">
               {billingCycle === "month" && proMonthly ? (
                 <div className="mb-4">
-                  <div className="flex items-baseline mb-2">
-                    <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                      {formatPrice(proMonthly.unit_amount, proMonthly.currency)}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400 ml-2">
-                      /month
-                    </span>
+                  <div className="flex flex-col mb-2">
+                    {discount > 0 && (
+                      <span className="text-lg text-gray-500 line-through">
+                        {formatPrice(
+                          proMonthly.unit_amount,
+                          proMonthly.currency
+                        )}
+                      </span>
+                    )}
+                    <div className="flex items-baseline">
+                      <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                        {formatPrice(
+                          getDiscountedPrice(proMonthly.unit_amount),
+                          proMonthly.currency
+                        )}
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-400 ml-2">
+                        /month
+                      </span>
+                    </div>
                   </div>
                   {proYearly && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       Or{" "}
-                      {formatPrice(proYearly.unit_amount, proYearly.currency)}
+                      {formatPrice(
+                        getDiscountedPrice(proYearly.unit_amount),
+                        proYearly.currency
+                      )}
                       /year
                     </p>
                   )}
                 </div>
               ) : billingCycle === "year" && proYearly ? (
                 <div className="mb-4">
-                  <div className="flex items-baseline mb-2">
-                    <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                      {formatPrice(proYearly.unit_amount, proYearly.currency)}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400 ml-2">
-                      /year
-                    </span>
+                  <div className="flex flex-col mb-2">
+                    {discount > 0 && (
+                      <span className="text-lg text-gray-500 line-through">
+                        {formatPrice(
+                          proYearly.unit_amount,
+                          proYearly.currency
+                        )}
+                      </span>
+                    )}
+                    <div className="flex items-baseline">
+                      <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                        {formatPrice(
+                          getDiscountedPrice(proYearly.unit_amount),
+                          proYearly.currency
+                        )}
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-400 ml-2">
+                        /year
+                      </span>
+                    </div>
                   </div>
                   {proSavings && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
                         {formatPrice(
-                          proMonthly!.unit_amount * 12,
+                          getDiscountedPrice(proMonthly!.unit_amount * 12),
                           proYearly.currency
                         )}
                         /year
                       </span>
                       <span className="text-sm font-medium text-green-600 dark:text-green-400">
                         Save{" "}
-                        {formatPrice(proSavings.amount, proYearly.currency)} (
-                        {proSavings.percentage}%)
+                        {formatPrice(
+                          getDiscountedPrice(proSavings.amount),
+                          proYearly.currency
+                        )}{" "}
+                        ({proSavings.percentage}%)
                       </span>
                     </div>
                   )}
@@ -471,9 +524,9 @@ export default function PricingPlans() {
                 className="w-full py-3 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center"
               >
                 {selectedPlan ===
-                (billingCycle === "month"
-                  ? proMonthly?.stripe_price_id
-                  : proYearly?.stripe_price_id) ? (
+                  (billingCycle === "month"
+                    ? proMonthly?.stripe_price_id
+                    : proYearly?.stripe_price_id) ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : null}
                 {currentTier === "pro"
@@ -482,8 +535,8 @@ export default function PricingPlans() {
                     (billingCycle === "month"
                       ? proMonthly?.stripe_price_id
                       : proYearly?.stripe_price_id)
-                  ? "Processing..."
-                  : "Upgrade to Pro"}
+                    ? "Processing..."
+                    : "Upgrade to Pro"}
               </button>
             </div>
 

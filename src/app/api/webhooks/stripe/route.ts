@@ -19,8 +19,8 @@ async function handleProductSync(productData: Record<string, unknown>) {
         tier_key: name.toLowerCase().includes("pro")
           ? "pro"
           : name.toLowerCase().includes("starter")
-          ? "starter"
-          : null,
+            ? "starter"
+            : null,
         metadata: productData.metadata,
         updated_at: new Date().toISOString(),
       },
@@ -77,7 +77,7 @@ async function handlePriceSync(priceData: Record<string, unknown>) {
       console.error("Error syncing price:", error);
     } else {
       console.log(`Price ${priceData.id} synced successfully`);
-      
+
       // Also update audiobook price if this is an audiobook product
       if (product?.id) {
         const { data: audiobookProduct } = await supabase
@@ -86,16 +86,16 @@ async function handlePriceSync(priceData: Record<string, unknown>) {
           .eq('id', product.id)
           .eq('product_type', 'audiobook')
           .single();
-          
+
         if (audiobookProduct?.book_id) {
           const { error: audiobookError } = await supabase
             .from('audiobooks')
-            .update({ 
+            .update({
               price_cents: (priceData.unit_amount || priceData.amount) as number,
               updated_at: new Date().toISOString()
             })
             .eq('book_id', audiobookProduct.book_id);
-            
+
           if (audiobookError) {
             console.error(`Error updating audiobook price for book_id ${audiobookProduct.book_id}:`, audiobookError);
           } else {
@@ -206,8 +206,24 @@ async function handleSubscriptionCreated(
       return;
     }
 
-    console.log(`Creating subscription ${subscriptionData.id} for customer ${subscriptionData.customer}`);
-    
+    // Ensure user is linked to customer if user_id is present in metadata
+    const metadata = subscriptionData.metadata as Record<string, string> | undefined;
+    const userId = metadata?.user_id;
+
+    if (userId) {
+      const { error: linkError } = await supabase
+        .from("student_profiles")
+        .update({
+          stripe_customer_id: subscriptionData.customer as string,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("profile_id", userId);
+
+      if (linkError) {
+        console.error("Error linking customer in subscription webhook:", linkError);
+      }
+    }
+
     // Use the new database function to handle subscription creation
     const { error } = await supabase.rpc("upsert_stripe_subscription", {
       p_stripe_subscription_id: subscriptionData.id as string,
@@ -217,7 +233,7 @@ async function handleSubscriptionCreated(
     });
 
     if (error) {
-      console.error("Error creating subscription:", error);
+      console.error("Error calling upsert_stripe_subscription:", error);
       return;
     }
 
@@ -243,7 +259,7 @@ async function handleSubscriptionUpdated(
     }
 
     console.log(`Updating subscription ${subscriptionData.id} for customer ${subscriptionData.customer}`);
-    
+
     // Use the same database function to handle subscription updates
     const { error } = await supabase.rpc("upsert_stripe_subscription", {
       p_stripe_subscription_id: subscriptionData.id as string,
@@ -322,11 +338,11 @@ async function handleInvoicePaymentSucceeded(
   try {
     const metadata = invoiceData.metadata as Record<string, string> | undefined;
     const isAudiobookPurchase = metadata?.type === 'audiobook_purchase';
-    
+
     if (isAudiobookPurchase) {
       // Handle audiobook purchase
       console.log(`Processing audiobook purchase invoice ${invoiceData.id}`);
-      
+
       const { error } = await supabase.rpc("upsert_audiobook_purchase", {
         p_stripe_invoice_id: invoiceData.id as string,
         p_stripe_customer_id: invoiceData.customer as string,
@@ -344,7 +360,7 @@ async function handleInvoicePaymentSucceeded(
     } else {
       // Handle subscription invoice
       let subscriptionId = (invoiceData.subscription as string) || "";
-      
+
       // If no subscription ID in invoice, try to find active subscription for customer
       if (!subscriptionId) {
         const { data: activeSubscription } = await supabase
@@ -358,15 +374,12 @@ async function handleInvoicePaymentSucceeded(
           .order("created_at", { ascending: false })
           .limit(1)
           .single();
-          
+
         if (activeSubscription?.stripe_subscription_id) {
           subscriptionId = activeSubscription.stripe_subscription_id;
-          console.log(`Found active subscription ${subscriptionId} for customer ${invoiceData.customer}`);
         }
       }
-      
-      console.log(`Processing subscription invoice ${invoiceData.id} with subscription_id: ${subscriptionId || 'NULL'}`);
-      
+
       // Use the existing database function to handle invoice upsert
       const { error } = await supabase.rpc("upsert_stripe_invoice", {
         p_stripe_invoice_id: invoiceData.id as string,
@@ -379,7 +392,7 @@ async function handleInvoicePaymentSucceeded(
       });
 
       if (error) {
-        console.error("Error creating/updating subscription invoice:", error);
+        console.error("Error calling upsert_stripe_invoice:", error);
       } else {
         console.log(`Subscription invoice ${invoiceData.id} payment recorded successfully`);
       }
@@ -394,7 +407,7 @@ async function handleInvoicePaymentFailed(
 ) {
   try {
     let subscriptionId = (invoiceData.subscription as string) || "";
-    
+
     // If no subscription ID in invoice, try to find active subscription for customer
     if (!subscriptionId) {
       const { data: activeSubscription } = await supabase
@@ -408,15 +421,15 @@ async function handleInvoicePaymentFailed(
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
-        
+
       if (activeSubscription?.stripe_subscription_id) {
         subscriptionId = activeSubscription.stripe_subscription_id;
         console.log(`Found active subscription ${subscriptionId} for customer ${invoiceData.customer}`);
       }
     }
-    
+
     console.log(`Processing failed invoice ${invoiceData.id} with subscription_id: ${subscriptionId || 'NULL'}`);
-    
+
     // Use the new database function to handle invoice upsert
     const { error } = await supabase.rpc("upsert_stripe_invoice", {
       p_stripe_invoice_id: invoiceData.id as string,

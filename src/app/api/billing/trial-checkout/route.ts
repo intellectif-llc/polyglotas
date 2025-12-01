@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     if (eligibilityError || !eligibility?.[0]?.is_eligible) {
       return NextResponse.json(
-        { 
+        {
           error: "Not eligible for trial",
           reason: eligibility?.[0]?.reason_message || "Unknown eligibility issue"
         },
@@ -131,6 +131,10 @@ export async function POST(request: NextRequest) {
       cancel_url: cancelUrl,
       subscription_data: {
         trial_period_days: 7,
+        metadata: {
+          user_id: user.id,
+          tier_key: "pro",
+        },
       },
       metadata: {
         user_id: user.id,

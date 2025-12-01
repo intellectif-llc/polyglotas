@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the price exists in our database
+    type ProductData = { tier_key: string; name: string } | { tier_key: string; name: string }[];
     const { data: priceData, error: priceError } = await supabase
       .from("prices")
       .select(
@@ -74,6 +75,8 @@ export async function POST(request: NextRequest) {
     if (priceError || !priceData) {
       return NextResponse.json({ error: "Invalid price ID" }, { status: 400 });
     }
+
+    const products = priceData.products as ProductData;
 
     let customerId = profile.stripe_customer_id;
 
@@ -112,7 +115,6 @@ export async function POST(request: NextRequest) {
 
     // Handle Partnership Discount
     let discounts = undefined;
-    let allowPromotionCodes = true;
 
     if (profile.discount && profile.discount > 0) {
       const discountPercent = Number(profile.discount);
@@ -121,7 +123,7 @@ export async function POST(request: NextRequest) {
       try {
         // Check if coupon exists
         await stripe.coupons.retrieve(couponId);
-      } catch (error) {
+      } catch {
         // Create coupon if it doesn't exist
         console.log(`Creating new partnership coupon: ${couponId}`);
         await stripe.coupons.create({
@@ -133,7 +135,6 @@ export async function POST(request: NextRequest) {
       }
 
       discounts = [{ coupon: couponId }];
-      allowPromotionCodes = false; // Cannot use promo codes if a discount is already applied
     }
 
     // Get the correct base URL, prioritizing forwarded host (for ngrok/proxy usage)
@@ -163,7 +164,17 @@ export async function POST(request: NextRequest) {
       cancel_url: cancel_url || defaultCancelUrl,
       metadata: {
         user_id: user.id,
-        tier_key: Array.isArray(priceData.products) ? priceData.products[0]?.tier_key || "unknown" : "unknown",
+        tier_key: Array.isArray(products)
+          ? products[0]?.tier_key || "unknown"
+          : products?.tier_key || "unknown",
+      },
+      subscription_data: {
+        metadata: {
+          user_id: user.id,
+          tier_key: Array.isArray(products)
+            ? products[0]?.tier_key || "unknown"
+            : products?.tier_key || "unknown",
+        },
       },
       ...(discounts ? { discounts } : { allow_promotion_codes: true }),
       billing_address_collection: "auto",
